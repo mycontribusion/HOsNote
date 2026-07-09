@@ -1,7 +1,7 @@
-import { Trash2, Pencil, CheckCircle2 } from 'lucide-react'
+import { Trash2, Pencil, CheckCircle2, FileText } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function PatientCard({ patient, onEdit, onDelete, onReview, isSelected = false, onToggleSelect, isMortality = false }) {
+export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false }) {
     const { id, name, hospitalNumber, ward, bed, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
 
     let durationText = '';
@@ -131,6 +131,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, isSel
                             >
                                 <Pencil size={16} strokeWidth={2} />
                             </button>
+
                         </div>
                     </div>
 
@@ -148,6 +149,11 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, isSel
                             {hospitalNumber && (
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis ${reviewed ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-500 line-through' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>
                                     {hospitalNumber}
+                                </span>
+                            )}
+                            {docCount > 0 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 whitespace-nowrap">
+                                    <FileText size={10} />{docCount}
                                 </span>
                             )}
                             {durationText && (
@@ -172,7 +178,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, isSel
                                 })}
                             </div>
                         )}
-                        {note && <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto" style={{ whiteSpace: 'pre-wrap', maxHeight: '5.5rem' }}>{note}</div>}
+                        {note && <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>{note}</div>}
                     </div>
                 </div>
 
@@ -208,6 +214,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, isSel
                     >
                         <Pencil size={18} strokeWidth={2} />
                     </button>
+
                 </div>
             </div>
         </div>

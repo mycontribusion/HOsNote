@@ -10,6 +10,8 @@ import EmptyState from './components/EmptyState'
 import ReviewDuplicatesModal from './components/ReviewDuplicatesModal'
 import RemovalChoiceDialog from './components/RemovalChoiceDialog'
 import FeedbackModal from './components/FeedbackModal'
+import NotebookPage from './components/NotebookPage'
+import DocComposer from './components/DocComposer'
 import { get, set } from 'idb-keyval'
 
 const STORAGE_KEY = '4myteam_patients'
@@ -17,6 +19,7 @@ const MORTALITIES_KEY = '4myteam_mortalities'
 const DISCHARGES_KEY = '4myteam_discharges'
 const DISCHARGES_RESET_KEY = '4myteam_discharges_reset'
 const DARK_MODE_KEY = '4myteam_darkmode'
+const DOCUMENTATION_KEY = 'hosnote_docs'
 
 function generateId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -71,10 +74,13 @@ function PrintView({ patients, listName }) {
 
 export default function App() {
     const [activeTab, setActiveTab] = useState('my_team') // 'my_team' | 'other_team' | 'mortalities'
+    const [activePage, setActivePage] = useState('patients') // 'patients' | 'notebook'
     const [isLoaded, setIsLoaded] = useState(false)
     const [patients, setPatients] = useState([])
     const [mortalities, setMortalities] = useState([])
     const [discharges, setDischarges] = useState([])
+    const [docs, setDocs] = useState([])
+    const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
     const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
     const [darkMode, setDarkMode] = useState(() => {
         try {
@@ -126,6 +132,34 @@ export default function App() {
                 setMortalities(morts)
                 setDischarges(dis)
                 setDischargesResetDate(resDate)
+
+                // Docs — load then migrate any legacy patient.note strings
+                let storedDocs = await get(DOCUMENTATION_KEY)
+                if (storedDocs === undefined) storedDocs = []
+
+                // One-time migration: any patient that still has a note string
+                // but no corresponding doc entry gets one created
+                const existingPatientIds = new Set(storedDocs.map(d => d.patientId))
+                const migrated = []
+                pts.forEach(p => {
+                    if (p.note && p.note.trim() && !existingPatientIds.has(p.id)) {
+                        migrated.push({
+                            id: `${Date.now()}-migrated-${p.id}`,
+                            patientId: p.id,
+                            patientName: p.name || '',
+                            patientWard: p.ward || '',
+                            patientHosp: p.hospitalNumber || '',
+                            text: p.note.trim(),
+                            color: 'blue',
+                            createdAt: p.lastUpdated || new Date().toISOString(),
+                            updatedAt: p.lastUpdated || new Date().toISOString(),
+                        })
+                    }
+                })
+                const allDocs = [...storedDocs, ...migrated]
+                if (migrated.length > 0) await set(DOCUMENTATION_KEY, allDocs)
+                setDocs(allDocs)
+
             } catch (err) {
                 console.error("Failed to load data from IndexedDB", err)
             } finally {
@@ -184,6 +218,82 @@ export default function App() {
         set(DISCHARGES_RESET_KEY, dischargesResetDate).catch(console.error)
     }, [discharges, dischargesResetDate, isLoaded])
 
+    useEffect(() => {
+        if (!isLoaded) return;
+        set(DOCUMENTATION_KEY, docs).catch(console.error)
+    }, [docs, isLoaded])
+
+    // ── Documentation callbacks ───────────────────────────────────────────────
+
+    const addDoc = useCallback((patient, text, color = 'blue') => {
+        const entry = {
+            id: generateId(),
+            patientId: patient.id,
+            patientName: patient.name || '',
+            patientWard: patient.ward || '',
+            patientHosp: patient.hospitalNumber || '',
+            text: text.trim(),
+            color,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        }
+        setDocs(prev => [entry, ...prev])
+        setComposingFor(null)
+    }, [])
+
+    const updateDoc = useCallback((id, text, color) => {
+        setDocs(prev => prev.map(d =>
+            d.id === id ? { ...d, text: text.trim(), color, updatedAt: new Date().toISOString() } : d
+        ))
+    }, [])
+
+    const deleteDoc = useCallback((id) => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setDocs(prev => prev.filter(d => d.id !== id))
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs])
+
+    const getDocCount = useCallback((patientId) => {
+        return docs.filter(d => d.patientId === patientId).length
+    }, [docs])
+
+    // ── Restore from JSON backup ──────────────────────────────────────────────
+
+    const restoreFromBackup = useCallback((data) => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+
+        if (Array.isArray(data.patients)) {
+            setPatients(prev => {
+                const ids = new Set(prev.map(p => p.id))
+                const newOnes = data.patients.filter(p => !ids.has(p.id))
+                return [...prev, ...newOnes]
+            })
+        }
+        if (Array.isArray(data.mortalities)) {
+            setMortalities(prev => {
+                const ids = new Set(prev.map(p => p.id))
+                const newOnes = data.mortalities.filter(p => !ids.has(p.id))
+                return [...prev, ...newOnes]
+            })
+        }
+        if (Array.isArray(data.discharges)) {
+            setDischarges(prev => {
+                const ids = new Set(prev.map(d => d.id))
+                const newOnes = data.discharges.filter(d => !ids.has(d.id))
+                return [...prev, ...newOnes]
+            })
+        }
+        if (Array.isArray(data.docs)) {
+            setDocs(prev => {
+                const ids = new Set(prev.map(d => d.id))
+                const newOnes = data.docs.filter(d => !ids.has(d.id))
+                return [...prev, ...newOnes]
+            })
+        }
+    }, [patients, mortalities, discharges, docs])
+
+
     const savePatient = useCallback(({ team = 'my_team', name, hospitalNumber, ward, bed, note, critical = false, admissionDate }) => {
         const n = name.trim()
         const h = hospitalNumber.trim()
@@ -209,6 +319,9 @@ export default function App() {
 
         if (editingPatient) {
             const sid = editingPatient.id
+            if (t && t !== (editingPatient.note || '').trim()) {
+                addDoc({ id: sid, name: n, hospitalNumber: h, ward: w }, t)
+            }
             if (editingPatient.reason === 'mortality') {
                 setMortalities(prev => prev.map(p =>
                     p.id === sid
@@ -232,9 +345,11 @@ export default function App() {
                 }
             }, 100)
         } else {
+            const newId = generateId()
+            if (t) addDoc({ id: newId, name: n, hospitalNumber: h, ward: w }, t)
             setPatients((prev) => [
                 ...prev,
-                { id: generateId(), team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, lastUpdated: new Date().toISOString() },
+                { id: newId, team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, lastUpdated: new Date().toISOString() },
             ])
         }
         return true
@@ -245,8 +360,11 @@ export default function App() {
         const h = hospitalNumber.trim()
         const w = ward.trim().toUpperCase()
         if (!w && !h && !n) return false
+        const newId = generateId()
+        if (note.trim()) addDoc({ id: newId, name: n, hospitalNumber: h, ward: w }, note.trim())
+
         const record = {
-            id: generateId(),
+            id: newId,
             team: 'my_team',
             name: n,
             hospitalNumber: h,
@@ -369,10 +487,12 @@ export default function App() {
             setPatients(prev.patients)
             setMortalities(prev.mortalities)
             setDischarges(prev.discharges)
+            if (prev.docs) setDocs(prev.docs)
             setHistory(rest)
             setShowUndoToast(false)
         }
     }, [history])
+
 
     const resetDischarges = useCallback(() => {
         setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
@@ -492,7 +612,7 @@ export default function App() {
     const dischargeCount = discharges.filter(d => d.team === 'my_team').length
     const otherDischargeCount = discharges.filter(d => d.team === 'other_team').length
 
-    const listName = activeTab === 'my_team' ? 'My Team' : activeTab === 'other_team' ? 'List B' : 'Mortalities'
+    const listName = activeTab === 'my_team' ? 'My Team' : activeTab === 'other_team' ? 'On Call' : 'Mortalities'
 
     const patientsToExport = selectedPatientIds.size > 0
         ? activePatients.filter(p => selectedPatientIds.has(p.id))
@@ -511,12 +631,26 @@ export default function App() {
             <Header
                 saveFlash={saveFlash}
                 patientCount={patients.length}
+                docCount={docs.length}
                 darkMode={darkMode}
                 toggleDarkMode={toggleDarkMode}
                 onFeedback={() => setShowFeedback(true)}
+                activePage={activePage}
+                onPageChange={setActivePage}
             />
 
-            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-6 pb-28">
+            {/* Notebook Page */}
+            {activePage === 'notebook' && (
+                <NotebookPage
+                    docs={docs}
+                    onUpdateDoc={updateDoc}
+                    onDeleteDoc={deleteDoc}
+                />
+            )}
+
+            {/* Patients Page */}
+            {activePage === 'patients' && (
+            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-6 pb-20">
                 {!showAddForm && !editingPatient && !showMortalityForm ? (
                     activeTab === 'mortalities' ? (
                         <button
@@ -569,7 +703,7 @@ export default function App() {
                             onClick={() => setActiveTab('other_team')}
                             className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'other_team' ? 'border-purple-600 text-purple-700 dark:text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                         >
-                            List B
+                            On Call
                             <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'other_team' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
                                 {otherTeamCount}
                             </span>
@@ -619,6 +753,8 @@ export default function App() {
                         onDelete={startRemovalProcess}
                         onReview={toggleReview}
                         onResetReviews={resetReviews}
+                        onDocument={(patient) => setComposingFor(patient)}
+                        getDocCount={getDocCount}
                         selectedIds={selectedPatientIds}
                         onToggleSelect={toggleSelectPatient}
                         onToggleSelectAll={toggleSelectAll}
@@ -652,8 +788,10 @@ export default function App() {
                     </div>
                 )}
             </main>
+            )} {/* end activePage === 'patients' */}
 
-            {/* Bottom action bar */}
+            {/* Bottom action bar — Patients page only */}
+            {activePage === 'patients' && (
             <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 shadow-lg z-40 transition-colors duration-300">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex gap-2 justify-between items-center">
                     {/* Clear All */}
@@ -697,6 +835,7 @@ export default function App() {
                     </div>
                 </div>
             </div>
+            )} {/* end activePage === 'patients' (action bar) */}
 
             {/* Modals */}
             {showExport && (
@@ -705,6 +844,11 @@ export default function App() {
                     listName={listName}
                     selectionCount={selectedPatientIds.size}
                     onClose={() => { setShowExport(false); clearSelection() }}
+                    mortalities={mortalities}
+                    discharges={discharges}
+                    dischargesResetDate={dischargesResetDate}
+                    docs={docs}
+                    onRestore={restoreFromBackup}
                 />
             )}
             {showScanner && (
@@ -753,7 +897,7 @@ export default function App() {
 
             {/* Undo Toast */}
             {showUndoToast && (
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-700 text-white px-4 py-3 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-700 text-white px-4 py-3 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
                     <span className="text-sm font-medium">Action completed.</span>
                     <button
                         onClick={undo}
@@ -771,6 +915,15 @@ export default function App() {
                 patients={activePatients}
                 listName={listName}
             />
+
+            {/* DocComposer — opens when Document button is tapped on a patient card */}
+            {composingFor && (
+                <DocComposer
+                    patient={composingFor}
+                    onSave={({ text, color }) => addDoc(composingFor, text, color)}
+                    onClose={() => setComposingFor(null)}
+                />
+            )}
         </div>
     )
 }

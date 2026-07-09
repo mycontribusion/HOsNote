@@ -1,25 +1,81 @@
-import { CheckCircle, Moon, Sun, MessageCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { CheckCircle, Moon, Sun, MessageCircle, Menu, Stethoscope, BookOpen } from 'lucide-react'
 
-export default function Header({ saveFlash, patientCount, darkMode, toggleDarkMode, onFeedback }) {
+export default function Header({ saveFlash, patientCount, docCount = 0, darkMode, toggleDarkMode, onFeedback, activePage, onPageChange }) {
+    const [menuOpen, setMenuOpen] = useState(false)
+    const menuRef = useRef(null)
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                setMenuOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
     return (
         <header className="bg-blue-700 dark:bg-gray-900 text-white shadow-lg shadow-blue-900/30 dark:shadow-black/40 sticky top-0 z-30 transition-colors duration-300">
             <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
-                {/* Logo + Title */}
+                {/* Logo/Menu + Title */}
                 <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex-shrink-0 bg-white/20 rounded-xl p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                            <circle cx="9" cy="7" r="4" />
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                        </svg>
+                    <div className="relative flex-shrink-0" ref={menuRef}>
+                        <button
+                            type="button"
+                            onClick={() => setMenuOpen(!menuOpen)}
+                            className="bg-white/20 hover:bg-white/30 rounded-xl p-2 flex items-center justify-center transition-all active:scale-95 text-white"
+                            aria-label="Toggle navigation menu"
+                            aria-expanded={menuOpen}
+                        >
+                            <Menu size={20} />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {menuOpen && (
+                            <div className="absolute left-0 top-11 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 py-1.5 z-50 text-gray-800 dark:text-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => { onPageChange('patients'); setMenuOpen(false) }}
+                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors text-left ${
+                                        activePage === 'patients'
+                                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                    }`}
+                                >
+                                    <Stethoscope size={16} className={activePage === 'patients' ? 'text-blue-500' : 'text-gray-400'} />
+                                    Patients Tracker
+                                </button>
+                                
+                                <button
+                                    type="button"
+                                    onClick={() => { onPageChange('notebook'); setMenuOpen(false) }}
+                                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors text-left ${
+                                        activePage === 'notebook'
+                                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <BookOpen size={16} className={activePage === 'notebook' ? 'text-blue-500' : 'text-gray-400'} />
+                                        Clinical Notebook
+                                    </div>
+                                    {docCount > 0 && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                            {docCount}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     </div>
                     <div className="min-w-0">
-                        <h1 className="font-bold text-xl leading-tight tracking-tight">4MyTeam</h1>
+                        <h1 className="font-bold text-xl leading-tight tracking-tight">HOsNote</h1>
                         <p className="text-blue-200 dark:text-gray-400 text-xs font-medium leading-tight">
                             {patientCount === 0
                                 ? 'No patients tracked'
-                                : `${patientCount} patient${patientCount !== 1 ? 's' : ''} tracked`}
+                                : `${patientCount} patient${patientCount !== 1 ? 's' : ''}`}
+                            {docCount > 0 && ` · ${docCount} note${docCount !== 1 ? 's' : ''}`}
                         </p>
                     </div>
                 </div>

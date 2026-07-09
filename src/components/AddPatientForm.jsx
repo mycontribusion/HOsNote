@@ -1,83 +1,165 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Save } from 'lucide-react'
+import { Plus, Save, X, Undo2, Redo2 } from 'lucide-react'
 
 const DRAFT_KEY = '4myteam_draft_patient'
+
+function today() {
+    return new Date().toISOString().split('T')[0]
+}
+
+function makeTemplate(patient = {}) {
+    return [
+        `Name: ${patient.name || ''}`,
+        `Hosp#: ${patient.hospitalNumber || ''}`,
+        `Ward: ${patient.ward || ''}`,
+        `Bed: ${patient.bed || ''}`,
+        `Date: ${patient.admissionDate || today()}`,
+        `Notes: ${patient.note || ''}`,
+    ].join('\n')
+}
+
+// Parse label-prefixed lines, or fallback to original line-based format
+function parsePatientText(text) {
+    const hasLabels = /^(Name|Hosp#|Ward|Bed|Date|Notes):/im.test(text)
+
+    if (hasLabels) {
+        const get = (label) => {
+            const re = new RegExp(`^${label}:\\s*(.*)`, 'im')
+            const m = text.match(re)
+            return m ? m[1].trim() : ''
+        }
+        // Notes can span multiple lines — grab everything after "Notes: ..."
+        const notesMatch = text.match(/^Notes:\s*([\s\S]*)/im)
+        const rawNote = notesMatch ? notesMatch[1].trim() : ''
+
+        return {
+            name: get('Name'),
+            hospitalNumber: get('Hosp#'),
+            ward: get('Ward').toUpperCase(),
+            bed: get('Bed'),
+            admissionDate: get('Date') || today(),
+            note: rawNote,
+        }
+    }
+
+    // Fallback: old line-based parsing
+    const lines = text.split('\n')
+    return {
+        name: (lines[0] || '').trim(),
+        hospitalNumber: (lines[1] || '').trim(),
+        ward: (lines[2] || '').trim().toUpperCase(),
+        bed: (lines[3] || '').trim(),
+        admissionDate: (lines[4] || '').trim() || today(),
+        note: lines.slice(5).join('\n').trim()
+    }
+}
 
 function loadDraft() {
     try {
         const raw = localStorage.getItem(DRAFT_KEY)
         return raw ? JSON.parse(raw) : null
-    } catch {
-        return null
-    }
+    } catch { return null }
 }
 
 function saveDraft(data) {
-    try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(data))
-    } catch {
-        // storage quota exceeded — silently ignore
-    }
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)) }
+    catch { /* quota exceeded */ }
 }
 
 function clearDraft() {
-    try {
-        localStorage.removeItem(DRAFT_KEY)
-    } catch { /* ignore */ }
+    try { localStorage.removeItem(DRAFT_KEY) }
+    catch { /* ignore */ }
 }
+
 
 export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false }) {
     const [team, setTeam] = useState(initialTeam)
-    const [name, setName] = useState('')
-    const [hospitalNumber, setHospitalNumber] = useState('')
-    const [ward, setWard] = useState('')
-    const [bed, setBed] = useState('')
-    const [note, setNote] = useState('')
+    const [text, setText] = useState('')
     const [critical, setCritical] = useState(false)
-    const [admissionDate, setAdmissionDate] = useState(() => new Date().toISOString().split('T')[0])
     const [error, setError] = useState('')
     const [draftRestored, setDraftRestored] = useState(false)
+    const textareaRef = useRef(null)
 
-    // Populate form — edit mode uses initialData; add mode checks for a saved draft
+    const autoGrow = useCallback((el) => {
+        if (!el) return
+        el.style.height = 'auto'
+        el.style.height = Math.min(el.scrollHeight, 240) + 'px'
+    }, [])
+
+
+
+    useEffect(() => { autoGrow(textareaRef.current) }, [text, autoGrow])
+
+    const [history, setHistory] = useState({ stack: [], index: -1 })
+    const isUndoRedo = useRef(false)
+
     useEffect(() => {
+        let initialText = ''
         if (initialData) {
             setTeam(initialData.team || 'my_team')
-            setName(initialData.name || '')
-            setHospitalNumber(initialData.hospitalNumber || '')
-            setWard(initialData.ward || '')
-            setBed(initialData.bed || '')
-            setNote(initialData.note || '')
+            initialText = makeTemplate(initialData)
             setCritical(!!initialData.critical)
-            setAdmissionDate(initialData.admissionDate || new Date().toISOString().split('T')[0])
             setDraftRestored(false)
         } else {
             setTeam(initialTeam)
-            setName('')
-            setHospitalNumber('')
-            setWard('')
-            setBed('')
-            setNote('')
             setCritical(false)
-            setAdmissionDate(new Date().toISOString().split('T')[0])
+            setDraftRestored(false)
 
             if (!isMortalityMode) {
                 const draft = loadDraft()
-                if (draft && Object.values(draft).some(v => v !== '' && v !== false && v !== initialTeam)) {
+                if (draft && draft.text && draft.text.trim()) {
                     setTeam(draft.team ?? initialTeam)
-                    setName(draft.name ?? '')
-                    setHospitalNumber(draft.hospitalNumber ?? '')
-                    setWard(draft.ward ?? '')
-                    setBed(draft.bed ?? '')
-                    setNote(draft.note ?? '')
+                    initialText = draft.text
                     setCritical(!!draft.critical)
-                    setAdmissionDate(draft.admissionDate ?? new Date().toISOString().split('T')[0])
                     setDraftRestored(true)
+                } else {
+                    initialText = makeTemplate()
                 }
+            } else {
+                initialText = makeTemplate()
             }
         }
+        setText(initialText)
+        setHistory({ stack: [initialText], index: 0 })
+        isUndoRedo.current = true
     }, [initialData, initialTeam, isMortalityMode])
 
-    // Debounced draft save — only for new-patient mode, not edit or mortality
+    useEffect(() => {
+        if (isUndoRedo.current) {
+            isUndoRedo.current = false
+            return
+        }
+        const timer = setTimeout(() => {
+            setHistory(prev => {
+                if (prev.stack[prev.index] === text) return prev
+                const nextStack = [...prev.stack.slice(0, prev.index + 1), text]
+                if (nextStack.length > 50) nextStack.shift()
+                return { stack: nextStack, index: nextStack.length - 1 }
+            })
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [text])
+
+    const handleUndo = () => {
+        if (history.index > 0) {
+            isUndoRedo.current = true
+            const prevText = history.stack[history.index - 1]
+            setText(prevText)
+            setHistory(prev => ({ ...prev, index: prev.index - 1 }))
+            textareaRef.current?.focus()
+        }
+    }
+
+    const handleRedo = () => {
+        if (history.index < history.stack.length - 1) {
+            isUndoRedo.current = true
+            const nextText = history.stack[history.index + 1]
+            setText(nextText)
+            setHistory(prev => ({ ...prev, index: prev.index + 1 }))
+            textareaRef.current?.focus()
+        }
+    }
+
     const saveTimerRef = useRef(null)
     const scheduleDraftSave = useCallback((patch) => {
         if (initialData || isMortalityMode) return
@@ -87,314 +169,154 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
 
-    const hospNumRef = useRef(null)
-    const wardRef = useRef(null)
-    const bedRef = useRef(null)
-    const noteRef = useRef(null)
-
-    const autoGrow = useCallback((el) => {
-        if (!el) return
-        el.style.height = 'auto'
-        el.style.height = Math.min(el.scrollHeight, 240) + 'px'
-    }, [])
-
-    useEffect(() => {
-        autoGrow(noteRef.current)
-    }, [note, autoGrow])
-
-    // Helper to build current draft snapshot
-    const currentDraft = useCallback((overrides = {}) => ({
-        team, name, hospitalNumber, ward, bed, note, critical, admissionDate, ...overrides
-    }), [team, name, hospitalNumber, ward, bed, note, critical, admissionDate])
-
     const handleSubmit = (e) => {
         e.preventDefault()
         setError('')
-
-        const n = name.trim()
-        const h = hospitalNumber.trim()
-        const w = ward.trim()
-
-        if (!w && !h && !n) {
-            setError('Please provide at least a Name, Hospital Number, or Ward.')
-            return
-        }
-
-        const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: bed.trim(), note: note.trim(), critical, admissionDate })
-        if (result === 'duplicate_hosp') {
-            setError('A patient with this Hospital Number already exists.')
-            return
-        }
-        if (result === 'duplicate_bed') {
-            setError('This Ward/Bed is already occupied by another patient.')
-            return
-        }
-        if (result === 'duplicate') {
-            setError('A patient with this Hospital Number or Ward/Bed already exists.')
-            return
-        }
+        const parsed = parsePatientText(text)
+        const { name: n, hospitalNumber: h, ward: w } = parsed
+        if (!w && !h && !n) { setError('Please fill in at least Name, Hospital # or Ward.'); return }
+        const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: parsed.bed, note: parsed.note, critical, admissionDate: parsed.admissionDate })
+        if (result === 'duplicate_hosp') { setError('A patient with this Hospital Number already exists.'); return }
+        if (result === 'duplicate_bed')  { setError('This Ward/Bed is already occupied by another patient.'); return }
+        if (result === 'duplicate')      { setError('A patient with this Hospital Number or Ward/Bed already exists.'); return }
         if (result) {
             clearDraft()
-            setName('')
-            setHospitalNumber('')
-            setWard('')
-            setBed('')
-            setNote('')
+            const newBlank = makeTemplate()
+            setText(newBlank)
+            setHistory({ stack: [newBlank], index: 0 })
+            isUndoRedo.current = true
             setCritical(false)
-            setAdmissionDate(new Date().toISOString().split('T')[0])
             setError('')
             setDraftRestored(false)
         }
     }
 
-    const handleKeyDown = (e, nextRef) => {
-        if (e.key === 'Enter') {
-            e.preventDefault()
-            nextRef.current?.focus()
-        }
-    }
+    const currentDraft = useCallback((overrides = {}) => ({ team, text, critical, ...overrides }), [team, text, critical])
 
     return (
-        <div className="card p-3 sm:p-4 mb-6 dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="hidden sm:block font-semibold text-gray-700 dark:text-gray-300 text-sm mb-3 uppercase tracking-wider">
-                {isMortalityMode ? 'Add Mortality Record' : initialData ? 'Edit Patient' : 'Add Patient'}
-            </h2>
+        <div className="card p-2.5 sm:p-3 mb-4 dark:bg-gray-800 dark:border-gray-700">
 
             {/* Draft restored notice */}
             {draftRestored && (
-                <div
-                    role="status"
-                    className="flex items-center justify-between gap-2 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-3 py-2 text-xs font-medium mb-3"
-                >
-                    <span className="flex items-center gap-1.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-                        Draft restored from your last session
-                    </span>
-                    <button
-                        type="button"
-                        aria-label="Dismiss draft notice"
-                        onClick={() => setDraftRestored(false)}
-                        className="text-blue-400 dark:text-blue-500 hover:text-blue-600 dark:hover:text-blue-300 transition-colors leading-none"
-                    >
-                        ✕
-                    </button>
+                <div role="status" className="flex items-center justify-between gap-2 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-2.5 py-1.5 text-xs font-medium mb-2">
+                    <span>Draft restored</span>
+                    <button type="button" aria-label="Dismiss" onClick={() => setDraftRestored(false)} className="text-blue-400 hover:text-blue-600 transition-colors">✕</button>
                 </div>
             )}
 
             <form id="add-patient-form" onSubmit={handleSubmit}>
-                {/* Team Selector — hidden in mortality mode */}
+
+                {/* Team toggle */}
                 {!isMortalityMode && (
-                    <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl mb-4 sm:mb-5">
-                        <button
-                            type="button"
-                            onClick={() => { setTeam('my_team'); scheduleDraftSave(currentDraft({ team: 'my_team' })) }}
-                            className={`flex-1 text-xs sm:text-sm font-semibold py-2 rounded-lg transition-all ${team === 'my_team' ? 'bg-white dark:bg-gray-600 text-blue-700 dark:text-blue-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        >
-                            My Team
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setTeam('other_team'); scheduleDraftSave(currentDraft({ team: 'other_team' })) }}
-                            className={`flex-1 text-xs sm:text-sm font-semibold py-2 rounded-lg transition-all ${team === 'other_team' ? 'bg-white dark:bg-gray-600 text-purple-700 dark:text-purple-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        >
-                            List B
-                        </button>
+                    <div className="flex bg-gray-100 dark:bg-gray-700 p-0.5 rounded-lg mb-2.5">
+                        {[['my_team', 'My Team', 'text-blue-700 dark:text-blue-300'], ['other_team', 'On Call', 'text-purple-700 dark:text-purple-300']].map(([val, label, activeColor]) => (
+                            <button
+                                key={val}
+                                type="button"
+                                onClick={() => { setTeam(val); scheduleDraftSave(currentDraft({ team: val })) }}
+                                className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${team === val ? `bg-white dark:bg-gray-600 ${activeColor} shadow-sm` : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                            >
+                                {label}
+                            </button>
+                        ))}
                     </div>
                 )}
 
-                {/* Critical Toggle — hidden in mortality mode */}
-                {!isMortalityMode && (
-                    <div className="flex items-center justify-between mb-4 px-1 bg-gray-50/50 dark:bg-gray-700/50 p-2 rounded-xl border border-gray-100/50 dark:border-gray-600/50">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mb-1">Priority</span>
-                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider text-left">Status</span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border-2 ${critical
-                                ? 'bg-red-50 text-red-600 border-red-200 shadow-sm'
-                                : 'bg-white text-gray-400 border-gray-100'}`}
-                        >
-                            <div className={`w-2 h-2 rounded-full ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300'}`} />
-                            {critical ? 'CRITICAL' : 'NORMAL'}
-                        </button>
-                    </div>
-                )}
-
-                <div className="flex flex-col gap-3 sm:gap-4 mb-3 sm:mb-4">
-                    {/* Row 1: Name (Full width) */}
-                    <div>
-                        <label htmlFor="input-name" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                            Patient Name
-                        </label>
-                        <input
-                            id="input-name"
-                            type="text"
-                            className="input-field text-left font-medium text-sm"
-                            placeholder="John Doe"
-                            value={name}
-                            onChange={(e) => {
-                                let val = e.target.value.replace(/[0-9]/g, '')
-                                if (!e.nativeEvent.isComposing) {
-                                    val = val.replace(/(?:^|\s)\S/g, (c) => c.toUpperCase())
-                                }
-                                setName(val)
-                                setError('')
-                                scheduleDraftSave(currentDraft({ name: val }))
-                            }}
-                            onKeyDown={(e) => handleKeyDown(e, hospNumRef)}
-                            autoCapitalize="words"
-                            autoComplete="off"
-                        />
-                    </div>
-
-                    {/* Row 2: HospNum (45%) + Ward (35%) + Bed (20%) */}
-                    <div className="flex gap-2 sm:gap-3">
-                        <div className="min-w-0" style={{ flex: '45 1 0%' }}>
-                            <label htmlFor="input-hospnum" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                                Hospital Number
+                {/* Fill-in-the-blank textarea */}
+                <div className="mb-2">
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                            <label htmlFor="input-patient-text" className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                                Patient Details
                             </label>
-                            <input
-                                id="input-hospnum"
-                                ref={hospNumRef}
-                                type="text"
-                                className="input-field text-center font-bold text-sm"
-                                placeholder="H-123456"
-                                value={hospitalNumber}
-                                onChange={(e) => {
-                                    setHospitalNumber(e.target.value)
-                                    setError('')
-                                    scheduleDraftSave(currentDraft({ hospitalNumber: e.target.value }))
-                                }}
-                                onKeyDown={(e) => handleKeyDown(e, wardRef)}
-                                autoComplete="off"
-                            />
+                            {/* Undo / Redo */}
+                            <div className="flex items-center gap-0.5 ml-1">
+                                <button
+                                    type="button"
+                                    onClick={handleUndo}
+                                    disabled={history.index <= 0}
+                                    className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
+                                    aria-label="Undo"
+                                >
+                                    <Undo2 size={13} strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleRedo}
+                                    disabled={history.index >= history.stack.length - 1}
+                                    className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
+                                    aria-label="Redo"
+                                >
+                                    <Redo2 size={13} strokeWidth={2.5} />
+                                </button>
+                            </div>
                         </div>
-                        <div className="min-w-0" style={{ flex: '35 1 0%' }}>
-                            <label htmlFor="input-ward" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                                Ward
-                            </label>
-                            <input
-                                id="input-ward"
-                                ref={wardRef}
-                                type="text"
-                                className="input-field text-center font-bold uppercase text-sm tracking-wider"
-                                placeholder="A1"
-                                value={ward}
-                                onChange={(e) => {
-                                    setWard(e.target.value)
-                                    setError('')
-                                    scheduleDraftSave(currentDraft({ ward: e.target.value }))
-                                }}
-                                onKeyDown={(e) => handleKeyDown(e, bedRef)}
-                                maxLength={10}
-                                autoCapitalize="characters"
-                                autoComplete="off"
-                                spellCheck={false}
-                            />
-                        </div>
-                        <div className="min-w-0" style={{ flex: '20 1 0%' }}>
-                            <label htmlFor="input-bed" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                                Bed
-                            </label>
-                            <input
-                                id="input-bed"
-                                ref={bedRef}
-                                type="text"
-                                className="input-field text-center font-bold text-sm"
-                                placeholder="12"
-                                value={bed}
-                                onChange={(e) => {
-                                    setBed(e.target.value)
-                                    setError('')
-                                    scheduleDraftSave(currentDraft({ bed: e.target.value }))
-                                }}
-                                onKeyDown={(e) => handleKeyDown(e, noteRef)}
-                                maxLength={10}
-                                autoComplete="off"
-                                spellCheck={false}
-                                inputMode="text"
-                            />
-                        </div>
-                    </div>
+                        <div className="flex items-center gap-2">
+                            {/* Actions as icons */}
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                aria-label="Cancel"
+                                className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                <X size={14} strokeWidth={2.5} />
+                            </button>
+                            <button
+                                id="btn-add-patient"
+                                type="submit"
+                                aria-label={initialData ? "Save" : "Add"}
+                                className="p-1.5 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
+                            >
+                                {initialData ? <Save size={14} strokeWidth={2.5} /> : <Plus size={14} strokeWidth={2.5} />}
+                            </button>
 
-                    {/* Row 3: Admission Date */}
-                    <div>
-                        <label htmlFor="input-admission" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 flex justify-between">
-                            <span>Admission Date</span>
-                            <span className="font-normal opacity-70">Optional</span>
-                        </label>
-                        <input
-                            id="input-admission"
-                            type="date"
-                            className="input-field text-left font-medium text-sm text-gray-600 dark:text-gray-300"
-                            value={admissionDate}
-                            onChange={(e) => {
-                                setAdmissionDate(e.target.value)
-                                scheduleDraftSave(currentDraft({ admissionDate: e.target.value }))
-                            }}
-                            onKeyDown={(e) => handleKeyDown(e, noteRef)}
-                        />
-                    </div>
-
-                    {/* Row 4: Note (Full width) */}
-                    <div>
-                        <label htmlFor="input-note" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">
-                            Note
-                        </label>
-                        <textarea
-                            id="input-note"
-                            ref={noteRef}
-                            rows={1}
-                            className="input-field text-left text-sm resize-none"
-                            placeholder="Add a note"
-                            value={note}
-                            onChange={(e) => {
-                                setNote(e.target.value)
-                                setError('')
-                                autoGrow(e.target)
-                                scheduleDraftSave(currentDraft({ note: e.target.value }))
-                            }}
-                            autoComplete="off"
-                            style={{ minHeight: '40px', maxHeight: '240px', overflowY: 'auto' }}
-                        />
-                    </div>
-
-                    {/* Row 5: Buttons (Right aligned) */}
-                    <div className="flex justify-end gap-2 mt-1">
-                        <button
-                            type="button"
-                            className="btn-secondary px-4 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300"
-                            onClick={onCancel}
-                            style={{ minHeight: '40px', fontSize: '0.875rem' }}
-                        >
-                            Close
-                        </button>
-                        <button
-                            id="btn-add-patient"
-                            type="submit"
-                            className="btn-primary px-5"
-                            style={{ minHeight: '40px', fontSize: '0.875rem' }}
-                        >
-                            {initialData ? (
-                                <span className="inline-flex items-center gap-1"><Save size={16} strokeWidth={2.5} /> Save</span>
-                            ) : (
-                                <span className="inline-flex items-center gap-1"><Plus size={16} strokeWidth={2.5} /> Add</span>
+                            {/* Compact critical toggle — inline pill */}
+                            {!isMortalityMode && (
+                                <button
+                                    type="button"
+                                    aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
+                                    onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-all ${
+                                        critical
+                                            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400'
+                                            : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:border-gray-300'
+                                    }`}
+                                >
+                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
+                                    {critical ? 'CRITICAL' : 'Critical'}
+                                </button>
                             )}
-                        </button>
+                        </div>
                     </div>
+
+                    <textarea
+                        id="input-patient-text"
+                        ref={textareaRef}
+                        rows={6}
+                        className="input-field text-left resize-none py-2.5 px-3 font-mono leading-relaxed"
+                        style={{ minHeight: '148px', maxHeight: '240px', fontSize: '0.8rem' }}
+                        value={text}
+                        onChange={(e) => {
+                            setText(e.target.value)
+                            setError('')
+                            autoGrow(e.target)
+                            scheduleDraftSave(currentDraft({ text: e.target.value }))
+                        }}
+                        autoComplete="off"
+                        spellCheck={false}
+                    />
                 </div>
 
+                {/* Error */}
                 {error && (
-                    <div
-                        role="alert"
-                        className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2 text-sm font-medium"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+                    <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 text-xs font-medium mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
                         {error}
                     </div>
                 )}
+
+
+
             </form>
         </div>
     )

@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { X, Copy, Share2, CheckCircle, ClipboardPaste } from 'lucide-react'
+import { X, Copy, Share2, CheckCircle, ClipboardPaste, Download, Upload } from 'lucide-react'
 
-export default function ExportModal({ patients, listName, onClose }) {
+export default function ExportModal({ patients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [], onRestore }) {
     const [copiedText, setCopiedText] = useState(false)
     const [copiedData, setCopiedData] = useState(false)
+    const [restoreMsg, setRestoreMsg] = useState('')
+    const restoreInputRef = useRef(null)
 
     // 1. QR Data: Optimized for scanning (excludes notes to keep QR density low)
     const qrCompressed = patients.map((p) => {
@@ -108,6 +110,53 @@ export default function ExportModal({ patients, listName, onClose }) {
         window.print()
     }
 
+    // ── Backup: download full JSON ────────────────────────────────────────────
+    const handleBackup = () => {
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            version: 1,
+            patients,
+            mortalities,
+            discharges,
+            dischargesResetDate,
+            docs,
+        }
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.setAttribute('href', url)
+        link.setAttribute('download', `HOsNote_backup_${new Date().toISOString().split('T')[0]}.json`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+    }
+
+    // ── Restore: parse JSON and call parent callback ──────────────────────────
+    const handleRestoreFile = (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result)
+                if (!data.patients && !data.docs) {
+                    setRestoreMsg('❌ Invalid backup file.')
+                    return
+                }
+                onRestore(data)
+                setRestoreMsg('✅ Restore successful!')
+                setTimeout(() => setRestoreMsg(''), 4000)
+            } catch {
+                setRestoreMsg('❌ Could not parse file.')
+            }
+        }
+        reader.readAsText(file)
+        // reset so the same file can be re-selected
+        e.target.value = ''
+    }
+
     return (
         <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
             <div className="modal-box max-w-md w-[95%]" role="dialog" aria-modal="true" aria-labelledby="export-title">
@@ -205,6 +254,43 @@ export default function ExportModal({ patients, listName, onClose }) {
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect width="12" height="8" x="6" y="14" /></svg>
                         Print PDF
                     </button>
+                </div>
+
+                {/* Backup & Restore */}
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-1">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Device Backup</p>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            id="btn-backup"
+                            className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white transition-colors text-xs font-semibold shadow-sm"
+                            onClick={handleBackup}
+                        >
+                            <Download size={14} />
+                            Backup JSON
+                        </button>
+
+                        <button
+                            id="btn-restore"
+                            className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs font-semibold"
+                            onClick={() => restoreInputRef.current?.click()}
+                        >
+                            <Upload size={14} />
+                            Restore
+                        </button>
+                        <input
+                            ref={restoreInputRef}
+                            type="file"
+                            accept=".json,application/json"
+                            className="hidden"
+                            onChange={handleRestoreFile}
+                        />
+                    </div>
+                    {restoreMsg && (
+                        <p className="text-xs text-center mt-2 font-medium text-gray-600 dark:text-gray-300">{restoreMsg}</p>
+                    )}
+                    <p className="text-center text-[10px] text-gray-400 italic mt-1.5">
+                        Backup includes patients, notes &amp; mortalities.
+                    </p>
                 </div>
 
                 <p className="text-center text-[10px] text-gray-400 italic px-2">
