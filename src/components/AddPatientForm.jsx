@@ -7,18 +7,7 @@ function today() {
     return new Date().toISOString().split('T')[0]
 }
 
-function makeTemplate(patient = {}) {
-    return [
-        `Name: ${patient.name || ''}`,
-        `Hosp#: ${patient.hospitalNumber || ''}`,
-        `Ward: ${patient.ward || ''}`,
-        `Bed: ${patient.bed || ''}`,
-        `Date: ${patient.admissionDate || today()}`,
-        `Notes: ${patient.note || ''}`,
-    ].join('\n')
-}
-
-// Parse label-prefixed lines, or fallback to original line-based format
+// Keep parsePatientText to migrate old string-based drafts from localStorage
 function parsePatientText(text) {
     const hasLabels = /^(Name|Hosp#|Ward|Bed|Date|Notes):/im.test(text)
 
@@ -28,7 +17,6 @@ function parsePatientText(text) {
             const m = text.match(re)
             return m ? m[1].trim() : ''
         }
-        // Notes can span multiple lines — grab everything after "Notes: ..."
         const notesMatch = text.match(/^Notes:\s*([\s\S]*)/im)
         const rawNote = notesMatch ? notesMatch[1].trim() : ''
 
@@ -42,7 +30,6 @@ function parsePatientText(text) {
         }
     }
 
-    // Fallback: old line-based parsing
     const lines = text.split('\n')
     return {
         name: (lines[0] || '').trim(),
@@ -71,14 +58,21 @@ function clearDraft() {
     catch { /* ignore */ }
 }
 
-
 export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false }) {
     const [team, setTeam] = useState(initialTeam)
-    const [text, setText] = useState('')
+    
+    const [fields, setFields] = useState({ name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), note: '' })
+    
     const [critical, setCritical] = useState(false)
     const [error, setError] = useState('')
     const [draftRestored, setDraftRestored] = useState(false)
-    const textareaRef = useRef(null)
+    
+    const nameRef = useRef(null)
+    const hospRef = useRef(null)
+    const wardRef = useRef(null)
+    const bedRef = useRef(null)
+    const dateRef = useRef(null)
+    const noteRef = useRef(null)
 
     const autoGrow = useCallback((el) => {
         if (!el) return
@@ -86,18 +80,23 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         el.style.height = Math.min(el.scrollHeight, 240) + 'px'
     }, [])
 
-
-
-    useEffect(() => { autoGrow(textareaRef.current) }, [text, autoGrow])
+    useEffect(() => { autoGrow(noteRef.current) }, [fields.note, autoGrow])
 
     const [history, setHistory] = useState({ stack: [], index: -1 })
     const isUndoRedo = useRef(false)
 
     useEffect(() => {
-        let initialText = ''
+        let initialFields = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), note: '' }
         if (initialData) {
             setTeam(initialData.team || 'my_team')
-            initialText = makeTemplate(initialData)
+            initialFields = {
+                name: initialData.name || '',
+                hospitalNumber: initialData.hospitalNumber || '',
+                ward: initialData.ward || '',
+                bed: initialData.bed || '',
+                admissionDate: initialData.admissionDate || today(),
+                note: initialData.note || ''
+            }
             setCritical(!!initialData.critical)
             setDraftRestored(false)
         } else {
@@ -107,20 +106,20 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
             if (!isMortalityMode) {
                 const draft = loadDraft()
-                if (draft && draft.text && draft.text.trim()) {
+                if (draft) {
                     setTeam(draft.team ?? initialTeam)
-                    initialText = draft.text
                     setCritical(!!draft.critical)
+                    if (draft.fields) {
+                        initialFields = draft.fields
+                    } else if (draft.text && draft.text.trim()) {
+                        initialFields = parsePatientText(draft.text)
+                    }
                     setDraftRestored(true)
-                } else {
-                    initialText = makeTemplate()
                 }
-            } else {
-                initialText = makeTemplate()
             }
         }
-        setText(initialText)
-        setHistory({ stack: [initialText], index: 0 })
+        setFields(initialFields)
+        setHistory({ stack: [initialFields], index: 0 })
         isUndoRedo.current = true
     }, [initialData, initialTeam, isMortalityMode])
 
@@ -131,32 +130,34 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
         const timer = setTimeout(() => {
             setHistory(prev => {
-                if (prev.stack[prev.index] === text) return prev
-                const nextStack = [...prev.stack.slice(0, prev.index + 1), text]
+                const currStr = JSON.stringify(fields)
+                const prevStr = JSON.stringify(prev.stack[prev.index])
+                if (currStr === prevStr) return prev
+                const nextStack = [...prev.stack.slice(0, prev.index + 1), fields]
                 if (nextStack.length > 50) nextStack.shift()
                 return { stack: nextStack, index: nextStack.length - 1 }
             })
         }, 500)
         return () => clearTimeout(timer)
-    }, [text])
+    }, [fields])
 
     const handleUndo = () => {
         if (history.index > 0) {
             isUndoRedo.current = true
-            const prevText = history.stack[history.index - 1]
-            setText(prevText)
+            const prevFields = history.stack[history.index - 1]
+            setFields(prevFields)
             setHistory(prev => ({ ...prev, index: prev.index - 1 }))
-            textareaRef.current?.focus()
+            noteRef.current?.focus()
         }
     }
 
     const handleRedo = () => {
         if (history.index < history.stack.length - 1) {
             isUndoRedo.current = true
-            const nextText = history.stack[history.index + 1]
-            setText(nextText)
+            const nextFields = history.stack[history.index + 1]
+            setFields(nextFields)
             setHistory(prev => ({ ...prev, index: prev.index + 1 }))
-            textareaRef.current?.focus()
+            noteRef.current?.focus()
         }
     }
 
@@ -169,20 +170,31 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
 
+    const currentDraft = useCallback((overrides = {}) => ({ team, fields, critical, ...overrides }), [team, fields, critical])
+    
+    // Add custom field update handler
+    const updateField = (key, value) => {
+        setFields(prev => {
+            const next = { ...prev, [key]: value }
+            scheduleDraftSave(currentDraft({ fields: next }))
+            return next
+        })
+        setError('')
+    }
+
     const handleSubmit = (e) => {
         e.preventDefault()
         setError('')
-        const parsed = parsePatientText(text)
-        const { name: n, hospitalNumber: h, ward: w } = parsed
+        const { name: n, hospitalNumber: h, ward: w } = fields
         if (!w && !h && !n) { setError('Please fill in at least Name, Hospital # or Ward.'); return }
-        const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: parsed.bed, note: parsed.note, critical, admissionDate: parsed.admissionDate })
+        const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: fields.bed, note: fields.note, critical, admissionDate: fields.admissionDate })
         if (result === 'duplicate_hosp') { setError('A patient with this Hospital Number already exists.'); return }
         if (result === 'duplicate_bed')  { setError('This Ward/Bed is already occupied by another patient.'); return }
         if (result === 'duplicate')      { setError('A patient with this Hospital Number or Ward/Bed already exists.'); return }
         if (result) {
             clearDraft()
-            const newBlank = makeTemplate()
-            setText(newBlank)
+            const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), note: '' }
+            setFields(newBlank)
             setHistory({ stack: [newBlank], index: 0 })
             isUndoRedo.current = true
             setCritical(false)
@@ -191,7 +203,12 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
     }
 
-    const currentDraft = useCallback((overrides = {}) => ({ team, text, critical, ...overrides }), [team, text, critical])
+    const handleEnter = (e, nextRef) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            nextRef.current?.focus()
+        }
+    }
 
     return (
         <div className="card p-2.5 sm:p-3 mb-4 dark:bg-gray-800 dark:border-gray-700">
@@ -222,52 +239,47 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                     </div>
                 )}
 
-                {/* Fill-in-the-blank textarea */}
+                {/* Faux-textarea container */}
                 <div className="mb-2">
-                    <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                            <label htmlFor="input-patient-text" className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                                Patient Details
-                            </label>
-                            {/* Undo / Redo */}
-                            <div className="flex items-center gap-0.5 ml-1">
-                                <button
-                                    type="button"
-                                    onClick={handleUndo}
-                                    disabled={history.index <= 0}
-                                    className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
-                                    aria-label="Undo"
-                                >
-                                    <Undo2 size={13} strokeWidth={2.5} />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleRedo}
-                                    disabled={history.index >= history.stack.length - 1}
-                                    className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
-                                    aria-label="Redo"
-                                >
-                                    <Redo2 size={13} strokeWidth={2.5} />
-                                </button>
-                            </div>
+                    <div className="flex items-center justify-between mb-1.5">
+                        {/* Undo / Redo */}
+                        <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                onClick={handleUndo}
+                                disabled={history.index <= 0}
+                                className="p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
+                                aria-label="Undo"
+                            >
+                                <Undo2 size={18} strokeWidth={2.5} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRedo}
+                                disabled={history.index >= history.stack.length - 1}
+                                className="p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
+                                aria-label="Redo"
+                            >
+                                <Redo2 size={18} strokeWidth={2.5} />
+                            </button>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                             {/* Actions as icons */}
                             <button
                                 type="button"
                                 onClick={onCancel}
                                 aria-label="Cancel"
-                                className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+                                className="p-2.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
                             >
-                                <X size={14} strokeWidth={2.5} />
+                                <X size={18} strokeWidth={2.5} />
                             </button>
                             <button
                                 id="btn-add-patient"
                                 type="submit"
                                 aria-label={initialData ? "Save" : "Add"}
-                                className="p-1.5 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
+                                className="p-2.5 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
                             >
-                                {initialData ? <Save size={14} strokeWidth={2.5} /> : <Plus size={14} strokeWidth={2.5} />}
+                                {initialData ? <Save size={18} strokeWidth={2.5} /> : <Plus size={18} strokeWidth={2.5} />}
                             </button>
 
                             {/* Compact critical toggle — inline pill */}
@@ -276,35 +288,53 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                     type="button"
                                     aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
                                     onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-all ${
+                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-[11px] font-bold transition-all ${
                                         critical
                                             ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400'
                                             : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:border-gray-300'
                                     }`}
                                 >
-                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
                                     {critical ? 'CRITICAL' : 'Critical'}
                                 </button>
                             )}
                         </div>
                     </div>
 
-                    <textarea
-                        id="input-patient-text"
-                        ref={textareaRef}
-                        rows={6}
-                        className="input-field text-left resize-none py-2.5 px-3 font-mono leading-relaxed"
-                        style={{ minHeight: '148px', maxHeight: '240px', fontSize: '0.8rem' }}
-                        value={text}
-                        onChange={(e) => {
-                            setText(e.target.value)
-                            setError('')
-                            autoGrow(e.target)
-                            scheduleDraftSave(currentDraft({ text: e.target.value }))
-                        }}
-                        autoComplete="off"
-                        spellCheck={false}
-                    />
+                    <div className="input-field text-left py-2.5 px-3 font-mono leading-relaxed flex flex-col cursor-text" style={{ minHeight: '148px', fontSize: '0.8rem' }} onClick={() => noteRef.current?.focus()}>
+                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
+                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Name:</label>
+                            <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.name} onChange={e => updateField('name', e.target.value)} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} />
+                        </div>
+                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
+                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Hosp#:</label>
+                            <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.hospitalNumber} onChange={e => updateField('hospitalNumber', e.target.value)} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} />
+                        </div>
+                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
+                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Ward:</label>
+                            <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} />
+                        </div>
+                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
+                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Bed:</label>
+                            <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.bed} onChange={e => updateField('bed', e.target.value)} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} />
+                        </div>
+                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
+                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Date:</label>
+                            <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} />
+                        </div>
+                        <div className="flex flex-col items-start gap-1 mt-1 relative" onClick={e => e.stopPropagation()}>
+                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 pt-[1px]">Notes:</label>
+                            <textarea 
+                                ref={noteRef} 
+                                rows={2} 
+                                className="w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0 resize-none overflow-hidden" 
+                                value={fields.note} 
+                                onChange={e => { updateField('note', e.target.value); autoGrow(e.target); }} 
+                                autoComplete="off" 
+                                spellCheck={false} 
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {/* Error */}
@@ -314,8 +344,6 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         {error}
                     </div>
                 )}
-
-
 
             </form>
         </div>
