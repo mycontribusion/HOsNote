@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: '4MyTeam – Patient Tracker',
-        short_name: '4MyTeam',
-        description: 'Zero-network patient ward & bed tracker for medical teams.',
+        name: 'HOsNote – Patient Tracker & Notebook',
+        short_name: 'HOsNote',
+        description: 'Patient tracker and clinical notebook for medical teams. Zero-network, offline-first.',
         theme_color: '#1d4ed8',
         background_color: '#f9fafb',
         display: 'standalone',
