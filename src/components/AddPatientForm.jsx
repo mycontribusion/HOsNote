@@ -264,25 +264,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                             </button>
                         </div>
                         <div className="flex items-center gap-3">
-                            {/* Actions as icons */}
-                            <button
-                                type="button"
-                                onClick={onCancel}
-                                aria-label="Cancel"
-                                className="p-2.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
-                            >
-                                <X size={18} strokeWidth={2.5} />
-                            </button>
-                            <button
-                                id="btn-add-patient"
-                                type="submit"
-                                aria-label={initialData ? "Save" : "Add"}
-                                className="p-2.5 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
-                            >
-                                {initialData ? <Save size={18} strokeWidth={2.5} /> : <Plus size={18} strokeWidth={2.5} />}
-                            </button>
-
-                            {/* Compact critical toggle — inline pill */}
+                            {/* Critical in the middle */}
                             {!isMortalityMode && (
                                 <button
                                     type="button"
@@ -298,6 +280,27 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                     {critical ? 'CRITICAL' : 'Critical'}
                                 </button>
                             )}
+
+                            {/* Add / Save with text label */}
+                            <button
+                                id="btn-add-patient"
+                                type="submit"
+                                aria-label={initialData ? "Save" : "Add"}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
+                            >
+                                {initialData ? <Save size={18} strokeWidth={2.5} /> : <Plus size={18} strokeWidth={2.5} />}
+                                <span className="text-xs font-bold">{initialData ? 'Save' : 'Add'}</span>
+                            </button>
+
+                            {/* Cancel */}
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                aria-label="Cancel"
+                                className="p-2.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                <X size={18} strokeWidth={2.5} />
+                            </button>
                         </div>
                     </div>
 

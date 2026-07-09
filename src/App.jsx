@@ -178,7 +178,6 @@ export default function App() {
     const [showFeedback, setShowFeedback] = useState(false)
     const [editingPatient, setEditingPatient] = useState(null)
     const [removalCandidateId, setRemovalCandidateId] = useState(null)
-    const [saveFlash, setSaveFlash] = useState(false)
     const [pendingImport, setPendingImport] = useState(null)
     const [history, setHistory] = useState([]) // Stack of { patients, mortalities, discharges } objects
     const [showUndoToast, setShowUndoToast] = useState(false)
@@ -202,9 +201,6 @@ export default function App() {
     useEffect(() => {
         if (!isLoaded) return;
         set(STORAGE_KEY, patients).catch(console.error)
-        setSaveFlash(true)
-        const t = setTimeout(() => setSaveFlash(false), 1200)
-        return () => clearTimeout(t)
     }, [patients, isLoaded])
 
     useEffect(() => {
@@ -629,7 +625,6 @@ export default function App() {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col transition-colors duration-300">
             <Header
-                saveFlash={saveFlash}
                 patientCount={patients.length}
                 docCount={docs.length}
                 darkMode={darkMode}
