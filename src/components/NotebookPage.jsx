@@ -217,31 +217,26 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                     className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all`}
                                     onClick={() => setSelectedDoc(doc)}
                                 >
-                                    {/* Card header */}
-                                    <div className={`px-4 pt-3 pb-2 ${bg}`}>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-bold text-sm text-gray-900 dark:text-white leading-tight">
+                                    {/* Card header — compact single row */}
+                                    <div className={`px-4 py-2 flex items-center justify-between gap-2 ${bg}`}>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
                                                 {doc.patientName || 'Unknown Patient'}
                                             </span>
                                             {doc.patientWard && (
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${badge}`}>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0 ${badge}`}>
                                                     {doc.patientWard}
                                                 </span>
                                             )}
-                                            {doc.patientHosp && (
-                                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-white/60 dark:bg-gray-800/60 px-1.5 py-0.5 rounded">
-                                                    {doc.patientHosp}
-                                                </span>
-                                            )}
                                         </div>
-                                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                        <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
                                             {formatDate(doc.createdAt)}
                                             {doc.updatedAt && doc.updatedAt !== doc.createdAt && ' · edited'}
-                                        </p>
+                                        </span>
                                     </div>
-                                    {/* Text preview */}
-                                    <div className="px-4 py-3">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-5 whitespace-pre-wrap">
+                                    {/* Text preview — more space, no clamp */}
+                                    <div className="px-4 py-2">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                                             {doc.text}
                                         </p>
                                     </div>

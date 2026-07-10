@@ -65,22 +65,13 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     
     const [critical, setCritical] = useState(false)
     const [error, setError] = useState('')
-    const [draftRestored, setDraftRestored] = useState(false)
-    
+
     const nameRef = useRef(null)
     const hospRef = useRef(null)
     const wardRef = useRef(null)
     const bedRef = useRef(null)
     const dateRef = useRef(null)
     const noteRef = useRef(null)
-
-    const autoGrow = useCallback((el) => {
-        if (!el) return
-        el.style.height = 'auto'
-        el.style.height = Math.min(el.scrollHeight, 240) + 'px'
-    }, [])
-
-    useEffect(() => { autoGrow(noteRef.current) }, [fields.note, autoGrow])
 
     const [history, setHistory] = useState({ stack: [], index: -1 })
     const isUndoRedo = useRef(false)
@@ -98,11 +89,9 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 note: initialData.note || ''
             }
             setCritical(!!initialData.critical)
-            setDraftRestored(false)
         } else {
             setTeam(initialTeam)
             setCritical(false)
-            setDraftRestored(false)
 
             if (!isMortalityMode) {
                 const draft = loadDraft()
@@ -114,7 +103,6 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                     } else if (draft.text && draft.text.trim()) {
                         initialFields = parsePatientText(draft.text)
                     }
-                    setDraftRestored(true)
                 }
             }
         }
@@ -199,7 +187,6 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
             isUndoRedo.current = true
             setCritical(false)
             setError('')
-            setDraftRestored(false)
         }
     }
 
@@ -212,14 +199,6 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     return (
         <div className="card p-2.5 sm:p-3 mb-4 dark:bg-gray-800 dark:border-gray-700">
-
-            {/* Draft restored notice */}
-            {draftRestored && (
-                <div role="status" className="flex items-center justify-between gap-2 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-2.5 py-1.5 text-xs font-medium mb-2">
-                    <span>Draft restored</span>
-                    <button type="button" aria-label="Dismiss" onClick={() => setDraftRestored(false)} className="text-blue-400 hover:text-blue-600 transition-colors">✕</button>
-                </div>
-            )}
 
             <form id="add-patient-form" onSubmit={handleSubmit}>
 
@@ -304,7 +283,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         </div>
                     </div>
 
-                    <div className="input-field text-left py-2.5 px-3 font-mono leading-relaxed flex flex-col cursor-text" style={{ minHeight: '148px', fontSize: '0.8rem' }} onClick={() => noteRef.current?.focus()}>
+                    <div className="input-field text-left py-2.5 px-3 font-mono leading-relaxed flex flex-col cursor-text overflow-y-auto" style={{ minHeight: '148px', maxHeight: '520px', fontSize: '0.8rem' }} onClick={() => noteRef.current?.focus()}>
                         <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
                             <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Name:</label>
                             <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.name} onChange={e => updateField('name', e.target.value)} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} />
@@ -327,14 +306,14 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         </div>
                         <div className="flex flex-col items-start gap-1 mt-1 relative" onClick={e => e.stopPropagation()}>
                             <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 pt-[1px]">Notes:</label>
-                            <textarea 
-                                ref={noteRef} 
-                                rows={2} 
-                                className="w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0 resize-none overflow-hidden" 
-                                value={fields.note} 
-                                onChange={e => { updateField('note', e.target.value); autoGrow(e.target); }} 
-                                autoComplete="off" 
-                                spellCheck={false} 
+                            <textarea
+                                ref={noteRef}
+                                rows={15}
+                                className="w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0 resize-none"
+                                value={fields.note}
+                                onChange={e => updateField('note', e.target.value)}
+                                autoComplete="off"
+                                spellCheck={false}
                             />
                         </div>
                     </div>

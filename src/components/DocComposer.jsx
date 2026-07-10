@@ -41,7 +41,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
             className="modal-backdrop"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div className="modal-box max-w-md w-[95%] p-0 overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="doc-composer-title">
+            <div className="modal-box max-w-md w-[95%] p-0 overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }} role="dialog" aria-modal="true" aria-labelledby="doc-composer-title">
                 {/* Header */}
                 <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100 dark:border-gray-700">
                     <div className="min-w-0 flex-1">
@@ -63,19 +63,19 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="px-5 py-4 space-y-4">
-                    {/* Color picker */}
-                    <div>
-                        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Color</p>
-                        <div className="flex gap-2">
+                {/* Body — flex column so textarea can grow */}
+                <div className="px-5 py-4 flex flex-col flex-1 min-h-0">
+                    {/* Color picker — compact single row */}
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Color</p>
+                        <div className="flex gap-1.5">
                             {COLOR_OPTIONS.map(opt => (
                                 <button
                                     key={opt.value}
                                     type="button"
                                     onClick={() => setColor(opt.value)}
                                     aria-label={opt.label}
-                                    className={`w-8 h-8 rounded-full transition-all ${opt.bg} ${
+                                    className={`w-7 h-7 rounded-full transition-all ${opt.bg} ${
                                         color === opt.value
                                             ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-offset-gray-800 scale-110'
                                             : 'opacity-60 hover:opacity-90 hover:scale-105'
@@ -85,13 +85,13 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                         </div>
                     </div>
 
-                    {/* Text area */}
-                    <div>
+                    {/* Text area — flex-grow to fill remaining space */}
+                    <div className="flex-1 flex flex-col min-h-0">
                         <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Note</p>
                         <textarea
                             ref={textareaRef}
-                            className="input-field resize-none text-sm leading-relaxed"
-                            style={{ minHeight: '120px', maxHeight: '280px', overflowY: 'auto' }}
+                            className="input-field flex-1 resize-none text-sm leading-relaxed w-full"
+                            style={{ minHeight: '120px' }}
                             placeholder="Write your clinical documentation here…"
                             value={text}
                             onChange={(e) => {
@@ -107,7 +107,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end gap-2 px-5 pb-5">
+                <div className="flex justify-end gap-2 px-5 pb-5 border-t border-gray-100 dark:border-gray-700 pt-3">
                     <button
                         type="button"
                         className="btn-secondary px-5"
