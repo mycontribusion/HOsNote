@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Camera, Scan, Search } from 'lucide-react'
+import { parseFrame, createReceiver } from '../utils/chunkedQr'
 
 // Supported barcode formats for healthcare scanning
 const BARCODE_FORMATS = [
@@ -24,6 +25,9 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     const [lastScanned, setLastScanned] = useState(null) // { value, format, timestamp }
     const [scanHistory, setScanHistory] = useState([]) // Array of scanned values in quick mode
     const [detectedFormat, setDetectedFormat] = useState(null)
+    const receiverRef = useRef(createReceiver())
+    const [transferProgress, setTransferProgress] = useState(null) // { received, total } | null
+    const transferTimerRef = useRef(null)
 
     useEffect(() => {
         if (cameraMode !== 'camera') return
@@ -110,6 +114,54 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }, [cameraMode, scanMode])
 
     const handleImportScan = (decodedText) => {
+        // 1. Try chunked-transfer frame first (animated full transfer).
+        const frame = parseFrame(decodedText)
+        if (frame) {
+            const result = receiverRef.current.addFrame(frame)
+            if (result.status === 'complete') {
+                // Reassembled payload: { type, patients, mortalities, docs, ... }
+                const payload = result.payload
+                const incoming = [
+                    ...(payload.patients || []),
+                    ...(payload.mortalities || []),
+                ]
+                setTransferProgress(null)
+                setImportedCount(incoming.length)
+                setStatus('success')
+                setStatusMsg(`Reassembled ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
+                setTimeout(() => {
+                    if (mountedRef.current) onImport(incoming)
+                }, 800)
+                return
+            }
+            if (result.status === 'progress') {
+                setTransferProgress({ received: result.received, total: result.total })
+                setStatus('scanning')
+                setStatusMsg(`Receiving transfer… ${result.received}/${result.total} frames`)
+                // Auto-clear progress if no new frames arrive (transfer aborted).
+                if (transferTimerRef.current) clearTimeout(transferTimerRef.current)
+                transferTimerRef.current = setTimeout(() => {
+                    if (mountedRef.current) {
+                        setTransferProgress(null)
+                        setStatusMsg('Point camera at QR code')
+                    }
+                }, 4000)
+                return
+            }
+            if (result.status === 'corrupt') {
+                receiverRef.current.reset()
+                setTransferProgress(null)
+                setStatus('error')
+                setStatusMsg('Transfer corrupted. Restart the Full Transfer from the beginning.')
+                setTimeout(() => {
+                    if (mountedRef.current) { setStatus('scanning'); setStatusMsg('Point camera at QR code') }
+                }, 2500)
+                return
+            }
+            return // 'ignored' (shouldn't happen since frame parsed)
+        }
+
+        // 2. Fallback: legacy single-QR JSON array.
         try {
             const parsed = JSON.parse(decodedText)
             if (!Array.isArray(parsed)) throw new Error('Not an array')
@@ -202,6 +254,28 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
         if (cleaned.includes('4MyTeam Patient List:') || cleaned.includes('Name: ')) {
             alert('It looks like you pasted the readable "Share Text". Please go back to Export and click "Copy Code" instead.')
+            return
+        }
+
+        // Support pasted chunked frames (one per line) for the Full Transfer.
+        const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+        const firstFrame = parseFrame(lines[0])
+        if (firstFrame && lines.length >= 1) {
+            receiverRef.current.reset()
+            let completed = null
+            for (const line of lines) {
+                const f = parseFrame(line)
+                if (!f) { alert('One of the pasted lines is not a valid transfer frame.'); return }
+                const r = receiverRef.current.addFrame(f)
+                if (r.status === 'complete') completed = r.payload
+                if (r.status === 'corrupt') { alert('Transfer corrupted. Paste all frames from the start.'); return }
+            }
+            if (completed) {
+                const incoming = [...(completed.patients || []), ...(completed.mortalities || [])]
+                onImport(incoming)
+                return
+            }
+            alert(`Pasted ${lines.length} frame(s) but the transfer is incomplete. Paste all frames.`)
             return
         }
 
@@ -323,6 +397,19 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             {status === 'error' && <span className="mr-1.5">⚠️</span>}
                             {status === 'found' && <Search size={16} className="inline mr-1.5" />}
                             {statusMsg}
+                            {transferProgress && (
+                                <div className="mt-2">
+                                    <div className="h-1.5 w-full bg-blue-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-blue-600 transition-all"
+                                            style={{ width: `${(transferProgress.received / transferProgress.total) * 100}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-blue-700 mt-1">
+                                        Full Transfer: {transferProgress.received}/{transferProgress.total} frames
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Last Scanned Info */}

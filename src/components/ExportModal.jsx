@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { X, Copy, Share2, CheckCircle, ClipboardPaste, Download, Upload } from 'lucide-react'
+import { X, Copy, Share2, CheckCircle, ClipboardPaste, Download, Upload, QrCode, Pause, Play } from 'lucide-react'
+import { buildFrames } from '../utils/chunkedQr'
 
 export default function ExportModal({ patients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [], onRestore }) {
     const [copiedText, setCopiedText] = useState(false)
@@ -44,6 +45,53 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
         return obj
     })
     const fullData = JSON.stringify(fullCompressed)
+
+    // 3. Full Transfer payload: EVERYTHING (incl. notes) for chunked animated QR.
+    //    We reuse the same compact object shape as fullCompressed but wrap it in
+    //    a transfer envelope so the receiver knows what it is receiving.
+    const transferPayload = useMemo(() => {
+        const sid = Math.random().toString(36).slice(2, 8).toUpperCase()
+        return {
+            __sid: sid,
+            __v: 1,
+            type: 'patients',
+            listName,
+            patients: fullCompressed,
+            mortalities: mortalities.map((p) => {
+                const obj = {}
+                if (p.ward) obj.w = p.ward
+                if (p.bed) obj.b = p.bed
+                if (p.name) obj.n = p.name
+                if (p.hospitalNumber) obj.h = p.hospitalNumber
+                if (p.note) obj.t = p.note
+                if (p.critical) obj.c = true
+                obj.reason = 'mortality'
+                if (p.removedAt) obj.removedAt = p.removedAt
+                if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
+                if (p.admissionDate) obj.admissionDate = p.admissionDate
+                return obj
+            }),
+            docs,
+        }
+    }, [fullCompressed, mortalities, docs, listName])
+
+    const { frames, total: frameTotal, bytes } = useMemo(
+        () => buildFrames(transferPayload),
+        [transferPayload]
+    )
+
+    // Animated frame playback state
+    const [frameIdx, setFrameIdx] = useState(0)
+    const [playing, setPlaying] = useState(true)
+    const FRAME_MS = 600 // dwell time per frame (must be >= scanner fps capture)
+
+    useEffect(() => {
+        if (!playing || frames.length <= 1) return
+        const t = setInterval(() => {
+            setFrameIdx((i) => (i + 1) % frames.length)
+        }, FRAME_MS)
+        return () => clearInterval(t)
+    }, [playing, frames.length])
 
     // Human-readable text
     const textData = patients
@@ -200,6 +248,49 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                             )}
                         </div>
                     </div>
+                    <p className="text-center text-[10px] text-gray-400 italic px-2">
+                        Compact QR (excludes notes) for a quick handover scan.
+                    </p>
+                </div>
+
+                {/* Full Transfer: animated chunked QR (includes notes) */}
+                <div className="bg-blue-50 rounded-2xl p-4 mb-4 border border-blue-100">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <QrCode size={14} /> Full Transfer (incl. notes)
+                        </p>
+                        {frames.length > 1 && (
+                            <button
+                                className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1"
+                                onClick={() => setPlaying((p) => !p)}
+                            >
+                                {playing ? <Pause size={13} /> : <Play size={13} />}
+                                {playing ? 'Pause' : 'Play'}
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex justify-center mb-2">
+                        <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm inline-block">
+                            <QRCodeSVG
+                                key={frameIdx}
+                                value={frames[frameIdx] || qrData}
+                                size={240}
+                                level="L"
+                                includeMargin={false}
+                                fgColor="#111827"
+                                bgColor="#ffffff"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-blue-700 font-medium">
+                        <span>
+                            Frame {frameIdx + 1} / {frames.length}
+                        </span>
+                        <span>~{bytes} B total</span>
+                    </div>
+                    <p className="text-center text-[10px] text-blue-600/80 italic mt-1.5 px-2">
+                        Scan every frame with the Import scanner. It reassembles automatically.
+                    </p>
                 </div>
 
                 {/* Primary Data Actions */}
@@ -297,7 +388,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                 </div>
 
                 <p className="text-center text-[10px] text-gray-400 italic px-2">
-                    QR excludes personal notes to maintain fast scanning.
+                    Use "Full Transfer" above to send notes &amp; everything via animated QR.
                 </p>
             </div>
         </div>
