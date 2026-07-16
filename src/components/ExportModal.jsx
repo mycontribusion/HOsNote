@@ -83,7 +83,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     // Animated frame playback state
     const [frameIdx, setFrameIdx] = useState(0)
     const [playing, setPlaying] = useState(true)
-    const FRAME_MS = 600 // dwell time per frame (must be >= scanner fps capture)
+    const FRAME_MS = 1200 // dwell time per frame (must be >= scanner fps capture)
 
     useEffect(() => {
         if (!playing || frames.length <= 1) return
@@ -227,70 +227,76 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                     </button>
                 </div>
 
-                {/* QR Code Section */}
-                <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
-                    <div className="flex justify-center mb-3">
-                        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm inline-block">
-                            {qrData.length > 2300 ? (
-                                <div className="w-[240px] h-[240px] flex items-center justify-center text-center p-3 bg-red-50 text-red-600 rounded-lg text-xs font-medium border border-red-100">
-                                    <p>⚠️ List too large for QR. Use Copy Code instead.</p>
-                                </div>
-                            ) : (
+                {/* QR Section: Compact + Full Transfer side by side (scroll to view) */}
+                <div className="flex gap-3 overflow-x-auto pb-2 mb-4 snap-x">
+                    {/* Compact QR */}
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 shrink-0 w-[260px] snap-start">
+                        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <QrCode size={14} /> Compact QR
+                        </p>
+                        <div className="flex justify-center mb-3">
+                            <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm inline-block">
+                                {qrData.length > 2300 ? (
+                                    <div className="w-[240px] h-[240px] flex items-center justify-center text-center p-3 bg-red-50 text-red-600 rounded-lg text-xs font-medium border border-red-100">
+                                        <p>⚠️ List too large for QR. Use Copy Code instead.</p>
+                                    </div>
+                                ) : (
+                                    <QRCodeSVG
+                                        id="qr-code-svg"
+                                        value={qrData}
+                                        size={240}
+                                        level="L"
+                                        includeMargin={false}
+                                        fgColor="#111827"
+                                        bgColor="#ffffff"
+                                    />
+                                )}
+                            </div>
+                        </div>
+                        <p className="text-center text-[10px] text-gray-400 italic px-2">
+                            Compact QR (excludes notes) for a quick handover scan.
+                        </p>
+                    </div>
+
+                    {/* Full Transfer: animated chunked QR (includes notes) */}
+                    <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 shrink-0 w-[260px] snap-start">
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <QrCode size={14} /> Full Transfer
+                            </p>
+                            {frames.length > 1 && (
+                                <button
+                                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1"
+                                    onClick={() => setPlaying((p) => !p)}
+                                >
+                                    {playing ? <Pause size={13} /> : <Play size={13} />}
+                                    {playing ? 'Pause' : 'Play'}
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex justify-center mb-2">
+                            <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm inline-block">
                                 <QRCodeSVG
-                                    id="qr-code-svg"
-                                    value={qrData}
+                                    key={frameIdx}
+                                    value={frames[frameIdx] || qrData}
                                     size={240}
                                     level="L"
                                     includeMargin={false}
                                     fgColor="#111827"
                                     bgColor="#ffffff"
                                 />
-                            )}
+                            </div>
                         </div>
-                    </div>
-                    <p className="text-center text-[10px] text-gray-400 italic px-2">
-                        Compact QR (excludes notes) for a quick handover scan.
-                    </p>
-                </div>
-
-                {/* Full Transfer: animated chunked QR (includes notes) */}
-                <div className="bg-blue-50 rounded-2xl p-4 mb-4 border border-blue-100">
-                    <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-                            <QrCode size={14} /> Full Transfer (incl. notes)
+                        <div className="flex items-center justify-between text-[11px] text-blue-700 font-medium">
+                            <span>
+                                Frame {frameIdx + 1} / {frames.length}
+                            </span>
+                            <span>~{bytes} B total</span>
+                        </div>
+                        <p className="text-center text-[10px] text-blue-600/80 italic mt-1.5 px-2">
+                            Scan every frame with the Import scanner. It reassembles automatically.
                         </p>
-                        {frames.length > 1 && (
-                            <button
-                                className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1"
-                                onClick={() => setPlaying((p) => !p)}
-                            >
-                                {playing ? <Pause size={13} /> : <Play size={13} />}
-                                {playing ? 'Pause' : 'Play'}
-                            </button>
-                        )}
                     </div>
-                    <div className="flex justify-center mb-2">
-                        <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm inline-block">
-                            <QRCodeSVG
-                                key={frameIdx}
-                                value={frames[frameIdx] || qrData}
-                                size={240}
-                                level="L"
-                                includeMargin={false}
-                                fgColor="#111827"
-                                bgColor="#ffffff"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-blue-700 font-medium">
-                        <span>
-                            Frame {frameIdx + 1} / {frames.length}
-                        </span>
-                        <span>~{bytes} B total</span>
-                    </div>
-                    <p className="text-center text-[10px] text-blue-600/80 italic mt-1.5 px-2">
-                        Scan every frame with the Import scanner. It reassembles automatically.
-                    </p>
                 </div>
 
                 {/* Primary Data Actions */}
