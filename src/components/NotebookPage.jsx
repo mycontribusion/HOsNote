@@ -234,9 +234,9 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                             {doc.updatedAt && doc.updatedAt !== doc.createdAt && ' · edited'}
                                         </span>
                                     </div>
-                                    {/* Text preview — more space, no clamp */}
+                                    {/* Text preview — max 4 lines, rest scrollable */}
                                     <div className="px-4 py-2">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-[5.75rem] overflow-y-auto">
                                             {doc.text}
                                         </p>
                                     </div>

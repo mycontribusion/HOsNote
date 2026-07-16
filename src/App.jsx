@@ -465,6 +465,25 @@ export default function App() {
         ))
     }, [activeTab])
 
+    const lookupPatient = useCallback((hospitalNumber) => {
+        const found = activePatients.find(p => p.hospitalNumber === hospitalNumber)
+        if (found) {
+            setTimeout(() => {
+                const el = document.getElementById(`patient-${found.id}`)
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2')
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2'), 3000)
+                }
+            }, 100)
+            return found
+        }
+        // Not found - open add form with hospital number pre-filled
+        setShowAddForm(true)
+        setEditingPatient({ hospitalNumber })
+        return null
+    }, [activePatients])
+
     const clearAll = useCallback(() => {
         setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
         if (activeTab === 'mortalities') {
@@ -850,6 +869,7 @@ export default function App() {
                 <ScannerComponent
                     listName={listName}
                     onImport={importPatients}
+                    onLookup={lookupPatient}
                     onClose={() => setShowScanner(false)}
                 />
             )}
