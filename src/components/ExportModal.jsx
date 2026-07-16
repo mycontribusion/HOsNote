@@ -8,18 +8,21 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     const [restoreMsg, setRestoreMsg] = useState('')
     const restoreInputRef = useRef(null)
 
-    // 1. QR Data: Optimized for scanning (excludes notes to keep QR density low)
+    // 1. QR Data: Ultra-compact positional array to keep QR density low.
+    // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
+    //  - criticalFlag: 1 if critical, else omitted
+    //  - mortalityFlag: 1 if mortality, else omitted
+    //  - lastUpdated is intentionally dropped (not needed for a handover scan)
     const qrCompressed = patients.map((p) => {
-        const obj = {}
-        if (p.ward) obj.w = p.ward
-        if (p.bed) obj.b = p.bed
-        if (p.name) obj.n = p.name
-        if (p.hospitalNumber) obj.h = p.hospitalNumber
-        if (p.critical) obj.c = true
-        if (p.reason === 'mortality') obj.m = true
-        if (p.lastUpdated) obj.u = p.lastUpdated
-        if (p.admissionDate) obj.ad = p.admissionDate
-        return obj
+        const row = []
+        row.push(p.ward || '')
+        row.push(p.bed || '')
+        row.push(p.name || '')
+        row.push(p.hospitalNumber || '')
+        if (p.critical) row.push(1)
+        if (p.reason === 'mortality') row.push(1)
+        if (p.admissionDate) row.push(p.admissionDate)
+        return row
     })
     const qrData = JSON.stringify(qrCompressed)
 

@@ -507,25 +507,41 @@ export default function App() {
         const defaultTeam = isMortalityTab ? 'my_team' : activeTab;
 
         incoming.forEach(_p => {
+            // Support both the new ultra-compact positional array format
+            // [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
+            // and the legacy object format ({w,b,n,h,c,m,u,ad,...}).
+            let src;
+            if (Array.isArray(_p)) {
+                const [w, b, n, h, cFlag, mFlag, ad] = _p;
+                src = {
+                    w, b, n, h,
+                    c: cFlag === 1,
+                    m: mFlag === 1,
+                    ad,
+                };
+            } else {
+                src = _p;
+            }
+
             const isMortalityRecord = !!(
-                _p.m ||
-                _p.reason === 'mortality' ||
+                src.m ||
+                src.reason === 'mortality' ||
                 isMortalityTab
             );
             const p = {
                 id: generateId(),
-                team: _p.team || defaultTeam,
-                name: (_p.n || _p.name || '').trim(),
-                hospitalNumber: (_p.h || _p.hospitalNumber || '').trim(),
-                ward: (_p.w || _p.ward || '').trim().toUpperCase(),
-                bed: (_p.b || _p.bed || '').trim(),
-                note: (_p.t || _p.note || '').trim(),
-                critical: !!(_p.c || _p.critical),
+                team: src.team || defaultTeam,
+                name: (src.n || src.name || '').trim(),
+                hospitalNumber: (src.h || src.hospitalNumber || '').trim(),
+                ward: (src.w || src.ward || '').trim().toUpperCase(),
+                bed: (src.b || src.bed || '').trim(),
+                note: (src.t || src.note || '').trim(),
+                critical: !!(src.c || src.critical),
                 reason: isMortalityRecord ? 'mortality' : undefined,
-                admissionDate: _p.ad || _p.admissionDate || new Date().toISOString().split('T')[0],
-                lastUpdated: _p.u || _p.lastUpdated || (isMortalityRecord ? undefined : new Date().toISOString()),
-                removedAt: _p.removedAt || (isMortalityRecord ? new Date().toISOString() : undefined),
-                originalTeam: _p.originalTeam || defaultTeam,
+                admissionDate: src.ad || src.admissionDate || new Date().toISOString().split('T')[0],
+                lastUpdated: src.u || src.lastUpdated || (isMortalityRecord ? undefined : new Date().toISOString()),
+                removedAt: src.removedAt || (isMortalityRecord ? new Date().toISOString() : undefined),
+                originalTeam: src.originalTeam || defaultTeam,
             };
             if (!p.name && !p.hospitalNumber && !p.ward) return;
 
