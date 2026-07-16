@@ -83,7 +83,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     // Animated frame playback state
     const [frameIdx, setFrameIdx] = useState(0)
     const [playing, setPlaying] = useState(true)
-    const FRAME_MS = 1200 // dwell time per frame (must be >= scanner fps capture)
+    const FRAME_MS = 3000 // dwell time per frame (must be >= scanner fps capture)
 
     useEffect(() => {
         if (!playing || frames.length <= 1) return
