@@ -283,7 +283,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         </div>
                     </div>
 
-                    <div className="input-field text-left py-2.5 px-3 font-mono leading-relaxed flex flex-col cursor-text overflow-y-auto" style={{ minHeight: '148px', maxHeight: '520px', fontSize: '0.8rem' }} onClick={() => noteRef.current?.focus()}>
+                    <div className="input-field text-left py-2.5 px-3 font-mono leading-relaxed flex flex-col cursor-text overflow-y-auto max-h-[250px] sm:max-h-[520px]" style={{ minHeight: '148px', fontSize: '0.8rem' }} onClick={() => noteRef.current?.focus()}>
                         <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
                             <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Name:</label>
                             <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.name} onChange={e => updateField('name', e.target.value)} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} />
