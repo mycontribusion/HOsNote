@@ -20,8 +20,9 @@
 export const PROTOCOL_TAG = 'HN1'
 
 // Keep each frame comfortably under the safe QR capacity (~1.1KB per frame at
-// error-correction level L). We use 900 chars of Base64 payload per frame.
-const CHUNK_SIZE = 900
+// error-correction level L). We use 400 chars of Base64 payload per frame to
+// keep QR density low and improve scan reliability on phone cameras.
+const CHUNK_SIZE = 400
 
 // Small, dependency-free CRC32 (used only for integrity verification).
 function crc32(str) {

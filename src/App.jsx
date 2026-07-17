@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import Header from './components/Header'
 import AddPatientForm from './components/AddPatientForm'
@@ -73,8 +74,27 @@ function PrintView({ patients, listName }) {
 }
 
 export default function App() {
-    const [activeTab, setActiveTab] = useState('my_team') // 'my_team' | 'other_team' | 'mortalities'
-    const [activePage, setActivePage] = useState('patients') // 'patients' | 'notebook'
+    const params = useParams()
+    const navigate = useNavigate()
+    const location = useLocation()
+
+    // Real URL-based navigation:
+    //   /                 -> patients page, my_team tab
+    //   /team/:tab        -> patients page, :tab in {my_team, other_team, mortalities}
+    //   /notebook         -> clinical notebook page
+    const activePage = location.pathname.startsWith('/notebook') ? 'notebook' : 'patients'
+    const activeTab = params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
+        ? params.tab
+        : 'my_team'
+
+    const goToPage = useCallback((page) => {
+        if (page === 'notebook') navigate('/notebook')
+        else navigate(`/team/${activeTab}`)
+    }, [navigate, activeTab])
+
+    const goToTab = useCallback((tab) => {
+        navigate(`/team/${tab}`)
+    }, [navigate])
     const [isLoaded, setIsLoaded] = useState(false)
     const [patients, setPatients] = useState([])
     const [mortalities, setMortalities] = useState([])
@@ -666,7 +686,7 @@ export default function App() {
                 toggleDarkMode={toggleDarkMode}
                 onFeedback={() => setShowFeedback(true)}
                 activePage={activePage}
-                onPageChange={setActivePage}
+                onPageChange={goToPage}
             />
 
             {/* Notebook Page */}
@@ -721,7 +741,7 @@ export default function App() {
                 {!showAddForm && !editingPatient && !showMortalityForm && (
                     <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4 mt-2">
                         <button
-                            onClick={() => setActiveTab('my_team')}
+                            onClick={() => goToTab('my_team')}
                             className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'my_team' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                         >
                             My Team
@@ -730,7 +750,7 @@ export default function App() {
                             </span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('other_team')}
+                            onClick={() => goToTab('other_team')}
                             className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'other_team' ? 'border-purple-600 text-purple-700 dark:text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                         >
                             On Call
@@ -739,7 +759,7 @@ export default function App() {
                             </span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('mortalities')}
+                            onClick={() => goToTab('mortalities')}
                             className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'mortalities' ? 'border-red-600 text-red-700 dark:text-red-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                         >
                             Mortalities
@@ -878,7 +898,6 @@ export default function App() {
                     discharges={discharges}
                     dischargesResetDate={dischargesResetDate}
                     docs={docs}
-                    onRestore={restoreFromBackup}
                 />
             )}
             {showScanner && (
@@ -886,6 +905,7 @@ export default function App() {
                     listName={listName}
                     onImport={importPatients}
                     onLookup={lookupPatient}
+                    onRestore={restoreFromBackup}
                     onClose={() => setShowScanner(false)}
                 />
             )}

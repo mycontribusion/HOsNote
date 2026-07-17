@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Camera, Scan, Search } from 'lucide-react'
+import { X, Camera, Scan, Search, Upload, Smartphone } from 'lucide-react'
 import { parseFrame, createReceiver } from '../utils/chunkedQr'
+import useWakeLock from '../utils/useWakeLock'
 
 // Supported barcode formats for healthcare scanning
 const BARCODE_FORMATS = [
@@ -13,7 +14,7 @@ const BARCODE_FORMATS = [
     'CODABAR',        // Blood banks, some patient IDs
 ]
 
-export default function ScannerComponent({ onImport, onLookup, listName, onClose }) {
+export default function ScannerComponent({ onImport, onLookup, listName, onClose, onRestore }) {
     const scannerRef = useRef(null)
     const mountedRef = useRef(true)
     const [scanMode, setScanMode] = useState('import') // 'import' | 'quick'
@@ -28,6 +29,12 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     const receiverRef = useRef(createReceiver())
     const [transferProgress, setTransferProgress] = useState(null) // { received, total } | null
     const transferTimerRef = useRef(null)
+    const [restoreMsg, setRestoreMsg] = useState('')
+    const restoreInputRef = useRef(null)
+
+    // Keep the screen awake while scanning/importing so the display doesn't
+    // dim or sleep mid-transfer.
+    const { supported: wakeSupported, locked: wakeLocked } = useWakeLock(true)
 
     useEffect(() => {
         if (cameraMode !== 'camera') return
@@ -145,7 +152,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         setTransferProgress(null)
                         setStatusMsg('Point camera at QR code')
                     }
-                }, 4000)
+                }, 10000)
                 return
             }
             if (result.status === 'corrupt') {
@@ -249,6 +256,30 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         }, 3000)
     }
 
+    // ── Restore: parse JSON and call parent callback ──────────────────────────
+    const handleRestoreFile = (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result)
+                if (!data.patients && !data.docs) {
+                    setRestoreMsg('❌ Invalid backup file.')
+                    return
+                }
+                onRestore?.(data)
+                setRestoreMsg('✅ Restore successful!')
+                setTimeout(() => setRestoreMsg(''), 4000)
+            } catch {
+                setRestoreMsg('❌ Could not parse file.')
+            }
+        }
+        reader.readAsText(file)
+        // reset so the same file can be re-selected
+        e.target.value = ''
+    }
+
     const handlePasteImport = () => {
         const cleaned = pasteData.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
 
@@ -345,6 +376,12 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         <p className="text-gray-500 text-sm mt-0.5">
                             {scanMode === 'import' ? 'Scan a 4MyTeam QR export code' : 'Scan patient wristband or barcode'}
                         </p>
+                        {wakeSupported && (
+                            <p className={`text-[10px] font-semibold mt-1 flex items-center gap-1 ${wakeLocked ? 'text-green-600' : 'text-gray-400'}`}>
+                                <Smartphone size={11} className={wakeLocked ? 'animate-pulse' : ''} />
+                                {wakeLocked ? 'Screen kept awake' : 'Screen awake (unsupported)'}
+                            </p>
+                        )}
                     </div>
                     <button
                         id="btn-close-scanner"
@@ -373,6 +410,15 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         Quick Scan
                     </button>
                 </div>
+
+                {/* Single shared file input for restore */}
+                <input
+                    ref={restoreInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={handleRestoreFile}
+                />
 
                 {cameraMode === 'camera' ? (
                     <>
@@ -447,12 +493,24 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                 className="btn-primary w-full bg-blue-50 text-blue-700 hover:bg-blue-100 border-none"
                                 onClick={() => setCameraMode('paste')}
                             >
-                                Paste Data Code Instead
+                                Paste Code Instead
                             </button>
+                            {onRestore && (
+                                <button
+                                    className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 transition-colors text-xs font-semibold"
+                                    onClick={() => restoreInputRef.current?.click()}
+                                >
+                                    <Upload size={14} />
+                                    Restore Backup
+                                </button>
+                            )}
                             <button className="btn-secondary w-full" onClick={onClose}>
                                 Cancel
                             </button>
                         </div>
+                        {restoreMsg && (
+                            <p className="text-xs text-center mt-2 font-medium text-gray-600">{restoreMsg}</p>
+                        )}
                     </>
                 ) : (
                     <>
@@ -474,6 +532,15 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             >
                                 {scanMode === 'import' ? 'Import Code' : 'Lookup / Add Patient'}
                             </button>
+                            {onRestore && (
+                                <button
+                                    className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 transition-colors text-xs font-semibold"
+                                    onClick={() => restoreInputRef.current?.click()}
+                                >
+                                    <Upload size={14} />
+                                    Restore Backup
+                                </button>
+                            )}
                             <button
                                 className="btn-secondary w-full border-none text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                                 onClick={() => { setPasteData(''); setCameraMode('camera') }}
@@ -481,6 +548,9 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                 Use Camera Instead
                             </button>
                         </div>
+                        {restoreMsg && (
+                            <p className="text-xs text-center mt-2 font-medium text-gray-600">{restoreMsg}</p>
+                        )}
                     </>
                 )}
             </div>

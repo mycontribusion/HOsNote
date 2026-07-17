@@ -1,10 +1,10 @@
-export default function BottomNav({ activePage, setActivePage, docCount = 0 }) {
+export default function BottomNav({ activePage, onPageChange, docCount = 0 }) {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-700">
             <div className="max-w-2xl mx-auto flex">
                 <button
                     id="nav-patients"
-                    onClick={() => setActivePage('patients')}
+                    onClick={() => onPageChange('patients')}
                     className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors relative ${
                         activePage === 'patients'
                             ? 'text-blue-700 dark:text-blue-400'
@@ -26,7 +26,7 @@ export default function BottomNav({ activePage, setActivePage, docCount = 0 }) {
 
                 <button
                     id="nav-notebook"
-                    onClick={() => setActivePage('notebook')}
+                    onClick={() => onPageChange('notebook')}
                     className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors relative ${
                         activePage === 'notebook'
                             ? 'text-teal-600 dark:text-teal-400'

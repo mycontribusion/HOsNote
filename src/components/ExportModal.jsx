@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { X, Copy, Share2, CheckCircle, ClipboardPaste, Download, Upload, QrCode, Pause, Play } from 'lucide-react'
+import { X, Copy, CheckCircle, ClipboardPaste, QrCode, Pause, Play, Smartphone } from 'lucide-react'
 import { buildFrames } from '../utils/chunkedQr'
+import useWakeLock from '../utils/useWakeLock'
 
-export default function ExportModal({ patients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [], onRestore }) {
+export default function ExportModal({ patients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
     const [copiedText, setCopiedText] = useState(false)
     const [copiedData, setCopiedData] = useState(false)
-    const [restoreMsg, setRestoreMsg] = useState('')
-    const restoreInputRef = useRef(null)
+
+    // Keep the screen awake while the export QR codes are on screen so the
+    // receiver can scan them without the display dimming/sleeping.
+    const { supported: wakeSupported, locked: wakeLocked } = useWakeLock(true)
 
     // 1. QR Data: Ultra-compact positional array to keep QR density low.
     // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
@@ -83,7 +86,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     // Animated frame playback state
     const [frameIdx, setFrameIdx] = useState(0)
     const [playing, setPlaying] = useState(true)
-    const FRAME_MS = 3000 // dwell time per frame (must be >= scanner fps capture)
+    const FRAME_MS = 5000 // dwell time per frame (must be >= scanner fps capture)
 
     useEffect(() => {
         if (!playing || frames.length <= 1) return
@@ -109,27 +112,13 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
         })
         .join('\n\n')
 
-    const handleCopyOrShare = async () => {
-        const shareText = `4MyTeam Patient List:\n${textData}`
-
-        // Try Web Share API first (mobile)
-        if (navigator.share) {
-            try {
-                await navigator.share({ title: '4MyTeam Patient List', text: shareText })
-                return
-            } catch {
-                // User cancelled or not supported, fall through
-            }
-        }
-
-        // Fallback: copy to clipboard
+    const handleCopyText = async () => {
         try {
-            await navigator.clipboard.writeText(shareText)
+            await navigator.clipboard.writeText(textData)
             setCopiedText(true)
             setTimeout(() => setCopiedText(false), 2500)
         } catch {
-            // Clipboard unavailable (very old browser)
-            alert(shareText)
+            alert(textData)
         }
     }
 
@@ -161,53 +150,6 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
         window.print()
     }
 
-    // ── Backup: download full JSON ────────────────────────────────────────────
-    const handleBackup = () => {
-        const payload = {
-            exportedAt: new Date().toISOString(),
-            version: 1,
-            patients,
-            mortalities,
-            discharges,
-            dischargesResetDate,
-            docs,
-        }
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.setAttribute('href', url)
-        link.setAttribute('download', `HOsNote_backup_${new Date().toISOString().split('T')[0]}.json`)
-        link.style.visibility = 'hidden'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-    }
-
-    // ── Restore: parse JSON and call parent callback ──────────────────────────
-    const handleRestoreFile = (e) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        const reader = new FileReader()
-        reader.onload = (ev) => {
-            try {
-                const data = JSON.parse(ev.target.result)
-                if (!data.patients && !data.docs) {
-                    setRestoreMsg('❌ Invalid backup file.')
-                    return
-                }
-                onRestore(data)
-                setRestoreMsg('✅ Restore successful!')
-                setTimeout(() => setRestoreMsg(''), 4000)
-            } catch {
-                setRestoreMsg('❌ Could not parse file.')
-            }
-        }
-        reader.readAsText(file)
-        // reset so the same file can be re-selected
-        e.target.value = ''
-    }
-
     return (
         <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
             <div className="modal-box max-w-md w-[95%]" role="dialog" aria-modal="true" aria-labelledby="export-title">
@@ -216,6 +158,12 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                     <div>
                         <h2 id="export-title" className="font-bold text-gray-900 text-xl">Export Control</h2>
                         <p className="text-gray-500 text-sm mt-0.5">{listName} | {patients.length} Patients</p>
+                        {wakeSupported && (
+                            <p className={`text-[10px] font-semibold mt-1 flex items-center gap-1 ${wakeLocked ? 'text-green-600' : 'text-gray-400'}`}>
+                                <Smartphone size={11} className={wakeLocked ? 'animate-pulse' : ''} />
+                                {wakeLocked ? 'Screen kept awake' : 'Screen awake (unsupported)'}
+                            </p>
+                        )}
                     </div>
                     <button
                         id="btn-close-export"
@@ -275,7 +223,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                             )}
                         </div>
                         <div className="flex justify-center mb-2">
-                            <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm inline-block">
+                            <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm inline-block relative">
                                 <QRCodeSVG
                                     key={frameIdx}
                                     value={frames[frameIdx] || qrData}
@@ -285,6 +233,13 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                                     fgColor="#111827"
                                     bgColor="#ffffff"
                                 />
+                                {playing && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-xl">
+                                        <span className="text-xs font-bold text-blue-800 bg-white/90 px-3 py-1.5 rounded-full shadow-sm">
+                                            Hold still…
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="flex items-center justify-between text-[11px] text-blue-700 font-medium">
@@ -325,19 +280,20 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                         }}
                     >
                         {copiedData ? <CheckCircle size={18} /> : <ClipboardPaste size={18} />}
-                        {copiedData ? 'Copied!' : 'Copy Data Code'}
+                        {copiedData ? 'Copied!' : 'Copy Code'}
                     </button>
 
                     <button
                         className="btn-secondary flex-1 py-3 text-sm flex items-center justify-center gap-2"
-                        onClick={handleCopyOrShare}
+                        onClick={handleCopyText}
                     >
-                        {copiedText ? <CheckCircle size={18} /> : (navigator.share ? <Share2 size={18} /> : <Copy size={18} />)}
-                        {copiedText ? 'Copied!' : (navigator.share ? 'Share List' : 'Copy Text')}
+                        {copiedText ? <CheckCircle size={18} /> : <Copy size={18} />}
+                        {copiedText ? 'Copied!' : 'Copy Text'}
                     </button>
                 </div>
 
-                {/* Secondary Utility Actions */}
+                {/* Secondary Utility Actions - commented out per user request */}
+                {/*
                 <div className="grid grid-cols-2 gap-2 mb-3">
                     <button
                         className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 transition-colors text-xs font-semibold"
@@ -355,46 +311,10 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                         Print PDF
                     </button>
                 </div>
-
-                {/* Backup & Restore */}
-                <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Device Backup</p>
-                    <div className="grid grid-cols-2 gap-2">
-                        <button
-                            id="btn-backup"
-                            className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white transition-colors text-xs font-semibold shadow-sm"
-                            onClick={handleBackup}
-                        >
-                            <Download size={14} />
-                            Backup JSON
-                        </button>
-
-                        <button
-                            id="btn-restore"
-                            className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs font-semibold"
-                            onClick={() => restoreInputRef.current?.click()}
-                        >
-                            <Upload size={14} />
-                            Restore
-                        </button>
-                        <input
-                            ref={restoreInputRef}
-                            type="file"
-                            accept=".json,application/json"
-                            className="hidden"
-                            onChange={handleRestoreFile}
-                        />
-                    </div>
-                    {restoreMsg && (
-                        <p className="text-xs text-center mt-2 font-medium text-gray-600 dark:text-gray-300">{restoreMsg}</p>
-                    )}
-                    <p className="text-center text-[10px] text-gray-400 italic mt-1.5">
-                        Backup includes patients, notes &amp; mortalities.
-                    </p>
-                </div>
+                */}
 
                 <p className="text-center text-[10px] text-gray-400 italic px-2">
-                    Use "Full Transfer" above to send notes &amp; everything via animated QR.
+                    Use "Full Transfer" above to send notes & everything via animated QR.
                 </p>
             </div>
         </div>
