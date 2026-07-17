@@ -204,7 +204,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     }
 
     return (
-        <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200">
+        <div className="fixed top-0 left-0 w-full h-[100dvh] z-50 bg-gray-50 dark:bg-gray-950 flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-[85vh] sm:max-h-[800px] sm:max-w-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:border sm:border-gray-200 dark:sm:border-gray-700 overflow-hidden">
                 <form id="add-patient-form" onSubmit={handleSubmit} className="flex flex-col h-full">
 
