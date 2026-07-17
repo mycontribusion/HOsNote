@@ -198,7 +198,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     }
 
     return (
-        <div className="card p-2.5 sm:p-3 mb-4 dark:bg-gray-800 dark:border-gray-700">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2.5 sm:p-3 mb-4 dark:bg-gray-800 dark:border-gray-700">
 
             <form id="add-patient-form" onSubmit={handleSubmit}>
 
