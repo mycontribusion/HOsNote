@@ -87,11 +87,10 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     )
 
     // Animated frame playback state
-    // Default to manual: the user advances frames themselves. A toggle enables
-    // automatic playback when desired.
+    // Default to autoPlay so the scanner can instantly ingest all frames.
     const [frameIdx, setFrameIdx] = useState(0)
-    const [autoPlay, setAutoPlay] = useState(false)
-    const FRAME_MS = 5000 // dwell time per frame (must be >= scanner fps capture)
+    const [autoPlay, setAutoPlay] = useState(true)
+    const FRAME_MS = 500 // 500ms allows the 20fps scanner 10 tries per frame
 
     useEffect(() => {
         if (!autoPlay || frames.length <= 1) return

@@ -154,12 +154,12 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         receiverRef.current.reset()
                         setTransferProgress(null)
                         setStatus('error')
-                        setStatusMsg('Transfer stalled — a frame was missed. Restart the Full Transfer from frame 1.')
+                        setStatusMsg('Transfer stalled. Ensure the sender device is playing the QR animation.')
                         setTimeout(() => {
                             if (mountedRef.current) { setStatus('scanning'); setStatusMsg('Point camera at QR code') }
-                        }, 3000)
+                        }, 3500)
                     }
-                }, 10000)
+                }, 20000)
                 return
             }
             if (result.status === 'corrupt') {
