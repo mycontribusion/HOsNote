@@ -145,12 +145,19 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 setTransferProgress({ received: result.received, total: result.total })
                 setStatus('scanning')
                 setStatusMsg(`Receiving transfer… ${result.received}/${result.total} frames`)
-                // Auto-clear progress if no new frames arrive (transfer aborted).
+                // Auto-clear progress if no new frames arrive (transfer aborted or
+                // a frame was missed). Reset the receiver so the sender can simply
+                // restart the Full Transfer from the beginning without being stuck.
                 if (transferTimerRef.current) clearTimeout(transferTimerRef.current)
                 transferTimerRef.current = setTimeout(() => {
                     if (mountedRef.current) {
+                        receiverRef.current.reset()
                         setTransferProgress(null)
-                        setStatusMsg('Point camera at QR code')
+                        setStatus('error')
+                        setStatusMsg('Transfer stalled — a frame was missed. Restart the Full Transfer from frame 1.')
+                        setTimeout(() => {
+                            if (mountedRef.current) { setStatus('scanning'); setStatusMsg('Point camera at QR code') }
+                        }, 3000)
                     }
                 }, 10000)
                 return
@@ -282,9 +289,11 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
     const handlePasteImport = () => {
         const cleaned = pasteData.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+        if (!cleaned) return
 
         if (cleaned.includes('4MyTeam Patient List:') || cleaned.includes('Name: ')) {
-            alert('It looks like you pasted the readable "Share Text". Please go back to Export and click "Copy Code" instead.')
+            setStatus('error')
+            setStatusMsg('That looks like the readable "Share Text". Go back to Export and tap "Share Code" / "Copy Code" instead.')
             return
         }
 
@@ -296,26 +305,40 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             let completed = null
             for (const line of lines) {
                 const f = parseFrame(line)
-                if (!f) { alert('One of the pasted lines is not a valid transfer frame.'); return }
+                if (!f) {
+                    setStatus('error')
+                    setStatusMsg('One of the pasted lines is not a valid transfer frame.')
+                    return
+                }
                 const r = receiverRef.current.addFrame(f)
                 if (r.status === 'complete') completed = r.payload
-                if (r.status === 'corrupt') { alert('Transfer corrupted. Paste all frames from the start.'); return }
+                if (r.status === 'corrupt') {
+                    setStatus('error')
+                    setStatusMsg('Transfer corrupted. Paste all frames from the start.')
+                    return
+                }
             }
             if (completed) {
                 const incoming = [...(completed.patients || []), ...(completed.mortalities || [])]
-                onImport(incoming)
+                setStatus('success')
+                setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
+                setTimeout(() => { if (mountedRef.current) onImport(incoming) }, 600)
                 return
             }
-            alert(`Pasted ${lines.length} frame(s) but the transfer is incomplete. Paste all frames.`)
+            setStatus('error')
+            setStatusMsg(`Pasted ${lines.length} frame(s) but the transfer is incomplete. Paste all frames.`)
             return
         }
 
         try {
             const parsed = JSON.parse(cleaned)
             if (!Array.isArray(parsed)) throw new Error('Not an array')
-            onImport(parsed)
+            setStatus('success')
+            setStatusMsg(`Loaded ${parsed.length} patient${parsed.length !== 1 ? 's' : ''}! Importing…`)
+            setTimeout(() => { if (mountedRef.current) onImport(parsed) }, 600)
         } catch {
-            alert('Invalid data code. Please ensure you copied the exact code from the "Copy Code" button.')
+            setStatus('error')
+            setStatusMsg('Invalid code. Paste the exact code from "Share Code" / "Copy Code".')
         }
     }
 
@@ -489,12 +512,12 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         )}
 
                         <div className="flex flex-col gap-2">
-                            <button
-                                className="btn-primary w-full bg-blue-50 text-blue-700 hover:bg-blue-100 border-none"
-                                onClick={() => setCameraMode('paste')}
-                            >
-                                Paste Code Instead
-                            </button>
+                                <button
+                                    className="btn-primary w-full bg-blue-50 text-blue-700 hover:bg-blue-100 border-none"
+                                    onClick={() => setCameraMode('paste')}
+                                >
+                                    Paste Share Code Instead
+                                </button>
                             {onRestore && (
                                 <button
                                     className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 transition-colors text-xs font-semibold"
@@ -518,7 +541,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             <textarea
                                 className="input-field text-sm font-mono h-32 resize-none"
                                 placeholder={scanMode === 'import'
-                                    ? 'Paste 4MyTeam data code here...'
+                                    ? 'Paste the Share Code / Copy Code from Export here...'
                                     : 'Paste barcode value or hospital number here...'}
                                 value={pasteData}
                                 onChange={(e) => setPasteData(e.target.value)}

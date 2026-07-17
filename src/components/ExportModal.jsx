@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { X, Copy, CheckCircle, ClipboardPaste, QrCode, Pause, Play, Smartphone } from 'lucide-react'
+import { X, Copy, CheckCircle, ClipboardPaste, QrCode, Pause, Play, Smartphone, Share2 } from 'lucide-react'
 import { buildFrames } from '../utils/chunkedQr'
 import useWakeLock from '../utils/useWakeLock'
 
 export default function ExportModal({ patients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
     const [copiedText, setCopiedText] = useState(false)
     const [copiedData, setCopiedData] = useState(false)
+    const [sharedCode, setSharedCode] = useState(false)
+    const [shareError, setShareError] = useState('')
 
     // Keep the screen awake while the export QR codes are on screen so the
     // receiver can scan them without the display dimming/sleeping.
@@ -84,17 +86,19 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     )
 
     // Animated frame playback state
+    // Default to manual: the user advances frames themselves. A toggle enables
+    // automatic playback when desired.
     const [frameIdx, setFrameIdx] = useState(0)
-    const [playing, setPlaying] = useState(true)
+    const [autoPlay, setAutoPlay] = useState(false)
     const FRAME_MS = 5000 // dwell time per frame (must be >= scanner fps capture)
 
     useEffect(() => {
-        if (!playing || frames.length <= 1) return
+        if (!autoPlay || frames.length <= 1) return
         const t = setInterval(() => {
             setFrameIdx((i) => (i + 1) % frames.length)
         }, FRAME_MS)
         return () => clearInterval(t)
-    }, [playing, frames.length])
+    }, [autoPlay, frames.length])
 
     // Human-readable text
     const textData = patients
@@ -119,6 +123,55 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
             setTimeout(() => setCopiedText(false), 2500)
         } catch {
             alert(textData)
+        }
+    }
+
+    // Share Code: copy the full data code to the clipboard AND offer the native
+    // share sheet (so it can be sent over Bluetooth, WhatsApp, etc.). The
+    // receiver pastes/imports the code on their own device — no fragile
+    // multi-frame QR scanning required.
+    const handleShareCode = async () => {
+        setShareError('')
+        try {
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: `HOsNote handover — ${listName}`,
+                        text: fullData,
+                    })
+                    setSharedCode(true)
+                    setTimeout(() => setSharedCode(false), 2000)
+                    return
+                } catch (err) {
+                    // User cancelled the share sheet, or it failed — fall back
+                    // to copying the code to the clipboard.
+                    if (err && err.name === 'AbortError') {
+                        // fall through to clipboard copy
+                    }
+                }
+            }
+            // Clipboard fallback (works in all browsers / PWA contexts).
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(fullData)
+            } else {
+                const textArea = document.createElement('textarea')
+                textArea.value = fullData
+                textArea.style.position = 'fixed'
+                document.body.appendChild(textArea)
+                textArea.focus()
+                textArea.select()
+                try {
+                    document.execCommand('copy')
+                } catch {
+                    throw new Error('copy failed')
+                } finally {
+                    document.body.removeChild(textArea)
+                }
+            }
+            setSharedCode(true)
+            setTimeout(() => setSharedCode(false), 2000)
+        } catch {
+            setShareError('Could not share. Use "Copy Code" and paste it manually.')
         }
     }
 
@@ -215,10 +268,11 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                             {frames.length > 1 && (
                                 <button
                                     className="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1"
-                                    onClick={() => setPlaying((p) => !p)}
+                                    onClick={() => setAutoPlay((p) => !p)}
+                                    aria-pressed={autoPlay}
                                 >
-                                    {playing ? <Pause size={13} /> : <Play size={13} />}
-                                    {playing ? 'Pause' : 'Play'}
+                                    {autoPlay ? <Pause size={13} /> : <Play size={13} />}
+                                    {autoPlay ? 'Auto' : 'Manual'}
                                 </button>
                             )}
                         </div>
@@ -233,7 +287,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                                     fgColor="#111827"
                                     bgColor="#ffffff"
                                 />
-                                {playing && (
+                                {autoPlay && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-xl">
                                         <span className="text-xs font-bold text-blue-800 bg-white/90 px-3 py-1.5 rounded-full shadow-sm">
                                             Hold still…
@@ -242,6 +296,24 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                                 )}
                             </div>
                         </div>
+                        {frames.length > 1 && !autoPlay && (
+                            <div className="flex items-center justify-center gap-2 mb-2">
+                                <button
+                                    className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1"
+                                    onClick={() => setFrameIdx((i) => (i - 1 + frames.length) % frames.length)}
+                                    aria-label="Previous frame"
+                                >
+                                    Prev
+                                </button>
+                                <button
+                                    className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1"
+                                    onClick={() => setFrameIdx((i) => (i + 1) % frames.length)}
+                                    aria-label="Next frame"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between text-[11px] text-blue-700 font-medium">
                             <span>
                                 Frame {frameIdx + 1} / {frames.length}
@@ -255,41 +327,54 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                 </div>
 
                 {/* Primary Data Actions */}
-                <div className="flex gap-2 mb-4">
+                <div className="flex flex-col gap-2 mb-4">
                     <button
-                        className="btn-primary flex-1 py-3 text-sm flex items-center justify-center gap-2"
-                        onClick={async () => {
-                            const fallbackCopy = (text) => {
-                                const textArea = document.createElement("textarea");
-                                textArea.value = text;
-                                textArea.style.position = "fixed";
-                                document.body.appendChild(textArea);
-                                textArea.focus(); textArea.select();
-                                try { return document.execCommand('copy'); } catch { return false; }
-                                finally { document.body.removeChild(textArea); }
-                            }
-                            try {
-                                if (navigator.clipboard && window.isSecureContext) {
-                                    await navigator.clipboard.writeText(fullData)
-                                } else {
-                                    if (!fallbackCopy(fullData)) throw new Error()
-                                }
-                                setCopiedData(true)
-                                setTimeout(() => setCopiedData(false), 2000)
-                            } catch { alert('Clipboard error') }
-                        }}
+                        className="btn-primary py-3 text-sm flex items-center justify-center gap-2"
+                        onClick={handleShareCode}
                     >
-                        {copiedData ? <CheckCircle size={18} /> : <ClipboardPaste size={18} />}
-                        {copiedData ? 'Copied!' : 'Copy Code'}
+                        {sharedCode ? <CheckCircle size={18} /> : <Share2 size={18} />}
+                        {sharedCode ? 'Code shared / copied!' : 'Share Code (Bluetooth / Copy)'}
                     </button>
 
-                    <button
-                        className="btn-secondary flex-1 py-3 text-sm flex items-center justify-center gap-2"
-                        onClick={handleCopyText}
-                    >
-                        {copiedText ? <CheckCircle size={18} /> : <Copy size={18} />}
-                        {copiedText ? 'Copied!' : 'Copy Text'}
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            className="btn-secondary flex-1 py-3 text-sm flex items-center justify-center gap-2"
+                            onClick={async () => {
+                                const fallbackCopy = (text) => {
+                                    const textArea = document.createElement("textarea");
+                                    textArea.value = text;
+                                    textArea.style.position = "fixed";
+                                    document.body.appendChild(textArea);
+                                    textArea.focus(); textArea.select();
+                                    try { return document.execCommand('copy'); } catch { return false; }
+                                    finally { document.body.removeChild(textArea); }
+                                }
+                                try {
+                                    if (navigator.clipboard && window.isSecureContext) {
+                                        await navigator.clipboard.writeText(fullData)
+                                    } else {
+                                        if (!fallbackCopy(fullData)) throw new Error()
+                                    }
+                                    setCopiedData(true)
+                                    setTimeout(() => setCopiedData(false), 2000)
+                                } catch { alert('Clipboard error') }
+                            }}
+                        >
+                            {copiedData ? <CheckCircle size={18} /> : <ClipboardPaste size={18} />}
+                            {copiedData ? 'Copied!' : 'Copy Code'}
+                        </button>
+
+                        <button
+                            className="btn-secondary flex-1 py-3 text-sm flex items-center justify-center gap-2"
+                            onClick={handleCopyText}
+                        >
+                            {copiedText ? <CheckCircle size={18} /> : <Copy size={18} />}
+                            {copiedText ? 'Copied!' : 'Copy Text'}
+                        </button>
+                    </div>
+                    {shareError && (
+                        <p className="text-xs text-center text-red-600 font-medium">{shareError}</p>
+                    )}
                 </div>
 
                 {/* Secondary Utility Actions - commented out per user request */}
@@ -314,7 +399,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                 */}
 
                 <p className="text-center text-[10px] text-gray-400 italic px-2">
-                    Use "Full Transfer" above to send notes & everything via animated QR.
+                    Tap <span className="font-semibold">Share Code</span> and send it via Bluetooth / any app. The receiver opens Import → Paste Code to load it.
                 </p>
             </div>
         </div>
