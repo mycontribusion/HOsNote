@@ -219,8 +219,8 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 )}
 
                 {/* Faux-textarea container */}
-                <div className="mb-2">
-                    <div className="flex items-center justify-between mb-1.5">
+                <div className="mb-2 relative">
+                    <div className="flex items-center justify-between mb-2 sticky top-[72px] z-20 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md py-1.5 -mx-1 px-1 rounded-lg">
                         {/* Undo / Redo */}
                         <div className="flex items-center gap-1">
                             <button
