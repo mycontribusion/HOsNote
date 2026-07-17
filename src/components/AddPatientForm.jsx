@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { Plus, Save, X, Undo2, Redo2 } from 'lucide-react'
 
 const DRAFT_KEY = '4myteam_draft_patient'
@@ -158,6 +158,12 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
 
+    useEffect(() => {
+        // Lock background scroll while modal is open
+        document.body.style.overflow = 'hidden'
+        return () => { document.body.style.overflow = '' }
+    }, [])
+
     const currentDraft = useCallback((overrides = {}) => ({ team, fields, critical, ...overrides }), [team, fields, critical])
     
     // Add custom field update handler
@@ -198,77 +204,60 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2.5 sm:p-3 mb-4 dark:bg-gray-800 dark:border-gray-700">
+        <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-[85vh] sm:max-h-[800px] sm:max-w-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:border sm:border-gray-200 dark:sm:border-gray-700 overflow-hidden">
+                <form id="add-patient-form" onSubmit={handleSubmit} className="flex flex-col h-full">
 
-            <form id="add-patient-form" onSubmit={handleSubmit}>
-
-                {/* Team toggle */}
-                {!isMortalityMode && (
-                    <div className="flex bg-gray-100 dark:bg-gray-700 p-0.5 rounded-lg mb-2.5">
-                        {[['my_team', 'My Team', 'text-blue-700 dark:text-blue-300'], ['other_team', 'On Call', 'text-purple-700 dark:text-purple-300']].map(([val, label, activeColor]) => (
-                            <button
-                                key={val}
-                                type="button"
-                                onClick={() => { setTeam(val); scheduleDraftSave(currentDraft({ team: val })) }}
-                                className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${team === val ? `bg-white dark:bg-gray-600 ${activeColor} shadow-sm` : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {/* Faux-textarea container */}
-                <div className="mb-2 relative">
-                    <div className="flex items-center justify-between mb-2 sticky top-0 z-[60] bg-white dark:bg-gray-800 py-2 -mx-2 px-2 rounded-b-xl shadow-sm border-b border-gray-100 dark:border-gray-700">
+                    {/* Top Action Bar */}
+                    <div className="flex items-center justify-between px-3 py-3 sm:px-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10">
                         {/* Undo / Redo */}
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                             <button
                                 type="button"
                                 onClick={handleUndo}
                                 disabled={history.index <= 0}
-                                className="p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
+                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                 aria-label="Undo"
                             >
-                                <Undo2 size={18} strokeWidth={2.5} />
+                                <Undo2 size={20} strokeWidth={2.5} />
                             </button>
                             <button
                                 type="button"
                                 onClick={handleRedo}
                                 disabled={history.index >= history.stack.length - 1}
-                                className="p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 transition-colors"
+                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                 aria-label="Redo"
                             >
-                                <Redo2 size={18} strokeWidth={2.5} />
+                                <Redo2 size={20} strokeWidth={2.5} />
                             </button>
                         </div>
-                        <div className="flex items-center gap-3">
-                            {/* Critical in the middle */}
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            {/* Critical */}
                             {!isMortalityMode && (
                                 <button
                                     type="button"
                                     aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
                                     onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-[11px] font-bold transition-all ${
+                                    className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
                                         critical
-                                            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400'
-                                            : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:border-gray-300'
+                                            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 shadow-sm'
+                                            : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300'
                                     }`}
                                 >
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
+                                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
                                     {critical ? 'CRITICAL' : 'Critical'}
                                 </button>
                             )}
 
-                            {/* Add / Save with text label */}
+                            {/* Add / Save */}
                             <button
                                 id="btn-add-patient"
                                 type="submit"
                                 aria-label={initialData ? "Save" : "Add"}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm shadow-blue-200 dark:shadow-blue-900/20 transition-all active:scale-95"
                             >
                                 {initialData ? <Save size={18} strokeWidth={2.5} /> : <Plus size={18} strokeWidth={2.5} />}
-                                <span className="text-xs font-bold">{initialData ? 'Save' : 'Add'}</span>
+                                <span className="text-sm font-bold">{initialData ? 'Save' : 'Add'}</span>
                             </button>
 
                             {/* Cancel */}
@@ -276,58 +265,83 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 type="button"
                                 onClick={onCancel}
                                 aria-label="Cancel"
-                                className="p-2.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors active:scale-95 ml-1"
                             >
-                                <X size={18} strokeWidth={2.5} />
+                                <X size={20} strokeWidth={2.5} />
                             </button>
                         </div>
                     </div>
 
-                    <div className="input-field text-left py-2.5 px-3 font-mono leading-relaxed flex flex-col cursor-text overflow-y-auto max-h-[250px] sm:max-h-[520px]" style={{ minHeight: '148px', fontSize: '0.8rem' }} onClick={() => noteRef.current?.focus()}>
-                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
-                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Name:</label>
-                            <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.name} onChange={e => updateField('name', e.target.value)} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} />
-                        </div>
-                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
-                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Hosp#:</label>
-                            <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.hospitalNumber} onChange={e => updateField('hospitalNumber', e.target.value)} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} />
-                        </div>
-                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
-                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Ward:</label>
-                            <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} />
-                        </div>
-                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
-                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Bed:</label>
-                            <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.bed} onChange={e => updateField('bed', e.target.value)} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} />
-                        </div>
-                        <div className="flex items-center gap-1 min-h-[22px]" onClick={e => e.stopPropagation()}>
-                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 w-14">Date:</label>
-                            <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} />
-                        </div>
-                        <div className="flex flex-col items-start gap-1 mt-1 relative" onClick={e => e.stopPropagation()}>
-                            <label className="text-gray-400 dark:text-gray-500 font-semibold select-none flex-shrink-0 pt-[1px]">Notes:</label>
-                            <textarea
-                                ref={noteRef}
-                                rows={15}
-                                className="w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0 resize-none"
-                                value={fields.note}
-                                onChange={e => updateField('note', e.target.value)}
-                                autoComplete="off"
-                                spellCheck={false}
-                            />
-                        </div>
-                    </div>
-                </div>
+                    {/* Scrollable Form Body */}
+                    <div className="flex-1 overflow-y-auto flex flex-col bg-white dark:bg-gray-800">
+                        
+                        {/* Team toggle */}
+                        {!isMortalityMode && (
+                            <div className="flex bg-gray-100 dark:bg-gray-700/60 p-1 rounded-xl m-3 sm:m-4 shrink-0 shadow-inner">
+                                {[['my_team', 'My Team', 'text-blue-700 dark:text-blue-300'], ['other_team', 'On Call', 'text-purple-700 dark:text-purple-300']].map(([val, label, activeColor]) => (
+                                    <button
+                                        key={val}
+                                        type="button"
+                                        onClick={() => { setTeam(val); scheduleDraftSave(currentDraft({ team: val })) }}
+                                        className={`flex-1 text-sm font-bold py-2 rounded-lg transition-all ${team === val ? `bg-white dark:bg-gray-600 ${activeColor} shadow-sm` : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
-                {/* Error */}
-                {error && (
-                    <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 text-xs font-medium mb-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-                        {error}
-                    </div>
-                )}
+                        {/* Error */}
+                        {error && (
+                            <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm font-bold mx-3 sm:mx-4 mb-3 shrink-0 shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                                {error}
+                            </div>
+                        )}
 
-            </form>
+                        {/* Faux-textarea container */}
+                        <div className="text-left py-2 px-4 sm:px-6 font-mono leading-relaxed flex flex-col cursor-text flex-1 min-h-[300px]" style={{ fontSize: '0.85rem' }} onClick={() => noteRef.current?.focus()}>
+                            <div className="flex items-center gap-1.5 min-h-[26px]" onClick={e => e.stopPropagation()}>
+                                <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 w-14">Name:</label>
+                                <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.name} onChange={e => updateField('name', e.target.value)} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} />
+                            </div>
+                            <div className="flex items-center gap-1.5 min-h-[26px]" onClick={e => e.stopPropagation()}>
+                                <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 w-14">Hosp#:</label>
+                                <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.hospitalNumber} onChange={e => updateField('hospitalNumber', e.target.value)} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} />
+                            </div>
+                            <div className="flex items-center gap-1.5 min-h-[26px]" onClick={e => e.stopPropagation()}>
+                                <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 w-14">Ward:</label>
+                                <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} />
+                            </div>
+                            <div className="flex items-center gap-1.5 min-h-[26px]" onClick={e => e.stopPropagation()}>
+                                <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 w-14">Bed:</label>
+                                <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.bed} onChange={e => updateField('bed', e.target.value)} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} />
+                            </div>
+                            <div className="flex items-center gap-1.5 min-h-[26px] mb-1 border-b border-gray-100 dark:border-gray-700/50 pb-1" onClick={e => e.stopPropagation()}>
+                                <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 w-14">Date:</label>
+                                <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} />
+                            </div>
+                            <div className="flex flex-col items-start gap-1 mt-1.5 flex-1 relative" onClick={e => e.stopPropagation()}>
+                                <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 pt-[1px]">Notes:</label>
+                                <div className="grid w-full flex-1 min-h-[150px]">
+                                    <div className="col-start-1 row-start-1 w-full whitespace-pre-wrap break-words invisible pointer-events-none p-0 m-0 leading-normal" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
+                                        {fields.note + ' \n'}
+                                    </div>
+                                    <textarea
+                                        ref={noteRef}
+                                        className="col-start-1 row-start-1 w-full h-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0 resize-none overflow-hidden leading-normal"
+                                        value={fields.note}
+                                        onChange={e => updateField('note', e.target.value)}
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </form>
+            </div>
         </div>
     )
 }
