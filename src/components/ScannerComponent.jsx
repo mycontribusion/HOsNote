@@ -98,25 +98,20 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
                         // html5-qrcode v2.3+ sets its internal "paused" state
                         // AFTER the success callback returns, so an immediate
-                        // resume() is a no-op. We use a state-aware retrying helper.
-                        const tryResume = (attempts = 5) => {
+                        // resume() is a no-op. We unconditionally retry calling
+                        // resume() to capture the state transition without relying on getState().
+                        const tryResume = (attempts = 6) => {
                             if (!mountedRef.current || !scannerRef.current) return
                             try {
-                                const state = scannerRef.current.getState()
-                                if (state === 3) { // PAUSED
-                                    scannerRef.current.resume()
-                                } else if (state === 2) { // SCANNING
-                                    // Already running
-                                } else if (attempts > 0) {
-                                    setTimeout(() => tryResume(attempts - 1), 80)
-                                }
+                                scannerRef.current.resume()
                             } catch (e) {
-                                if (attempts > 0) {
-                                    setTimeout(() => tryResume(attempts - 1), 80)
-                                }
+                                // Ignore errors like "already scanning" or "not paused yet"
+                            }
+                            if (attempts > 0) {
+                                setTimeout(() => tryResume(attempts - 1), 100)
                             }
                         }
-                        setTimeout(() => tryResume(), 120)
+                        setTimeout(() => tryResume(), 100)
                     },
                     () => {
                         // Scan failure – normal, ignore
@@ -160,10 +155,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }, [cameraMode, scanMode])
 
     const handleImportScan = (decodedText) => {
+        console.log('[SCANNER DIAGNOSTIC] RAW:', decodedText)
         // 1. Try chunked-transfer frame first (animated full transfer).
         const frame = parseFrame(decodedText)
+        console.log('[SCANNER DIAGNOSTIC] FRAME:', frame)
         if (frame) {
             const result = receiverRef.current.addFrame(frame)
+            console.log('[SCANNER DIAGNOSTIC] RESULT:', result)
             if (result.status === 'complete') {
                 // Reassembled payload: { type, patients, mortalities, docs, ... }
                 const payload = result.payload
