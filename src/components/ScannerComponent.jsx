@@ -145,21 +145,23 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 setTransferProgress({ received: result.received, total: result.total })
                 setStatus('scanning')
                 setStatusMsg(`Receiving transfer… ${result.received}/${result.total} frames`)
-                // Auto-clear progress if no new frames arrive (transfer aborted or
-                // a frame was missed). Reset the receiver so the sender can simply
-                // restart the Full Transfer from the beginning without being stuck.
+                // If no new frames arrive for 8 s, surface a stall warning but
+                // KEEP all collected chunks in the receiver — the animation just
+                // needs to loop and the scanner will fill the missing gaps without
+                // having to restart from frame 0.
                 if (transferTimerRef.current) clearTimeout(transferTimerRef.current)
                 transferTimerRef.current = setTimeout(() => {
                     if (mountedRef.current) {
-                        receiverRef.current.reset()
-                        setTransferProgress(null)
                         setStatus('error')
-                        setStatusMsg('Transfer stalled. Ensure the sender device is playing the QR animation.')
+                        setStatusMsg('Stalled — keep the camera pointed at the QR animation to fill remaining frames.')
                         setTimeout(() => {
-                            if (mountedRef.current) { setStatus('scanning'); setStatusMsg('Point camera at QR code') }
-                        }, 3500)
+                            if (mountedRef.current && status !== 'success') {
+                                setStatus('scanning')
+                                setStatusMsg(`Receiving transfer… ${result.received}/${result.total} frames`)
+                            }
+                        }, 4000)
                     }
-                }, 20000)
+                }, 8000)
                 return
             }
             if (result.status === 'corrupt') {

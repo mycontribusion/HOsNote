@@ -287,7 +287,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                             {qrData.length > 2300 ? (
                                 <p className="text-red-600 text-sm text-center font-semibold">⚠️ List too large for QR.<br/>Use Share Code.</p>
                             ) : (
-                                <QRCodeSVG value={qrData} size="100%" level="L" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#111827" bgColor="#ffffff" />
+                                <QRCodeSVG value={qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#111827" bgColor="#ffffff" />
                             )}
                         </div>
                     ) : (
@@ -302,14 +302,17 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                                 )}
                             </div>
                             
-                            <div className="w-full aspect-square bg-white p-3 rounded-xl shadow-sm border border-blue-200 relative mb-2">
-                                <QRCodeSVG value={frames[frameIdx] || qrData} size="100%" level="L" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#1e3a8a" bgColor="#ffffff" />
-                                {autoPlay && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-xl backdrop-blur-[0.5px]">
-                                        <span className="text-xs font-bold text-blue-900 bg-white/95 px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>Hold still</span>
-                                    </div>
-                                )}
+                            <div className="w-full aspect-square bg-white p-3 rounded-xl shadow-sm border border-blue-200 relative mb-1">
+                                <QRCodeSVG value={frames[frameIdx] || qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#1e3a8a" bgColor="#ffffff" />
                             </div>
+
+                            {/* "Hold still" indicator lives BELOW the QR — never occludes or blurs it */}
+                            {autoPlay && (
+                                <div className="flex items-center justify-center gap-1.5 py-1.5 mb-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                    <span className="text-xs font-bold text-blue-700 dark:text-blue-400">Hold still — scanning in progress</span>
+                                </div>
+                            )}
 
                             {frames.length > 1 && !autoPlay && (
                                 <div className="flex w-full gap-2">

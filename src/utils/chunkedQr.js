@@ -19,10 +19,12 @@
 
 export const PROTOCOL_TAG = 'HN1'
 
-// Keep each frame comfortably under the safe QR capacity (~1.1KB per frame at
-// error-correction level L). We use 400 chars of Base64 payload per frame to
-// keep QR density low and improve scan reliability on phone cameras.
-const CHUNK_SIZE = 400
+// Keep each frame comfortably under the safe QR capacity at error-correction
+// level M. At ~700 bytes total QR payload (level M, version ~8) this is very
+// reliably scannable by phone cameras even in mediocre lighting.
+// 120 Base64 chars ≈ 90 bytes of raw data, leaving plenty of room for the
+// frame header (tag|sid|total|index|).
+const CHUNK_SIZE = 120
 
 // Small, dependency-free CRC32 (used only for integrity verification).
 function crc32(str) {
@@ -95,8 +97,14 @@ export function parseFrame(value) {
 
 // Accumulator that collects frames for one or more sessions and emits the
 // reassembled payload once a session is complete.
+// Resilience design:
+//   - Sessions are NEVER wiped on stall — the camera just needs to keep
+//     scanning and previously-received chunks stay in memory.
+//   - A session is only discarded on successful completion or on 'corrupt'.
+//   - reset() is an explicit operation called only when the user taps
+//     "restart" or a new paste is submitted.
 export function createReceiver() {
-    const sessions = new Map() // sessionId -> { total, chunks[], checksum }
+    const sessions = new Map() // sessionId -> { total, chunks[], checksum, received }
 
     function addFrame(frame) {
         if (!frame) return { status: 'ignored' }
@@ -110,6 +118,10 @@ export function createReceiver() {
         if (frame.index < sess.total && sess.chunks[frame.index] === undefined) {
             sess.chunks[frame.index] = frame.payload
             sess.received++
+            // Update checksum if this is frame 0 and we didn't have it yet
+            if (frame.index === 0 && frame.checksum !== null && sess.checksum === null) {
+                sess.checksum = frame.checksum
+            }
         }
 
         if (sess.received === sess.total && sess.chunks.every(c => c !== undefined)) {
@@ -119,12 +131,15 @@ export function createReceiver() {
                 if (sess.checksum !== null) {
                     const actual = crc32(json)
                     if (actual !== parseInt(sess.checksum, 10)) {
+                        // Corrupt — discard this session so it can restart cleanly
+                        sessions.delete(frame.sessionId)
                         return { status: 'corrupt' }
                     }
                 }
                 sessions.delete(frame.sessionId)
                 return { status: 'complete', payload: JSON.parse(json) }
             } catch {
+                sessions.delete(frame.sessionId)
                 return { status: 'corrupt' }
             }
         }

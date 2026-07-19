@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Save } from 'lucide-react'
+import { X, Save, Undo2, Redo2 } from 'lucide-react'
 
 const COLOR_OPTIONS = [
     { value: 'blue',   label: 'Blue',   bg: 'bg-blue-500' },
@@ -11,22 +11,60 @@ const COLOR_OPTIONS = [
 ]
 
 export default function DocComposer({ patient, existingDoc = null, onSave, onClose }) {
-    const [text, setText] = useState(existingDoc?.text ?? '')
+    const initialText = existingDoc?.text ?? ''
+    const [text, setText] = useState(initialText)
     const [color, setColor] = useState(existingDoc?.color ?? 'blue')
     const [error, setError] = useState('')
     const textareaRef = useRef(null)
 
+    // ── Undo / Redo history (mirrors AddPatientForm pattern) ──────────────────
+    const [history, setHistory] = useState({ stack: [initialText], index: 0 })
+    const isUndoRedo = useRef(false)
+
+    // Debounced push to history stack whenever text changes (skip if from undo/redo)
     useEffect(() => {
-        // Auto-focus and set initial height
+        if (isUndoRedo.current) {
+            isUndoRedo.current = false
+            return
+        }
+        const timer = setTimeout(() => {
+            setHistory(prev => {
+                if (text === prev.stack[prev.index]) return prev
+                const nextStack = [...prev.stack.slice(0, prev.index + 1), text]
+                if (nextStack.length > 50) nextStack.shift()
+                return { stack: nextStack, index: nextStack.length - 1 }
+            })
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [text])
+
+    const handleUndo = () => {
+        if (history.index <= 0) return
+        isUndoRedo.current = true
+        const prev = history.stack[history.index - 1]
+        setText(prev)
+        setHistory(h => ({ ...h, index: h.index - 1 }))
+        textareaRef.current?.focus()
+    }
+
+    const handleRedo = () => {
+        if (history.index >= history.stack.length - 1) return
+        isUndoRedo.current = true
+        const next = history.stack[history.index + 1]
+        setText(next)
+        setHistory(h => ({ ...h, index: h.index + 1 }))
+        textareaRef.current?.focus()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.focus()
-            textareaRef.current.style.height = 'auto'
-            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 280) + 'px'
         }
     }, [])
 
     useEffect(() => {
-        // Lock background scroll while modal is open
         document.body.style.overflow = 'hidden'
         return () => { document.body.style.overflow = '' }
     }, [])
@@ -42,17 +80,28 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                 <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full">
                     {/* Top Action Bar */}
                     <div className="flex items-center justify-between px-3 py-3 sm:px-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10">
-                        {/* Left: Title & Patient info */}
-                        <div className="min-w-0 flex-1 pr-4">
-                            <h2 id="doc-composer-title" className="font-bold text-gray-900 dark:text-white text-base leading-tight truncate">
-                                {existingDoc ? 'Edit Note' : 'New Note'}
-                            </h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate font-medium">
-                                {patient.name || 'Unknown Patient'}
-                                {patient.ward ? ` · ${patient.ward}` : ''}
-                                {patient.bed ? ` Bed ${patient.bed}` : ''}
-                            </p>
+                        {/* Left: Undo / Redo */}
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={handleUndo}
+                                disabled={history.index <= 0}
+                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                aria-label="Undo"
+                            >
+                                <Undo2 size={20} strokeWidth={2.5} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRedo}
+                                disabled={history.index >= history.stack.length - 1}
+                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                aria-label="Redo"
+                            >
+                                <Redo2 size={20} strokeWidth={2.5} />
+                            </button>
                         </div>
+
                         {/* Right: Save & Cancel */}
                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                             <button
@@ -77,7 +126,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
 
                     {/* Scrollable Form Body */}
                     <div className="flex-1 overflow-y-auto flex flex-col bg-white dark:bg-gray-800 p-4 sm:p-6" onClick={() => textareaRef.current?.focus()}>
-                        
+
                         {/* Error */}
                         {error && (
                             <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm font-bold mb-4 shrink-0 shadow-sm">
