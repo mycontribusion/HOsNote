@@ -140,12 +140,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     ...(payload.patients || []),
                     ...(payload.mortalities || []),
                 ]
+                const incomingDocs = payload.docs || []
                 setTransferProgress(null)
                 setImportedCount(incoming.length)
                 setStatus('success')
                 setStatusMsg(`Reassembled ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
                 setTimeout(() => {
-                    if (mountedRef.current) onImport(incoming)
+                    if (mountedRef.current) onImport(incoming, incomingDocs)
                 }, 800)
                 return
             }
@@ -330,9 +331,10 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             }
             if (completed) {
                 const incoming = [...(completed.patients || []), ...(completed.mortalities || [])]
+                const incomingDocs = completed.docs || []
                 setStatus('success')
                 setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
-                setTimeout(() => { if (mountedRef.current) onImport(incoming) }, 600)
+                setTimeout(() => { if (mountedRef.current) onImport(incoming, incomingDocs) }, 600)
                 return
             }
             setStatus('error')
@@ -380,10 +382,11 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             
             if (parsed && typeof parsed === 'object') {
                 const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
+                const incomingDocs = parsed.docs || []
                 if (incoming.length > 0) {
                     setStatus('success')
                     setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
-                    setTimeout(() => { if (mountedRef.current) onImport(incoming) }, 600)
+                    setTimeout(() => { if (mountedRef.current) onImport(incoming, incomingDocs) }, 600)
                     return
                 }
             }

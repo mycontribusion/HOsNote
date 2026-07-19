@@ -529,17 +529,20 @@ export default function App() {
     }, [activeTab, patients, mortalities, discharges])
 
     // Merge imported patients, deduplicate
-    const importPatients = useCallback((incoming) => {
+    // Merge imported patients, deduplicate
+    const importPatients = useCallback((incoming, incomingDocs = []) => {
         const conflicts = [];
         const newOnes = [];
         const isMortalityTab = activeTab === 'mortalities';
         const defaultTeam = isMortalityTab ? 'my_team' : activeTab;
+        const oldIdToNewIdMap = {};
 
         incoming.forEach(_p => {
             // Support both the new ultra-compact positional array format
             // [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
             // and the legacy object format ({w,b,n,h,c,m,u,ad,...}).
             let src;
+            let oldId = null;
             if (Array.isArray(_p)) {
                 const [w, b, n, h, cFlag, mFlag, ad] = _p;
                 src = {
@@ -550,6 +553,7 @@ export default function App() {
                 };
             } else {
                 src = _p;
+                oldId = _p.id;
             }
 
             const isMortalityRecord = !!(
@@ -557,8 +561,9 @@ export default function App() {
                 src.reason === 'mortality' ||
                 isMortalityTab
             );
+            const generatedId = generateId();
             const p = {
-                id: generateId(),
+                id: generatedId,
                 team: src.team || defaultTeam,
                 name: (src.n || src.name || '').trim(),
                 hospitalNumber: (src.h || src.hospitalNumber || '').trim(),
@@ -574,6 +579,10 @@ export default function App() {
             };
             if (!p.name && !p.hospitalNumber && !p.ward) return;
 
+            if (oldId) {
+                oldIdToNewIdMap[oldId] = generatedId;
+            }
+
             let existingMatch = null;
             if (p.hospitalNumber) {
                 existingMatch = patients.find(ex => ex.hospitalNumber === p.hospitalNumber) ||
@@ -585,14 +594,14 @@ export default function App() {
             }
 
             if (existingMatch) {
-                conflicts.push({ imported: p, existing: existingMatch });
+                conflicts.push({ imported: p, existing: existingMatch, oldId });
             } else {
                 newOnes.push(p);
             }
         });
 
         if (conflicts.length > 0) {
-            setPendingImport({ conflicts, newOnes });
+            setPendingImport({ conflicts, newOnes, incomingDocs, oldIdToNewIdMap });
         } else {
             const incomingMortalities = newOnes.filter(p => p.reason === 'mortality');
             const incomingActive = newOnes.filter(p => p.reason !== 'mortality');
@@ -601,6 +610,33 @@ export default function App() {
             if (incomingMortalities.length > 0) {
                 setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5));
                 setMortalities(prev => [...prev, ...incomingMortalities]);
+            }
+
+            if (incomingDocs && incomingDocs.length > 0) {
+                const addedIds = new Set(newOnes.map(p => p.id));
+                setDocs(prev => {
+                    const nextDocs = [...prev];
+                    incomingDocs.forEach(d => {
+                        const newPatientId = oldIdToNewIdMap[d.patientId];
+                        if (newPatientId && addedIds.has(newPatientId)) {
+                            const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
+                            if (!isDuplicate) {
+                                nextDocs.unshift({
+                                    id: generateId(),
+                                    patientId: newPatientId,
+                                    patientName: d.patientName || '',
+                                    patientWard: d.patientWard || '',
+                                    patientHosp: d.patientHosp || '',
+                                    text: d.text,
+                                    color: d.color || 'blue',
+                                    createdAt: d.createdAt || new Date().toISOString(),
+                                    updatedAt: d.updatedAt || new Date().toISOString(),
+                                });
+                            }
+                        }
+                    });
+                    return nextDocs;
+                });
             }
         }
         setShowScanner(false);
@@ -615,14 +651,23 @@ export default function App() {
         let nextPatients = [...patients];
         let nextMortalities = [...mortalities];
 
+        const addedOrUpdatedIds = new Set(newOnes.map(p => p.id));
+        const finalMap = { ...(pendingImport?.oldIdToNewIdMap || {}) };
+
         resolvedConflicts.forEach(res => {
             const p = res.imported;
+            const oldId = res.oldId;
             if (res.action === 'skip') return;
 
             if (res.action === 'new') {
+                addedOrUpdatedIds.add(p.id);
                 if (p.reason === 'mortality') toAddMortality.push(p);
                 else toAddActive.push(p);
             } else if (res.action === 'update') {
+                addedOrUpdatedIds.add(res.existing.id);
+                if (oldId) {
+                    finalMap[oldId] = res.existing.id;
+                }
                 const activeIdx = nextPatients.findIndex(ex => ex.id === res.existing.id);
                 const mortIdx = nextMortalities.findIndex(ex => ex.id === res.existing.id);
 
@@ -640,8 +685,37 @@ export default function App() {
 
         setPatients([...nextPatients, ...toAddActive]);
         setMortalities([...nextMortalities, ...toAddMortality]);
+
+        // Process incoming docs if any exist
+        const incomingDocs = pendingImport?.incomingDocs;
+        if (incomingDocs && incomingDocs.length > 0) {
+            setDocs(prev => {
+                const nextDocs = [...prev];
+                incomingDocs.forEach(d => {
+                    const newPatientId = finalMap[d.patientId];
+                    if (newPatientId && addedOrUpdatedIds.has(newPatientId)) {
+                        const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
+                        if (!isDuplicate) {
+                            nextDocs.unshift({
+                                id: generateId(),
+                                patientId: newPatientId,
+                                patientName: d.patientName || '',
+                                patientWard: d.patientWard || '',
+                                patientHosp: d.patientHosp || '',
+                                text: d.text,
+                                color: d.color || 'blue',
+                                createdAt: d.createdAt || new Date().toISOString(),
+                                updatedAt: d.updatedAt || new Date().toISOString(),
+                            });
+                        }
+                    }
+                });
+                return nextDocs;
+            });
+        }
+
         setPendingImport(null);
-    }, [patients, mortalities]);
+    }, [patients, mortalities, discharges, pendingImport]);
 
     const activePatients = activeTab === 'mortalities'
         ? mortalities
@@ -902,6 +976,7 @@ export default function App() {
             {showExport && (
                 <ExportModal
                     patients={patientsToExport}
+                    allPatients={activePatients}
                     listName={listName}
                     selectionCount={selectedPatientIds.size}
                     onClose={() => { setShowExport(false); clearSelection() }}

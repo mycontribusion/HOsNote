@@ -4,7 +4,23 @@ import { X, Copy, CheckCircle, Download, QrCode, Pause, Play, Smartphone, Share2
 import { buildFrames } from '../utils/chunkedQr'
 import useWakeLock from '../utils/useWakeLock'
 
-export default function ExportModal({ patients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
+function compressMortality(p) {
+    const obj = {}
+    if (p.id) obj.id = p.id
+    if (p.ward) obj.w = p.ward
+    if (p.bed) obj.b = p.bed
+    if (p.name) obj.n = p.name
+    if (p.hospitalNumber) obj.h = p.hospitalNumber
+    if (p.note) obj.t = p.note
+    if (p.critical) obj.c = true
+    obj.reason = 'mortality'
+    if (p.removedAt) obj.removedAt = p.removedAt
+    if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
+    if (p.admissionDate) obj.admissionDate = p.admissionDate
+    return obj
+}
+
+export default function ExportModal({ patients, allPatients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
     const [copiedCsv, setCopiedCsv] = useState(false)
     const [backupDone, setBackupDone] = useState(false)
     const [sharedCode, setSharedCode] = useState(false)
@@ -36,6 +52,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     // 2. Full Data: Includes everything for Copy/Paste sharing
     const fullCompressed = patients.map((p) => {
         const obj = {}
+        if (p.id) obj.id = p.id
         if (p.ward) obj.w = p.ward
         if (p.bed) obj.b = p.bed
         if (p.name) obj.n = p.name
@@ -52,13 +69,12 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     })
     const fullData = JSON.stringify(fullCompressed)
 
-    // 3. Full Transfer payload: EVERYTHING (incl. notes) for chunked animated QR.
+    // 3. Full Transfer payload (QR animation) — respects selection.
     //    Only docs belonging to the exported patients are included.
     const transferPayload = useMemo(() => {
         const sid = Math.random().toString(36).slice(2, 8).toUpperCase()
         const patientIds = new Set(patients.map(p => p.id))
         const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
-        // Only include mortalities when no selection is active (full-list export)
         const includedMortalities = selectionCount > 0 ? [] : mortalities
         return {
             __sid: sid,
@@ -66,23 +82,36 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
             type: 'patients',
             listName,
             patients: fullCompressed,
-            mortalities: includedMortalities.map((p) => {
-                const obj = {}
-                if (p.ward) obj.w = p.ward
-                if (p.bed) obj.b = p.bed
-                if (p.name) obj.n = p.name
-                if (p.hospitalNumber) obj.h = p.hospitalNumber
-                if (p.note) obj.t = p.note
-                if (p.critical) obj.c = true
-                obj.reason = 'mortality'
-                if (p.removedAt) obj.removedAt = p.removedAt
-                if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
-                if (p.admissionDate) obj.admissionDate = p.admissionDate
-                return obj
-            }),
+            mortalities: includedMortalities.map(compressMortality),
             docs: selectedDocs,
         }
     }, [fullCompressed, mortalities, docs, listName, patients, selectionCount])
+
+    // 4. Share payload — ALWAYS the full list regardless of selection.
+    const sharePayload = useMemo(() => {
+        const allPts = allPatients || patients
+        const allFullCompressed = allPts.map((p) => {
+            const obj = {}
+            if (p.ward) obj.w = p.ward
+            if (p.bed) obj.b = p.bed
+            if (p.name) obj.n = p.name
+            if (p.hospitalNumber) obj.h = p.hospitalNumber
+            if (p.note) obj.t = p.note
+            if (p.critical) obj.c = true
+            if (p.reason === 'mortality') { obj.reason = 'mortality'; obj.removedAt = p.removedAt }
+            if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
+            if (p.admissionDate) obj.admissionDate = p.admissionDate
+            return obj
+        })
+        const allIds = new Set(allPts.map(p => p.id))
+        return {
+            type: 'patients',
+            listName,
+            patients: allFullCompressed,
+            mortalities: mortalities.map(compressMortality),
+            docs: docs.filter(d => allIds.has(d.patientId)),
+        }
+    }, [allPatients, patients, mortalities, docs, listName])
 
     const { frames, total: frameTotal, bytes } = useMemo(
         () => buildFrames(transferPayload),
@@ -146,7 +175,7 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     const handleShareCode = async () => {
         setShareError('')
         try {
-            const shareText = JSON.stringify(transferPayload)
+            const shareText = JSON.stringify(sharePayload)
             if (navigator.share) {
                 try {
                     await navigator.share({
