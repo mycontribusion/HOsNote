@@ -602,6 +602,8 @@ export default function App() {
 
         if (conflicts.length > 0) {
             setPendingImport({ conflicts, newOnes, incomingDocs, oldIdToNewIdMap });
+            setShowScanner(false);
+            return false;
         } else {
             const incomingMortalities = newOnes.filter(p => p.reason === 'mortality');
             const incomingActive = newOnes.filter(p => p.reason !== 'mortality');
@@ -638,8 +640,8 @@ export default function App() {
                     return nextDocs;
                 });
             }
+            return true;
         }
-        setShowScanner(false);
     }, [activeTab, patients, mortalities, discharges])
 
     const resolveImport = useCallback((resolvedConflicts, newOnes) => {

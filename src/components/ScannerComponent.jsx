@@ -13,6 +13,23 @@ const BARCODE_FORMATS = [
     'CODE_93',        // Variant of Code 39
     'CODABAR',        // Blood banks, some patient IDs
 ]
+function decodeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&#39;/g, "'")
+        .replace(/&#34;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&#38;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&#60;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#62;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&#160;/g, ' ')
+        .replace(/<[^>]+>/g, ' '); // Strip HTML tags, replacing with space to preserve boundaries
+}
 
 export default function ScannerComponent({ onImport, onLookup, listName, onClose, onRestore }) {
     const scannerRef = useRef(null)
@@ -81,11 +98,25 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
                         // html5-qrcode v2.3+ sets its internal "paused" state
                         // AFTER the success callback returns, so an immediate
-                        // resume() is a no-op. A short timeout fires after the
-                        // library commits its pause, re-arming the scanner.
-                        setTimeout(() => {
-                            try { scannerRef.current?.resume() } catch { /* already running */ }
-                        }, 100)
+                        // resume() is a no-op. We use a state-aware retrying helper.
+                        const tryResume = (attempts = 5) => {
+                            if (!mountedRef.current || !scannerRef.current) return
+                            try {
+                                const state = scannerRef.current.getState()
+                                if (state === 3) { // PAUSED
+                                    scannerRef.current.resume()
+                                } else if (state === 2) { // SCANNING
+                                    // Already running
+                                } else if (attempts > 0) {
+                                    setTimeout(() => tryResume(attempts - 1), 80)
+                                }
+                            } catch (e) {
+                                if (attempts > 0) {
+                                    setTimeout(() => tryResume(attempts - 1), 80)
+                                }
+                            }
+                        }
+                        setTimeout(() => tryResume(), 120)
                     },
                     () => {
                         // Scan failure – normal, ignore
@@ -146,7 +177,19 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 setStatus('success')
                 setStatusMsg(`Reassembled ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
                 setTimeout(() => {
-                    if (mountedRef.current) onImport(incoming, incomingDocs)
+                    if (mountedRef.current) {
+                        const success = onImport(incoming, incomingDocs)
+                        if (success) {
+                            setTimeout(() => {
+                                if (mountedRef.current) {
+                                    setStatus('scanning')
+                                    setStatusMsg('Point camera at QR code')
+                                    setImportedCount(0)
+                                    receiverRef.current.reset()
+                                }
+                            }, 1500)
+                        }
+                    }
                 }, 800)
                 return
             }
@@ -196,7 +239,17 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
             setTimeout(() => {
                 if (mountedRef.current) {
-                    onImport(parsed)
+                    const success = onImport(parsed)
+                    if (success) {
+                        setTimeout(() => {
+                            if (mountedRef.current) {
+                                setStatus('scanning')
+                                setStatusMsg('Point camera at QR code')
+                                setImportedCount(0)
+                                receiverRef.current.reset()
+                            }
+                        }, 1500)
+                    }
                 }
             }, 800)
         } catch {
@@ -299,7 +352,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }
 
     const handlePasteImport = () => {
-        const cleaned = pasteData.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+        const rawText = decodeHtml(pasteData)
+        const cleaned = rawText.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
         if (!cleaned) return
 
         if (cleaned.includes('4MyTeam Patient List:') || cleaned.includes('Name: ')) {
@@ -334,7 +388,20 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 const incomingDocs = completed.docs || []
                 setStatus('success')
                 setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
-                setTimeout(() => { if (mountedRef.current) onImport(incoming, incomingDocs) }, 600)
+                setTimeout(() => {
+                    if (mountedRef.current) {
+                        const success = onImport(incoming, incomingDocs)
+                        if (success) {
+                            setTimeout(() => {
+                                if (mountedRef.current) {
+                                    setStatus('scanning')
+                                    setStatusMsg('Point camera at QR code')
+                                    setPasteData('')
+                                }
+                            }, 1500)
+                        }
+                    }
+                }, 600)
                 return
             }
             setStatus('error')
@@ -376,7 +443,20 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             if (Array.isArray(parsed)) {
                 setStatus('success')
                 setStatusMsg(`Loaded ${parsed.length} patient${parsed.length !== 1 ? 's' : ''}! Importing…`)
-                setTimeout(() => { if (mountedRef.current) onImport(parsed) }, 600)
+                setTimeout(() => {
+                    if (mountedRef.current) {
+                        const success = onImport(parsed)
+                        if (success) {
+                            setTimeout(() => {
+                                if (mountedRef.current) {
+                                    setStatus('scanning')
+                                    setStatusMsg('Point camera at QR code')
+                                    setPasteData('')
+                                }
+                            }, 1500)
+                        }
+                    }
+                }, 600)
                 return
             }
             
@@ -386,7 +466,20 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 if (incoming.length > 0) {
                     setStatus('success')
                     setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
-                    setTimeout(() => { if (mountedRef.current) onImport(incoming, incomingDocs) }, 600)
+                    setTimeout(() => {
+                        if (mountedRef.current) {
+                            const success = onImport(incoming, incomingDocs)
+                            if (success) {
+                                setTimeout(() => {
+                                    if (mountedRef.current) {
+                                        setStatus('scanning')
+                                        setStatusMsg('Point camera at QR code')
+                                        setPasteData('')
+                                    }
+                                }, 1500)
+                            }
+                        }
+                    }, 600)
                     return
                 }
             }
@@ -399,7 +492,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }
 
     const handlePasteQuick = () => {
-        const cleaned = pasteData.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+        const rawText = decodeHtml(pasteData)
+        const cleaned = rawText.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
         if (!cleaned) return
 
         setLastScanned({ value: cleaned, format: 'PASTE', timestamp: new Date() })
