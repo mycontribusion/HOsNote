@@ -330,12 +330,55 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             return
         }
 
+        let jsonStr = cleaned
+        const firstBracket = jsonStr.indexOf('[')
+        const firstBrace = jsonStr.indexOf('{')
+        let startIdx = -1
+        let isArray = false
+
+        if (firstBracket !== -1 && firstBrace !== -1) {
+            if (firstBracket < firstBrace) {
+                startIdx = firstBracket
+                isArray = true
+            } else {
+                startIdx = firstBrace
+            }
+        } else if (firstBracket !== -1) {
+            startIdx = firstBracket
+            isArray = true
+        } else if (firstBrace !== -1) {
+            startIdx = firstBrace
+        }
+
+        if (startIdx !== -1) {
+            const endChar = isArray ? ']' : '}'
+            const endIdx = jsonStr.lastIndexOf(endChar)
+            if (endIdx !== -1 && endIdx >= startIdx) {
+                jsonStr = jsonStr.substring(startIdx, endIdx + 1)
+            }
+        }
+
         try {
-            const parsed = JSON.parse(cleaned)
-            if (!Array.isArray(parsed)) throw new Error('Not an array')
-            setStatus('success')
-            setStatusMsg(`Loaded ${parsed.length} patient${parsed.length !== 1 ? 's' : ''}! Importing…`)
-            setTimeout(() => { if (mountedRef.current) onImport(parsed) }, 600)
+            const parsed = JSON.parse(jsonStr)
+            
+            if (Array.isArray(parsed)) {
+                setStatus('success')
+                setStatusMsg(`Loaded ${parsed.length} patient${parsed.length !== 1 ? 's' : ''}! Importing…`)
+                setTimeout(() => { if (mountedRef.current) onImport(parsed) }, 600)
+                return
+            }
+            
+            if (parsed && typeof parsed === 'object') {
+                const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
+                if (incoming.length > 0) {
+                    setStatus('success')
+                    setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
+                    setTimeout(() => { if (mountedRef.current) onImport(incoming) }, 600)
+                    return
+                }
+            }
+            
+            throw new Error('Not a valid payload')
         } catch {
             setStatus('error')
             setStatusMsg('Invalid code. Paste the exact code from "Share Code" / "Copy Code".')
@@ -351,10 +394,39 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
         // Try JSON first
         try {
-            const parsed = JSON.parse(cleaned)
+            let jsonStr = cleaned
+            const firstBracket = jsonStr.indexOf('[')
+            const firstBrace = jsonStr.indexOf('{')
+            let startIdx = -1
+            let isArray = false
+            
+            if (firstBracket !== -1 && firstBrace !== -1) {
+                if (firstBracket < firstBrace) { startIdx = firstBracket; isArray = true }
+                else { startIdx = firstBrace }
+            } else if (firstBracket !== -1) { startIdx = firstBracket; isArray = true }
+            else if (firstBrace !== -1) { startIdx = firstBrace }
+
+            if (startIdx !== -1) {
+                const endChar = isArray ? ']' : '}'
+                const endIdx = jsonStr.lastIndexOf(endChar)
+                if (endIdx !== -1 && endIdx >= startIdx) {
+                    jsonStr = jsonStr.substring(startIdx, endIdx + 1)
+                }
+            }
+
+            const parsed = JSON.parse(jsonStr)
+            
             if (Array.isArray(parsed)) {
                 onImport(parsed)
                 return
+            }
+            
+            if (parsed && typeof parsed === 'object') {
+                const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
+                if (incoming.length > 0) {
+                    onImport(incoming)
+                    return
+                }
             }
         } catch {
             // Not JSON

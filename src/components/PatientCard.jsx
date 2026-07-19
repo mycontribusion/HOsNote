@@ -1,7 +1,7 @@
-import { Trash2, Pencil, CheckCircle2, FileText } from 'lucide-react'
+import { Trash2, Pencil, CheckCircle2, FileText, ArrowRightLeft } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false }) {
+export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel }) {
     const { id, name, hospitalNumber, ward, bed, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
 
     let durationText = '';
@@ -124,6 +124,16 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                                     {isSelected ? <CheckCircle2 size={18} /> : <div className="w-4 h-4 rounded border-2 border-gray-300 dark:border-gray-500" />}
                                 </button>
                             )}
+                            {onMoveTeam && (
+                                <button
+                                    className="btn-icon !min-h-[36px] !min-w-[36px] rounded-lg text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                                    onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
+                                    aria-label={moveTeamLabel || 'Move team'}
+                                    title={moveTeamLabel || 'Move team'}
+                                >
+                                    <ArrowRightLeft size={15} strokeWidth={2} />
+                                </button>
+                            )}
                             <button
                                 className="btn-icon !min-h-[36px] !min-w-[36px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                                 onClick={() => onEdit(patient)}
@@ -204,6 +214,16 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                                     <rect width="18" height="18" x="3" y="3" rx="2" />
                                 </svg>
                             )}
+                        </button>
+                    )}
+                    {onMoveTeam && (
+                        <button
+                            className="btn-icon text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 focus:ring-purple-200 flex-shrink-0"
+                            onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
+                            aria-label={moveTeamLabel || 'Move team'}
+                            title={moveTeamLabel || 'Move team'}
+                        >
+                            <ArrowRightLeft size={18} strokeWidth={2} />
                         </button>
                     )}
                     <button

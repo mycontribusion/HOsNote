@@ -485,6 +485,15 @@ export default function App() {
         ))
     }, [activeTab])
 
+    const movePatientTeam = useCallback((id, targetTeam) => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setPatients(prev => prev.map(p =>
+            p.id === id ? { ...p, team: targetTeam, lastUpdated: new Date().toISOString() } : p
+        ))
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs])
+
     const clearAll = useCallback(() => {
         setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
         if (activeTab === 'mortalities') {
@@ -808,6 +817,8 @@ export default function App() {
                         selectedIds={selectedPatientIds}
                         onToggleSelect={toggleSelectPatient}
                         onToggleSelectAll={toggleSelectAll}
+                        onMoveTeam={activeTab === 'other_team' ? (id) => movePatientTeam(id, 'my_team') : undefined}
+                        moveTeamLabel={activeTab === 'other_team' ? 'Move to My Team' : undefined}
                     />
                 )}
 

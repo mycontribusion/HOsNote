@@ -138,18 +138,15 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
         }
     }
 
-    // Share Code: copy the full data code to the clipboard AND offer the native
-    // share sheet (so it can be sent over Bluetooth, WhatsApp, etc.). The
-    // receiver pastes/imports the code on their own device — no fragile
-    // multi-frame QR scanning required.
     const handleShareCode = async () => {
         setShareError('')
         try {
+            const shareText = JSON.stringify(transferPayload)
             if (navigator.share) {
                 try {
                     await navigator.share({
                         title: `HOsNote handover — ${listName}`,
-                        text: fullData,
+                        text: shareText,
                     })
                     setSharedCode(true)
                     setTimeout(() => setSharedCode(false), 2000)
@@ -164,10 +161,10 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
             }
             // Clipboard fallback (works in all browsers / PWA contexts).
             if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(fullData)
+                await navigator.clipboard.writeText(shareText)
             } else {
                 const textArea = document.createElement('textarea')
-                textArea.value = fullData
+                textArea.value = shareText
                 textArea.style.position = 'fixed'
                 document.body.appendChild(textArea)
                 textArea.focus()
