@@ -53,17 +53,20 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     const fullData = JSON.stringify(fullCompressed)
 
     // 3. Full Transfer payload: EVERYTHING (incl. notes) for chunked animated QR.
-    //    We reuse the same compact object shape as fullCompressed but wrap it in
-    //    a transfer envelope so the receiver knows what it is receiving.
+    //    Only docs belonging to the exported patients are included.
     const transferPayload = useMemo(() => {
         const sid = Math.random().toString(36).slice(2, 8).toUpperCase()
+        const patientIds = new Set(patients.map(p => p.id))
+        const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
+        // Only include mortalities when no selection is active (full-list export)
+        const includedMortalities = selectionCount > 0 ? [] : mortalities
         return {
             __sid: sid,
             __v: 1,
             type: 'patients',
             listName,
             patients: fullCompressed,
-            mortalities: mortalities.map((p) => {
+            mortalities: includedMortalities.map((p) => {
                 const obj = {}
                 if (p.ward) obj.w = p.ward
                 if (p.bed) obj.b = p.bed
@@ -77,9 +80,9 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
                 if (p.admissionDate) obj.admissionDate = p.admissionDate
                 return obj
             }),
-            docs,
+            docs: selectedDocs,
         }
-    }, [fullCompressed, mortalities, docs, listName])
+    }, [fullCompressed, mortalities, docs, listName, patients, selectionCount])
 
     const { frames, total: frameTotal, bytes } = useMemo(
         () => buildFrames(transferPayload),
@@ -90,7 +93,9 @@ export default function ExportModal({ patients, listName, selectionCount, onClos
     // Default to autoPlay so the scanner can instantly ingest all frames.
     const [frameIdx, setFrameIdx] = useState(0)
     const [autoPlay, setAutoPlay] = useState(true)
-    const FRAME_MS = 500 // 500ms allows the 20fps scanner 10 tries per frame
+    // 1500ms per frame: gives the 20fps scanner ~30 attempts per frame.
+    // Slower is much more reliable than racing the camera.
+    const FRAME_MS = 1500
 
     useEffect(() => {
         if (!autoPlay || frames.length <= 1) return

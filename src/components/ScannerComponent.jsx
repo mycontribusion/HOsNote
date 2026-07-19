@@ -79,10 +79,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             handleQuickScan(decodedText, format)
                         }
 
-                        // html5-qrcode v2.3+ auto-pauses after every successful
-                        // decode. Resume immediately so subsequent frames are
-                        // picked up without requiring a manual restart.
-                        try { scannerRef.current?.resume() } catch { /* no-op if already running */ }
+                        // html5-qrcode v2.3+ sets its internal "paused" state
+                        // AFTER the success callback returns, so an immediate
+                        // resume() is a no-op. A short timeout fires after the
+                        // library commits its pause, re-arming the scanner.
+                        setTimeout(() => {
+                            try { scannerRef.current?.resume() } catch { /* already running */ }
+                        }, 100)
                     },
                     () => {
                         // Scan failure – normal, ignore
