@@ -10,6 +10,7 @@ import EmptyState from './components/EmptyState'
 import ReviewDuplicatesModal from './components/ReviewDuplicatesModal'
 import RemovalChoiceDialog from './components/RemovalChoiceDialog'
 import FeedbackModal from './components/FeedbackModal'
+import SettingsModal from './components/SettingsModal'
 import NotebookPage from './components/NotebookPage'
 import DocComposer from './components/DocComposer'
 import { get, set } from 'idb-keyval'
@@ -194,12 +195,15 @@ export default function App() {
     const [showAddForm, setShowAddForm] = useState(false)
     const [showMortalityForm, setShowMortalityForm] = useState(false)
     const [showFeedback, setShowFeedback] = useState(false)
+    const [showSettings, setShowSettings] = useState(false)
+    const [textSize, setTextSize] = useState(100)
     const [editingPatient, setEditingPatient] = useState(null)
     const [removalCandidateId, setRemovalCandidateId] = useState(null)
     const [pendingImport, setPendingImport] = useState(null)
     const [history, setHistory] = useState([]) // Stack of { patients, mortalities, discharges } objects
     const [showUndoToast, setShowUndoToast] = useState(false)
     const [selectedPatientIds, setSelectedPatientIds] = useState(new Set())
+    const [pendingClearAction, setPendingClearAction] = useState(null)
 
     // Apply dark mode class to <html>
     useEffect(() => {
@@ -213,7 +217,81 @@ export default function App() {
         } catch { /* ignore */ }
     }, [darkMode])
 
+    // Apply text size to root
+    useEffect(() => {
+        document.documentElement.style.fontSize = `${textSize}%`
+        try {
+            localStorage.setItem('hosnote_textsize', JSON.stringify(textSize))
+        } catch { /* ignore */ }
+    }, [textSize])
+
+    // Load saved text size
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('hosnote_textsize')
+            if (saved) setTextSize(JSON.parse(saved))
+        } catch { /* ignore */ }
+    }, [])
+
     const toggleDarkMode = useCallback(() => setDarkMode(prev => !prev), [])
+
+    const decreaseTextSize = useCallback(() => {
+        setTextSize(prev => Math.max(80, prev - 10))
+    }, [])
+
+    const increaseTextSize = useCallback(() => {
+        setTextSize(prev => Math.min(130, prev + 10))
+    }, [])
+
+    const clearMyTeam = useCallback(() => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setPatients(prev => prev.filter(p => p.team !== 'my_team'))
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs])
+
+    const clearOnCall = useCallback(() => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setPatients(prev => prev.filter(p => p.team !== 'other_team'))
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs])
+
+    const clearMortalities = useCallback(() => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setMortalities([])
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs])
+
+    const clearNotebook = useCallback(() => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setDocs([])
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs])
+
+    const handleClearRequest = useCallback((action) => {
+        setPendingClearAction(action)
+    }, [])
+
+    const confirmClear = useCallback(() => {
+        switch (pendingClearAction) {
+            case 'my_team':
+                clearMyTeam()
+                break
+            case 'on_call':
+                clearOnCall()
+                break
+            case 'mortalities':
+                clearMortalities()
+                break
+            case 'notebook':
+                clearNotebook()
+                break
+        }
+        setPendingClearAction(null)
+    }, [pendingClearAction, clearMyTeam, clearOnCall, clearMortalities, clearNotebook])
 
     // Persist to IndexedDB on every change
     useEffect(() => {
@@ -776,7 +854,7 @@ export default function App() {
                 docCount={docs.length}
                 darkMode={darkMode}
                 toggleDarkMode={toggleDarkMode}
-                onFeedback={() => setShowFeedback(true)}
+                onOpenSettings={() => setShowSettings(true)}
                 activePage={activePage}
                 onPageChange={goToPage}
             />
@@ -1014,7 +1092,26 @@ export default function App() {
             {showFeedback && (
                 <FeedbackModal onClose={() => setShowFeedback(false)} />
             )}
+            {showSettings && (
+                <SettingsModal
+                    onClose={() => setShowSettings(false)}
+                    onOpenFeedback={() => setShowFeedback(true)}
+                    textSize={textSize}
+                    onDecreaseText={decreaseTextSize}
+                    onIncreaseText={increaseTextSize}
+                    onClearRequest={handleClearRequest}
+                />
+            )}
 
+            {pendingClearAction && (
+                <ConfirmDialog
+                    title={`Clear ${pendingClearAction === 'my_team' ? 'My Team' : pendingClearAction === 'on_call' ? 'On Call' : pendingClearAction === 'mortalities' ? 'Mortalities' : 'Notebook'}?`}
+                    message={`This will permanently remove all ${pendingClearAction === 'my_team' ? 'My Team' : pendingClearAction === 'on_call' ? 'On Call' : pendingClearAction === 'mortalities' ? 'Mortalities' : 'Notebook'} data. This action can be undone.`}
+                    confirmLabel="Yes, Clear"
+                    onConfirm={confirmClear}
+                    onCancel={() => setPendingClearAction(null)}
+                />
+            )}
             {/* Undo Toast */}
             {showUndoToast && (
                 <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-700 text-white px-4 py-3 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">

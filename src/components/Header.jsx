@@ -1,6 +1,6 @@
-import { Moon, Sun, MessageCircle, Stethoscope, BookOpen } from 'lucide-react'
+import { Moon, Sun, Settings, Stethoscope, BookOpen } from 'lucide-react'
 
-export default function Header({ patientCount, docCount = 0, darkMode, toggleDarkMode, onFeedback, activePage, onPageChange }) {
+export default function Header({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange }) {
     return (
         <header className="bg-blue-700 dark:bg-gray-900 text-white shadow-lg shadow-blue-900/30 dark:shadow-black/40 sticky top-0 z-30 transition-colors duration-300">
             <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
@@ -36,14 +36,14 @@ export default function Header({ patientCount, docCount = 0, darkMode, toggleDar
                         </span>
                     </button>
 
-                    {/* Feedback button */}
+                    {/* Settings button */}
                     <button
-                        onClick={onFeedback}
+                        onClick={onOpenSettings}
                         className="p-2 rounded-xl hover:bg-white/10 transition-colors"
-                        aria-label="Feedback & Contact"
-                        title="Feedback & Contact"
+                        aria-label="Settings"
+                        title="Settings"
                     >
-                        <MessageCircle size={18} className="text-blue-200 dark:text-gray-400" />
+                        <Settings size={18} className="text-blue-200 dark:text-gray-400" />
                     </button>
 
                     {/* Dark mode toggle */}
