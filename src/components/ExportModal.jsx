@@ -23,6 +23,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const [copiedCsv, setCopiedCsv] = useState(false)
     const [backupDone, setBackupDone] = useState(false)
     const [sharedCode, setSharedCode] = useState(false)
+    const [copiedCode, setCopiedCode] = useState(false)
     const [shareError, setShareError] = useState('')
     const [qrMode, setQrMode] = useState('compact') // 'compact' | 'full'
 
@@ -299,6 +300,18 @@ export default function ExportModal({ patients, allPatients, listName, selection
         }
     }
 
+    const handleCopyCode = async () => {
+        setShareError('')
+        try {
+            const json = JSON.stringify(sharePayload)
+            await navigator.clipboard.writeText(json)
+            setCopiedCode(true)
+            setTimeout(() => setCopiedCode(false), 2000)
+        } catch (err) {
+            setShareError('Failed to copy code to clipboard.')
+        }
+    }
+
     // Backup: download a full JSON snapshot of the current data. The file is
     // compatible with the Import → Restore flow (restoreFromBackup), so it can
     // be re-imported later to recover patients, mortalities, discharges & docs.
@@ -446,26 +459,35 @@ export default function ExportModal({ patients, allPatients, listName, selection
 
                     {/* Actions */}
                     <div className="flex flex-col gap-2 shrink-0">
-                        <button
-                            className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] ${sharedCode ? 'bg-emerald-500 text-white' : 'bg-blue-700 hover:bg-blue-800 text-white shadow-blue-200 dark:shadow-blue-900/30'}`}
-                            onClick={handleShareCode}
-                        >
-                            {sharedCode ? <CheckCircle size={16} /> : <Share2 size={16} />}
-                            {sharedCode ? 'Code Shared!' : 'Share Code'}
-                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                className={`py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] ${sharedCode ? 'bg-emerald-500 text-white' : 'bg-blue-700 hover:bg-blue-800 text-white shadow-blue-200 dark:shadow-blue-900/30'}`}
+                                onClick={handleShareCode}
+                            >
+                                {sharedCode ? <CheckCircle size={14} /> : <Share2 size={14} />}
+                                {sharedCode ? 'Shared!' : 'Share File'}
+                            </button>
+                            <button
+                                className={`py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] border ${copiedCode ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
+                                onClick={handleCopyCode}
+                            >
+                                {copiedCode ? <CheckCircle size={14} /> : <Copy size={14} />}
+                                {copiedCode ? 'Copied!' : 'Copy Code'}
+                            </button>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-2">
                             <button
-                                className="py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl font-semibold text-[11px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
+                                className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
                                 onClick={handleBackup}
                             >
-                                {backupDone ? <CheckCircle size={14} className="text-emerald-500" /> : <Download size={14} className="text-gray-500 dark:text-gray-400" />} {backupDone ? 'Saved' : 'Save Backup'}
+                                {backupDone ? <CheckCircle size={13} className="text-emerald-500" /> : <Download size={13} className="text-gray-500 dark:text-gray-400" />} {backupDone ? 'Saved' : 'Save Backup'}
                             </button>
                             <button
-                                className="py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl font-semibold text-[11px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
+                                className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
                                 onClick={handleCopyCsv}
                             >
-                                {copiedCsv ? <CheckCircle size={14} className="text-emerald-500" /> : <Copy size={14} className="text-gray-500 dark:text-gray-400" />} {copiedCsv ? 'Copied' : 'Copy CSV'}
+                                {copiedCsv ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} className="text-gray-500 dark:text-gray-400" />} {copiedCsv ? 'Copied' : 'Copy CSV'}
                             </button>
                         </div>
                         {shareError && <p className="text-[10px] text-center text-red-500 font-semibold mt-1">{shareError}</p>}

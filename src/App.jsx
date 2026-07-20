@@ -694,16 +694,17 @@ export default function App() {
                 setDocs(prev => {
                     const nextDocs = [...prev];
                     incomingDocs.forEach(d => {
-                        // Support both compact keys (n/w/h) and legacy keys (patientName/patientWard/patientHosp)
+                        // Support both compact keys (n/w/h/t/c/ca/ua) and legacy keys
                         const docName = d.n || d.patientName || '';
                         const docWard = d.w || d.patientWard || '';
                         const docHosp = d.h || d.patientHosp || '';
+                        const docText = d.t || d.text || '';
                         // Prefer id-based linking; fall back to identity match
                         // (name/ward/hosp) for payloads that omit patient ids.
                         const newPatientId = oldIdToNewIdMap[d.patientId]
                             || identityToNewIdMap[identityKey(docName, docWard, docHosp)];
                         if (newPatientId && addedIds.has(newPatientId)) {
-                            const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
+                            const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === docText.trim());
                             if (!isDuplicate) {
                                 nextDocs.unshift({
                                     id: generateId(),
@@ -711,10 +712,10 @@ export default function App() {
                                     patientName: docName,
                                     patientWard: docWard,
                                     patientHosp: docHosp,
-                                    text: d.text,
-                                    color: d.color || 'blue',
-                                    createdAt: d.createdAt || new Date().toISOString(),
-                                    updatedAt: d.updatedAt || new Date().toISOString(),
+                                    text: docText,
+                                    color: d.c || d.color || 'blue',
+                                    createdAt: d.ca || d.createdAt || new Date().toISOString(),
+                                    updatedAt: d.ua || d.updatedAt || new Date().toISOString(),
                                 });
                             }
                         }
@@ -781,14 +782,15 @@ export default function App() {
             setDocs(prev => {
                 const nextDocs = [...prev];
                 incomingDocs.forEach(d => {
-                    // Support both compact keys (n/w/h) and legacy keys (patientName/patientWard/patientHosp)
+                    // Support both compact keys (n/w/h/t/c/ca/ua) and legacy keys
                     const docName = d.n || d.patientName || '';
                     const docWard = d.w || d.patientWard || '';
                     const docHosp = d.h || d.patientHosp || '';
+                    const docText = d.t || d.text || '';
                     const newPatientId = finalMap[d.patientId]
                         || identityMap[identityKey(docName, docWard, docHosp)];
                     if (newPatientId && addedOrUpdatedIds.has(newPatientId)) {
-                        const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
+                        const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === docText.trim());
                         if (!isDuplicate) {
                             nextDocs.unshift({
                                 id: generateId(),
@@ -796,10 +798,10 @@ export default function App() {
                                 patientName: docName,
                                 patientWard: docWard,
                                 patientHosp: docHosp,
-                                text: d.text,
-                                color: d.color || 'blue',
-                                createdAt: d.createdAt || new Date().toISOString(),
-                                updatedAt: d.updatedAt || new Date().toISOString(),
+                                text: docText,
+                                color: d.c || d.color || 'blue',
+                                createdAt: d.ca || d.createdAt || new Date().toISOString(),
+                                updatedAt: d.ua || d.updatedAt || new Date().toISOString(),
                             });
                         }
                     }
