@@ -265,8 +265,11 @@ export default function ExportModal({ patients, allPatients, listName, selection
             const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
             const file = new File([blob], fileName, { type: 'application/json' })
 
-            // Try Web Share API with file (supported in Chrome/Edge on Android, etc.)
-            if (navigator.share && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+            // Try Web Share API with file first (works on Chrome/Edge on Android,
+            // and newer iOS Safari 15.4+). We attempt the share directly instead
+            // of gating on navigator.canShare because canShare is unavailable on
+            // older mobile browsers and can return false even when share works.
+            if (navigator.share) {
                 try {
                     await navigator.share({
                         title: `HOsNote handover — ${listName}`,
@@ -278,8 +281,20 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 } catch (err) {
                     if (err && err.name === 'AbortError') {
                         // User cancelled — fall through to download
+                        return
                     }
-                    // Other share errors also fall through to download
+                    // Other share errors: try text share fallback before download
+                    try {
+                        await navigator.share({
+                            title: `HOsNote handover — ${listName}`,
+                            text: json,
+                        })
+                        setSharedCode(true)
+                        setTimeout(() => setSharedCode(false), 2000)
+                        return
+                    } catch {
+                        // Text share also failed — fall through to download
+                    }
                 }
             }
 
