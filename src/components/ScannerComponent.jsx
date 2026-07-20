@@ -48,7 +48,6 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     const transferTimerRef = useRef(null)
     const [restoreMsg, setRestoreMsg] = useState('')
     const restoreInputRef = useRef(null)
-    const [cameraLive, setCameraLive] = useState(false)
 
     // Keep the screen awake while scanning/importing so the display doesn't
     // dim or sleep mid-transfer.
@@ -64,10 +63,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
                 if (!mountedRef.current) return
 
-                console.log('[SCANNER DIAGNOSTIC] html5-qrcode imported, creating instance')
                 html5QrCode = new Html5Qrcode('qr-reader')
                 scannerRef.current = html5QrCode
-                console.log('[SCANNER DIAGNOSTIC] instance created, calling start()')
 
                 // Build formats to support based on scan mode
                 let formatsToSupport = null
@@ -89,7 +86,6 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     },
                     (decodedText, decodedResult) => {
                         if (!mountedRef.current) return
-                        console.log('[SCANNER DIAGNOSTIC] decode callback fired:', decodedText.slice(0, 40))
                         const format = decodedResult?.result?.format?.formatName || 'UNKNOWN'
                         setDetectedFormat(format)
 
@@ -123,8 +119,6 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 )
 
                 if (mountedRef.current) {
-                    console.log('[SCANNER DIAGNOSTIC] start() resolved OK; status -> scanning')
-                    setCameraLive(true)
                     setStatus('scanning')
                     setStatusMsg(scanMode === 'import' ? 'Point camera at QR code' : 'Point camera at barcode or QR code')
                 }
@@ -144,7 +138,6 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
         return () => {
             mountedRef.current = false
-            setCameraLive(false)
             if (scannerRef.current) {
                 try {
                     scannerRef.current
@@ -627,12 +620,6 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         {/* QR/Barcode Viewer */}
                         <div className="w-full max-w-[320px] aspect-square mx-auto rounded-xl overflow-hidden bg-gray-900 relative shadow-inner">
                             <div id="qr-reader" className="w-full h-full object-cover [&>video]:object-cover [&>video]:h-full" />
-                            {cameraLive && (
-                                <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/50 rounded-full px-2 py-0.5 pointer-events-none">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                    <span className="text-[9px] font-bold text-white uppercase tracking-wider">Live</span>
-                                </div>
-                            )}
                             {status === 'scanning' && (
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div className="w-48 h-48 border-2 border-blue-400/50 rounded-3xl scan-zone-pulse" />

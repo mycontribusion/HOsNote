@@ -27,6 +27,17 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const [shareError, setShareError] = useState('')
     const [qrMode, setQrMode] = useState('compact') // 'compact' | 'full'
 
+    // Stable session id for the Full Transfer animation. It MUST stay constant
+    // for the entire lifetime of this modal so every animated frame carries the
+    // same sessionId — the receiver keys chunks by sessionId and can only
+    // reassemble a transfer when all frames share one id. Generating it inside a
+    // useMemo (which re-runs on every render) produced a NEW id per frame, so
+    // the receiver could never collect all chunks and the scanner hung on
+    // "Scanning…".
+    const transferSidRef = useRef(
+        Math.random().toString(36).slice(2, 8).toUpperCase()
+    )
+
     // Keep the screen awake while the export QR codes are on screen so the
     // receiver can scan them without the display dimming/sleeping.
     const { supported: wakeSupported, locked: wakeLocked } = useWakeLock(true)
@@ -72,7 +83,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     // 3. Full Transfer payload (QR animation) — respects selection.
     //    Only docs belonging to the exported patients are included.
     const transferPayload = useMemo(() => {
-        const sid = Math.random().toString(36).slice(2, 8).toUpperCase()
+        const sid = transferSidRef.current
         const patientIds = new Set(patients.map(p => p.id))
         const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
         const includedMortalities = selectionCount > 0 ? [] : mortalities
