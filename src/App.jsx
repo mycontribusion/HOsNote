@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Trash2 } from 'lucide-react'
 import Header from './components/Header'
 import AddPatientForm from './components/AddPatientForm'
 import PatientList from './components/PatientList'
@@ -191,7 +190,6 @@ export default function App() {
 
     const [showExport, setShowExport] = useState(false)
     const [showScanner, setShowScanner] = useState(false)
-    const [showConfirmClear, setShowConfirmClear] = useState(false)
     const [showConfirmResetStats, setShowConfirmResetStats] = useState(false)
     const [showAddForm, setShowAddForm] = useState(false)
     const [showMortalityForm, setShowMortalityForm] = useState(false)
@@ -493,18 +491,6 @@ export default function App() {
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
     }, [patients, mortalities, discharges, docs])
-
-    const clearAll = useCallback(() => {
-        setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
-        if (activeTab === 'mortalities') {
-            setMortalities([])
-        } else {
-            setPatients(prev => prev.filter(p => (p.team || 'my_team') !== activeTab))
-        }
-        setShowConfirmClear(false)
-        setShowUndoToast(true)
-        setTimeout(() => setShowUndoToast(false), 5000)
-    }, [activeTab, patients, mortalities, discharges])
 
     const undo = useCallback(() => {
         if (history.length > 0) {
@@ -951,22 +937,7 @@ export default function App() {
             {/* Bottom action bar — Patients page only */}
             {activePage === 'patients' && (
             <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 shadow-lg z-40 transition-colors duration-300">
-                <div className="max-w-2xl mx-auto px-4 py-3 flex gap-2 justify-between items-center">
-                    {/* Clear All */}
-                    <button
-                        id="btn-clear-all"
-                        className="flex items-center gap-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 focus:ring-red-200 p-2 sm:px-3 rounded-xl transition-colors min-w-0"
-                        onClick={() => activePatients.length > 0 && setShowConfirmClear(true)}
-                        disabled={activePatients.length === 0}
-                        aria-label={`Clear ${listName}`}
-                        title={`Clear ${listName}`}
-                    >
-                        <Trash2 size={20} className="flex-shrink-0" />
-                        <span className="text-sm font-bold uppercase tracking-tight truncate">
-                            {listName}
-                        </span>
-                    </button>
-
+                <div className="max-w-2xl mx-auto px-4 py-3 flex gap-2 justify-center items-center">
                     <div className="flex gap-2 flex-shrink-0">
                         {/* Import / Scan */}
                         <button
@@ -1016,15 +987,6 @@ export default function App() {
                     onLookup={lookupPatient}
                     onRestore={restoreFromBackup}
                     onClose={() => setShowScanner(false)}
-                />
-            )}
-            {showConfirmClear && (
-                <ConfirmDialog
-                    title={`Clear ${listName}?`}
-                    message={`This will remove all ${activePatients.length} record${activePatients.length !== 1 ? 's' : ''} from ${listName}. This cannot be undone.`}
-                    confirmLabel="Yes, Clear"
-                    onConfirm={clearAll}
-                    onCancel={() => setShowConfirmClear(false)}
                 />
             )}
             {showConfirmResetStats && (

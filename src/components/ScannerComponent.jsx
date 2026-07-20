@@ -569,66 +569,68 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
     return (
         <div className="modal-backdrop p-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="modal-box max-w-sm w-full p-4 overflow-y-auto flex flex-col max-h-[95vh] gap-3" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
-                
-                {/* Header */}
-                <div className="flex items-start justify-between shrink-0">
-                    <div className="flex-1">
-                        <h2 id="scanner-title" className="text-xl font-extrabold tracking-tight text-gray-900 leading-none mb-1 flex items-center gap-2">
-                            <Camera size={18} className="text-blue-600" /> Import
-                        </h2>
-                        <div className="flex items-center gap-2 mt-1.5">
-                            <p className="text-[11px] font-semibold text-gray-500 truncate max-w-[200px]">{listName}</p>
-                            {wakeSupported && wakeLocked && (
-                                <Smartphone size={12} className="text-emerald-500 animate-pulse" />
-                            )}
-                        </div>
-                    </div>
-                    <button
-                        className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full shrink-0"
-                        onClick={onClose}
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
+            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[95vh]" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
 
-                {/* Mode Selector */}
-                <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-                    {cameraMode === 'camera' ? (
-                        <>
-                            <button
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                                onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>
-                                Bulk Import
-                            </button>
-                            <button
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'quick' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                                onClick={() => { setScanMode('quick'); setStatus('scanning'); setStatusMsg('Point camera at barcode or QR') }}
-                            >
-                                <Scan size={14} />
-                                Quick Scan
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                                onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-                                Paste Code
-                            </button>
-                            <button
-                                className="flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all text-gray-500 hover:text-gray-700"
-                                onClick={() => restoreInputRef.current?.click()}
-                            >
-                                <Upload size={14} />
-                                Import File
-                            </button>
-                        </>
-                    )}
+                {/* Header — matches app's blue-700 header */}
+                <div className="bg-blue-700 dark:bg-gray-900 px-4 pt-4 pb-3 shrink-0">
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <h2 id="scanner-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1 flex items-center gap-2">
+                                <Camera size={18} className="text-blue-200" /> Import
+                            </h2>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[11px] font-semibold text-blue-200 truncate max-w-[200px]">{listName}</p>
+                                {wakeSupported && wakeLocked && (
+                                    <Smartphone size={12} className="text-emerald-300 animate-pulse" />
+                                )}
+                            </div>
+                        </div>
+                        <button
+                            className="p-1.5 bg-white/15 hover:bg-white/25 text-white rounded-full shrink-0 transition-colors"
+                            onClick={onClose}
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    {/* Mode Selector — inside header */}
+                    <div className="flex bg-blue-800/50 dark:bg-gray-800/50 p-1 rounded-lg mt-3">
+                        {cameraMode === 'camera' ? (
+                            <>
+                                <button
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>
+                                    Bulk Import
+                                </button>
+                                <button
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'quick' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                                    onClick={() => { setScanMode('quick'); setStatus('scanning'); setStatusMsg('Point camera at barcode or QR') }}
+                                >
+                                    <Scan size={14} />
+                                    Quick Scan
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                                    Paste Code
+                                </button>
+                                <button
+                                    className="flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all text-blue-200 hover:text-white"
+                                    onClick={() => restoreInputRef.current?.click()}
+                                >
+                                    <Upload size={14} />
+                                    Import File
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 {/* Hidden File Input */}
@@ -640,119 +642,124 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     onChange={handleRestoreFile}
                 />
 
-                {cameraMode === 'camera' ? (
-                    <div className="flex flex-col gap-3 shrink-0">
-                        {/* QR/Barcode Viewer */}
-                        <div className="w-full max-w-[320px] aspect-square mx-auto rounded-xl overflow-hidden bg-gray-900 relative shadow-inner">
-                            <div id="qr-reader" className="w-full h-full object-cover [&>video]:object-cover [&>video]:h-full" />
-                            {status === 'scanning' && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="w-48 h-48 border-2 border-blue-400/50 rounded-3xl scan-zone-pulse" />
-                                </div>
-                            )}
-                            {status === 'found' && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="w-48 h-48 border-2 border-purple-400/50 rounded-3xl bg-purple-900/20" />
-                                </div>
-                            )}
-                        </div>
+                {/* Body */}
+                <div className="flex flex-col gap-3 p-4 overflow-y-auto h-[440px]">
 
-                        {/* Status Bar */}
-                        <div className={`rounded-xl px-3 py-2 text-xs font-bold text-center transition-colors shadow-sm ${statusColors[status]}`}>
-                            {status === 'success' && <span className="mr-1.5">✅</span>}
-                            {status === 'error' && <span className="mr-1.5">⚠️</span>}
-                            {status === 'found' && <Search size={14} className="inline mr-1.5" />}
-                            {statusMsg}
-                            {transferProgress && (
-                                <div className="mt-2">
-                                    <div className="h-1.5 w-full bg-blue-200/50 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-blue-600 transition-all"
-                                            style={{ width: `${(transferProgress.received / transferProgress.total) * 100}%` }}
-                                        />
+                    {cameraMode === 'camera' ? (
+                        <div className="flex flex-col gap-3 shrink-0">
+                            {/* QR/Barcode Viewer */}
+                            <div className="w-full max-w-[320px] aspect-square mx-auto rounded-xl overflow-hidden bg-gray-900 relative shadow-inner">
+                                <div id="qr-reader" className="w-full h-full object-cover [&>video]:object-cover [&>video]:h-full" />
+                                {status === 'scanning' && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-48 h-48 border-2 border-blue-400/50 rounded-3xl scan-zone-pulse" />
                                     </div>
-                                    <p className="text-[10px] text-blue-700 mt-1">
-                                        Transfer: {transferProgress.received}/{transferProgress.total} parts
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        
-                        {/* Last Scanned Info (Quick Mode) */}
-                        {scanMode === 'quick' && lastScanned && (
-                            <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-                                <div className="flex items-center justify-between">
-                                    <div className="truncate pr-2">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Last Scanned</p>
-                                        <p className="text-xs font-mono text-gray-800 truncate">{lastScanned.value}</p>
+                                )}
+                                {status === 'found' && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-48 h-48 border-2 border-purple-400/50 rounded-3xl bg-purple-900/20" />
                                     </div>
-                                    <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap shrink-0">
-                                        {formatLabels[lastScanned.format] || lastScanned.format}
-                                    </span>
-                                </div>
+                                )}
                             </div>
-                        )}
 
-                        {/* Buttons Grid */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                className="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                onClick={() => setCameraMode('paste')}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-                                Use Code
-                            </button>
-                            {onRestore && (
-                                <button
-                                    className="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                    onClick={() => restoreInputRef.current?.click()}
-                                >
-                                    <Upload size={14} />
-                                    Import File
-                                </button>
+                            {/* Status Bar */}
+                            <div className={`rounded-xl px-3 py-2 text-xs font-bold text-center transition-colors shadow-sm ${statusColors[status]}`}>
+                                {status === 'success' && <span className="mr-1.5">✅</span>}
+                                {status === 'error' && <span className="mr-1.5">⚠️</span>}
+                                {status === 'found' && <Search size={14} className="inline mr-1.5" />}
+                                {statusMsg}
+                                {transferProgress && (
+                                    <div className="mt-2">
+                                        <div className="h-1.5 w-full bg-blue-200/50 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-blue-600 transition-all"
+                                                style={{ width: `${(transferProgress.received / transferProgress.total) * 100}%` }}
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-blue-700 mt-1">
+                                            Transfer: {transferProgress.received}/{transferProgress.total} parts
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Last Scanned Info (Quick Mode) */}
+                            {scanMode === 'quick' && lastScanned && (
+                                <div className="bg-gray-50 dark:bg-gray-800/40 rounded-xl p-2.5 border border-gray-100 dark:border-gray-700">
+                                    <div className="flex items-center justify-between">
+                                        <div className="truncate pr-2">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Last Scanned</p>
+                                            <p className="text-xs font-mono text-gray-800 dark:text-gray-200 truncate">{lastScanned.value}</p>
+                                        </div>
+                                        <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded font-bold whitespace-nowrap shrink-0">
+                                            {formatLabels[lastScanned.format] || lastScanned.format}
+                                        </span>
+                                    </div>
+                                </div>
                             )}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex flex-col gap-3 shrink-0">
-                        <textarea
-                            className="w-full rounded-xl border-2 border-gray-200 px-3 py-3 text-xs font-mono text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 h-40 resize-none shadow-sm"
-                            placeholder={scanMode === 'import'
-                                ? 'Paste the Data Code here...'
-                                : 'Paste barcode or hospital number...'}
-                            value={pasteData}
-                            onChange={(e) => setPasteData(e.target.value)}
-                        />
-                        <button
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-bold text-sm shadow-sm active:scale-[0.98] transition-all"
-                            disabled={!pasteData.trim()}
-                            onClick={scanMode === 'import' ? handlePasteImport : handlePasteQuick}
-                        >
-                            {scanMode === 'import' ? 'Import Code' : 'Lookup / Add Patient'}
-                        </button>
-                        <div className="grid grid-cols-2 gap-2 mt-1">
-                            <button
-                                className="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                onClick={() => { setPasteData(''); setCameraMode('camera') }}
-                            >
-                                <Camera size={14} /> Use Camera
-                            </button>
-                            {onRestore && (
+
+                            {/* Buttons Grid */}
+                            <div className="grid grid-cols-2 gap-2">
                                 <button
-                                    className="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                    onClick={() => restoreInputRef.current?.click()}
+                                    className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                                    onClick={() => setCameraMode('paste')}
                                 >
-                                    <Upload size={14} /> Import File
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                                    Use Code
                                 </button>
-                            )}
+                                {onRestore && (
+                                    <button
+                                        className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                                        onClick={() => restoreInputRef.current?.click()}
+                                    >
+                                        <Upload size={14} />
+                                        Import File
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
-                
-                {restoreMsg && (
-                    <p className="text-[10px] text-center font-bold text-gray-500 -mt-1">{restoreMsg}</p>
-                )}
+                    ) : (
+                        <div className="flex flex-col gap-3 h-full">
+                            <textarea
+                                className="w-full flex-1 min-h-0 rounded-xl border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 px-3 py-3 text-xs font-mono text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40 resize-none shadow-sm"
+                                placeholder={scanMode === 'import'
+                                    ? 'Paste the Data Code here...'
+                                    : 'Paste barcode or hospital number...'}
+                                value={pasteData}
+                                onChange={(e) => setPasteData(e.target.value)}
+                            />
+                            <button
+                                className="w-full py-3 bg-blue-700 hover:bg-blue-800 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl font-bold text-sm shadow-sm shadow-blue-200 dark:shadow-blue-900/30 active:scale-[0.98] transition-all"
+                                disabled={!pasteData.trim()}
+                                onClick={scanMode === 'import' ? handlePasteImport : handlePasteQuick}
+                            >
+                                {scanMode === 'import' ? 'Import Code' : 'Lookup / Add Patient'}
+                            </button>
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                <button
+                                    className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                                    onClick={() => { setPasteData(''); setCameraMode('camera') }}
+                                >
+                                    <Camera size={14} /> Use Camera
+                                </button>
+                                {onRestore && (
+                                    <button
+                                        className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                                        onClick={() => restoreInputRef.current?.click()}
+                                    >
+                                        <Upload size={14} /> Import File
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {restoreMsg && (
+                        <p className="text-[10px] text-center font-bold text-gray-500 dark:text-gray-400 -mt-1">{restoreMsg}</p>
+                    )}
+                </div>
             </div>
         </div>
     )
 }
+
