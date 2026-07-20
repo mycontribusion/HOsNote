@@ -523,13 +523,16 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             
             if (Array.isArray(parsed)) {
                 onImport(parsed)
+                setTimeout(() => onClose?.(), 600)
                 return
             }
             
             if (parsed && typeof parsed === 'object') {
                 const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
+                const incomingDocs = parsed.docs || []
                 if (incoming.length > 0) {
-                    onImport(incoming)
+                    onImport(incoming, incomingDocs)
+                    setTimeout(() => onClose?.(), 600)
                     return
                 }
             }
@@ -541,6 +544,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         const hospitalNumber = cleaned.includes('|') ? cleaned.split('|')[1].trim() : cleaned
         onLookup?.(hospitalNumber)
         setPasteData('')
+        setTimeout(() => onClose?.(), 600)
     }
 
     const statusColors = {
@@ -590,20 +594,41 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
                 {/* Mode Selector */}
                 <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-                    <button
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>
-                        Bulk Import
-                    </button>
-                    <button
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'quick' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => { setScanMode('quick'); setStatus('scanning'); setStatusMsg('Point camera at barcode or QR') }}
-                    >
-                        <Scan size={14} />
-                        Quick Scan
-                    </button>
+                    {cameraMode === 'camera' ? (
+                        <>
+                            <button
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>
+                                Bulk Import
+                            </button>
+                            <button
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'quick' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => { setScanMode('quick'); setStatus('scanning'); setStatusMsg('Point camera at barcode or QR') }}
+                            >
+                                <Scan size={14} />
+                                Quick Scan
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                                Paste Code
+                            </button>
+                            <button
+                                className="flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all text-gray-500 hover:text-gray-700"
+                                onClick={() => restoreInputRef.current?.click()}
+                            >
+                                <Upload size={14} />
+                                Import File
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Hidden File Input */}
@@ -675,7 +700,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                 onClick={() => setCameraMode('paste')}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-                                Paste Code
+                                Use Code
                             </button>
                             {onRestore && (
                                 <button
@@ -683,7 +708,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                     onClick={() => restoreInputRef.current?.click()}
                                 >
                                     <Upload size={14} />
-                                    Restore File
+                                    Import File
                                 </button>
                             )}
                         </div>
@@ -717,7 +742,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                     className="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
                                     onClick={() => restoreInputRef.current?.click()}
                                 >
-                                    <Upload size={14} /> Restore File
+                                    <Upload size={14} /> Import File
                                 </button>
                             )}
                         </div>
