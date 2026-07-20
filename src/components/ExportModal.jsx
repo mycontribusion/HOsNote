@@ -261,48 +261,69 @@ export default function ExportModal({ patients, allPatients, listName, selection
         try {
             const json = JSON.stringify(sharePayload, null, 2)
             const date = new Date().toISOString().split('T')[0]
-            const fileName = `HOsNote_Share_${(listName || 'handover').replace(/\s+/g, '_')}_${date}.json`
+            const baseName = `HOsNote_Share_${(listName || 'handover').replace(/\s+/g, '_')}_${date}`
             const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
-            const file = new File([blob], fileName, { type: 'application/json' })
 
-            // Try Web Share API with file first (works on Chrome/Edge on Android,
-            // and newer iOS Safari 15.4+). We attempt the share directly instead
-            // of gating on navigator.canShare because canShare is unavailable on
-            // older mobile browsers and can return false even when share works.
+            let shared = false
+
             if (navigator.share) {
+                // 1. Try sharing as a .json file
                 try {
-                    await navigator.share({
-                        title: `HOsNote handover — ${listName}`,
-                        files: [file],
-                    })
-                    setSharedCode(true)
-                    setTimeout(() => setSharedCode(false), 2000)
-                    return
-                } catch (err) {
-                    if (err && err.name === 'AbortError') {
-                        // User cancelled — fall through to download
-                        return
+                    const file = new File([blob], `${baseName}.json`, { type: 'application/json' })
+                    const canShareFiles = typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })
+                    if (canShareFiles) {
+                        await navigator.share({
+                            title: `HOsNote handover — ${listName}`,
+                            files: [file],
+                        })
+                        shared = true
                     }
-                    // Other share errors: try text share fallback before download
+                } catch (err) {
+                    // Fall through
+                }
+
+                // 2. Try sharing as a .txt file (more compatible for Web Share file type limitations)
+                if (!shared) {
+                    try {
+                        const txtFile = new File([blob], `${baseName}.txt`, { type: 'text/plain' })
+                        const canShareTxt = typeof navigator.canShare === 'function' && navigator.canShare({ files: [txtFile] })
+                        if (canShareTxt) {
+                            await navigator.share({
+                                title: `HOsNote handover — ${listName}`,
+                                files: [txtFile],
+                            })
+                            shared = true
+                        }
+                    } catch (err) {
+                        // Fall through
+                    }
+                }
+
+                // 3. Try sharing as raw text string (universal fallback for WhatsApp, messages, etc.)
+                if (!shared) {
                     try {
                         await navigator.share({
                             title: `HOsNote handover — ${listName}`,
                             text: json,
                         })
-                        setSharedCode(true)
-                        setTimeout(() => setSharedCode(false), 2000)
-                        return
-                    } catch {
-                        // Text share also failed — fall through to download
+                        shared = true
+                    } catch (err) {
+                        // Fall through
                     }
                 }
+            }
+
+            if (shared) {
+                setSharedCode(true)
+                setTimeout(() => setSharedCode(false), 2000)
+                return
             }
 
             // Fallback: trigger a direct file download
             const url = URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.setAttribute('href', url)
-            link.setAttribute('download', fileName)
+            link.setAttribute('download', `${baseName}.json`)
             link.style.visibility = 'hidden'
             document.body.appendChild(link)
             link.click()
@@ -512,4 +533,3 @@ export default function ExportModal({ patients, allPatients, listName, selection
         </div>
     )
 }
-

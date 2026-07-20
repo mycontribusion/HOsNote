@@ -663,7 +663,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 <input
                     ref={restoreInputRef}
                     type="file"
-                    accept=".json,application/json"
+                    accept=".json,application/json,.txt,text/plain"
                     className="hidden"
                     onChange={handleRestoreFile}
                 />
