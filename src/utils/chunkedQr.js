@@ -22,9 +22,9 @@ export const PROTOCOL_TAG = 'HN1'
 // Keep each frame comfortably under the safe QR capacity at error-correction
 // level M. At ~700 bytes total QR payload (level M, version ~8) this is very
 // reliably scannable by phone cameras even in mediocre lighting.
-// 120 Base64 chars ≈ 90 bytes of raw data, leaving plenty of room for the
+// 200 Base64 chars ≈ 150 bytes of raw data, leaving plenty of room for the
 // frame header (tag|sid|total|index|).
-const CHUNK_SIZE = 120
+const CHUNK_SIZE = 200
 
 // Small, dependency-free CRC32 (used only for integrity verification).
 function crc32(str) {

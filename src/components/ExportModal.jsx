@@ -5,19 +5,18 @@ import { buildFrames } from '../utils/chunkedQr'
 import useWakeLock from '../utils/useWakeLock'
 
 function compressMortality(p) {
-    const obj = {}
-    if (p.id) obj.id = p.id
-    if (p.ward) obj.w = p.ward
-    if (p.bed) obj.b = p.bed
-    if (p.name) obj.n = p.name
-    if (p.hospitalNumber) obj.h = p.hospitalNumber
-    if (p.note) obj.t = p.note
-    if (p.critical) obj.c = true
-    obj.reason = 'mortality'
-    if (p.removedAt) obj.removedAt = p.removedAt
-    if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
-    if (p.admissionDate) obj.admissionDate = p.admissionDate
-    return obj
+    const row = []
+    row.push(p.ward || '')
+    row.push(p.bed || '')
+    row.push(p.name || '')
+    row.push(p.hospitalNumber || '')
+    if (p.critical) row.push(1)
+    row.push(1) // mortality flag
+    if (p.admissionDate) row.push(p.admissionDate)
+    if (p.note) row.push(p.note)
+    if (p.removedAt) row.push(p.removedAt)
+    if (p.lastUpdated) row.push(p.lastUpdated)
+    return row
 }
 
 export default function ExportModal({ patients, allPatients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
@@ -81,40 +80,81 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const fullData = JSON.stringify(fullCompressed)
 
     // 3. Full Transfer payload (QR animation) — respects selection.
+    //    Uses ultra-compact positional arrays to minimize QR density.
     //    Only docs belonging to the exported patients are included.
     const transferPayload = useMemo(() => {
         const sid = transferSidRef.current
         const patientIds = new Set(patients.map(p => p.id))
         const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
         const includedMortalities = selectionCount > 0 ? [] : mortalities
+
+        // Ultra-compact patient array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
+        const transferPatients = patients.map((p) => {
+            const row = []
+            row.push(p.ward || '')
+            row.push(p.bed || '')
+            row.push(p.name || '')
+            row.push(p.hospitalNumber || '')
+            if (p.critical) row.push(1)
+            if (p.reason === 'mortality') row.push(1)
+            if (p.admissionDate) row.push(p.admissionDate)
+            return row
+        })
+
+        // Ultra-compact mortality array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
+        const transferMortalities = includedMortalities.map((p) => {
+            const row = []
+            row.push(p.ward || '')
+            row.push(p.bed || '')
+            row.push(p.name || '')
+            row.push(p.hospitalNumber || '')
+            if (p.critical) row.push(1)
+            row.push(1) // mortality flag
+            if (p.admissionDate) row.push(p.admissionDate)
+            if (p.note) row.push(p.note)
+            if (p.removedAt) row.push(p.removedAt)
+            if (p.lastUpdated) row.push(p.lastUpdated)
+            return row
+        })
+
+        // Ultra-compact docs: {pid, t, c, ca, ua}
+        const transferDocs = selectedDocs.map((d) => ({
+            pid: d.patientId,
+            t: d.text,
+            c: d.color,
+            ca: d.createdAt,
+            ua: d.updatedAt,
+        }))
+
         return {
             __sid: sid,
             __v: 1,
             type: 'patients',
             listName,
-            patients: fullCompressed,
-            mortalities: includedMortalities.map(compressMortality),
-            docs: selectedDocs,
+            patients: transferPatients,
+            mortalities: transferMortalities,
+            docs: transferDocs,
         }
-    }, [fullCompressed, mortalities, docs, listName, patients, selectionCount])
+    }, [patients, mortalities, docs, listName, selectionCount])
 
     // 4. Share payload — ALWAYS the full list regardless of selection.
     const sharePayload = useMemo(() => {
         const allPts = allPatients || patients
-        const allFullCompressed = allPts.map((p) => {
-            const obj = {}
-            if (p.ward) obj.w = p.ward
-            if (p.bed) obj.b = p.bed
-            if (p.name) obj.n = p.name
-            if (p.hospitalNumber) obj.h = p.hospitalNumber
-            if (p.note) obj.t = p.note
-            if (p.critical) obj.c = true
-            if (p.reason === 'mortality') { obj.reason = 'mortality'; obj.removedAt = p.removedAt }
-            if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
-            if (p.admissionDate) obj.admissionDate = p.admissionDate
-            return obj
-        })
         const allIds = new Set(allPts.map(p => p.id))
+        const allFullCompressed = allPts.map((p) => {
+            const row = []
+            row.push(p.ward || '')
+            row.push(p.bed || '')
+            row.push(p.name || '')
+            row.push(p.hospitalNumber || '')
+            if (p.critical) row.push(1)
+            if (p.reason === 'mortality') row.push(1)
+            if (p.note) row.push(p.note)
+            if (p.removedAt) row.push(p.removedAt)
+            if (p.lastUpdated) row.push(p.lastUpdated)
+            if (p.admissionDate) row.push(p.admissionDate)
+            return row
+        })
         return {
             type: 'patients',
             listName,
@@ -133,9 +173,9 @@ export default function ExportModal({ patients, allPatients, listName, selection
     // Default to autoPlay so the scanner can instantly ingest all frames.
     const [frameIdx, setFrameIdx] = useState(0)
     const [autoPlay, setAutoPlay] = useState(true)
-    // 1500ms per frame: gives the 20fps scanner ~30 attempts per frame.
-    // Slower is much more reliable than racing the camera.
-    const FRAME_MS = 1500
+    // 900ms per frame: gives the 20fps scanner ~18 attempts per frame.
+    // Fast enough for quick transfers while still reliable.
+    const FRAME_MS = 900
 
     useEffect(() => {
         if (!autoPlay || frames.length <= 1) return

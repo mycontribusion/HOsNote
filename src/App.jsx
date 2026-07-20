@@ -536,20 +536,29 @@ export default function App() {
         const isMortalityTab = activeTab === 'mortalities';
         const defaultTeam = isMortalityTab ? 'my_team' : activeTab;
         const oldIdToNewIdMap = {};
+        // Fallback map used to link docs when the exported patient carried no
+        // `id` (e.g. the "Share Code" payload omits ids). Keyed by a normalized
+        // identity string so docs can still attach to the right imported patient.
+        const identityToNewIdMap = {};
+        const identityKey = (name, ward, hosp) =>
+            `${(name || '').trim().toLowerCase()}|${(ward || '').trim().toUpperCase()}|${(hosp || '').trim().toLowerCase()}`;
 
         incoming.forEach(_p => {
-            // Support both the new ultra-compact positional array format
-            // [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
+            // Support both the ultra-compact positional array format
+            // [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
             // and the legacy object format ({w,b,n,h,c,m,u,ad,...}).
             let src;
             let oldId = null;
             if (Array.isArray(_p)) {
-                const [w, b, n, h, cFlag, mFlag, ad] = _p;
+                const [w, b, n, h, cFlag, mFlag, ad, note, removedAt, lastUpdated] = _p;
                 src = {
                     w, b, n, h,
                     c: cFlag === 1,
                     m: mFlag === 1,
                     ad,
+                    t: note,
+                    removedAt,
+                    u: lastUpdated,
                 };
             } else {
                 src = _p;
@@ -582,6 +591,9 @@ export default function App() {
             if (oldId) {
                 oldIdToNewIdMap[oldId] = generatedId;
             }
+            // Always record an identity-based mapping so docs can be linked
+            // even when the exported patient carried no `id`.
+            identityToNewIdMap[identityKey(p.name, p.ward, p.hospitalNumber)] = generatedId;
 
             let existingMatch = null;
             if (p.hospitalNumber) {
@@ -601,7 +613,7 @@ export default function App() {
         });
 
         if (conflicts.length > 0) {
-            setPendingImport({ conflicts, newOnes, incomingDocs, oldIdToNewIdMap });
+            setPendingImport({ conflicts, newOnes, incomingDocs, oldIdToNewIdMap, identityToNewIdMap });
             setShowScanner(false);
             return false;
         } else {
@@ -619,7 +631,10 @@ export default function App() {
                 setDocs(prev => {
                     const nextDocs = [...prev];
                     incomingDocs.forEach(d => {
-                        const newPatientId = oldIdToNewIdMap[d.patientId];
+                        // Prefer id-based linking; fall back to identity match
+                        // (name/ward/hosp) for payloads that omit patient ids.
+                        const newPatientId = oldIdToNewIdMap[d.patientId]
+                            || identityToNewIdMap[identityKey(d.patientName, d.patientWard, d.patientHosp)];
                         if (newPatientId && addedIds.has(newPatientId)) {
                             const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
                             if (!isDuplicate) {
@@ -655,6 +670,9 @@ export default function App() {
 
         const addedOrUpdatedIds = new Set(newOnes.map(p => p.id));
         const finalMap = { ...(pendingImport?.oldIdToNewIdMap || {}) };
+        const identityMap = { ...(pendingImport?.identityToNewIdMap || {}) };
+        const identityKey = (name, ward, hosp) =>
+            `${(name || '').trim().toLowerCase()}|${(ward || '').trim().toUpperCase()}|${(hosp || '').trim().toLowerCase()}`;
 
         resolvedConflicts.forEach(res => {
             const p = res.imported;
@@ -663,10 +681,12 @@ export default function App() {
 
             if (res.action === 'new') {
                 addedOrUpdatedIds.add(p.id);
+                identityMap[identityKey(p.name, p.ward, p.hospitalNumber)] = p.id;
                 if (p.reason === 'mortality') toAddMortality.push(p);
                 else toAddActive.push(p);
             } else if (res.action === 'update') {
                 addedOrUpdatedIds.add(res.existing.id);
+                identityMap[identityKey(p.name, p.ward, p.hospitalNumber)] = res.existing.id;
                 if (oldId) {
                     finalMap[oldId] = res.existing.id;
                 }
@@ -694,7 +714,8 @@ export default function App() {
             setDocs(prev => {
                 const nextDocs = [...prev];
                 incomingDocs.forEach(d => {
-                    const newPatientId = finalMap[d.patientId];
+                    const newPatientId = finalMap[d.patientId]
+                        || identityMap[identityKey(d.patientName, d.patientWard, d.patientHosp)];
                     if (newPatientId && addedOrUpdatedIds.has(newPatientId)) {
                         const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
                         if (!isDuplicate) {
