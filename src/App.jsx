@@ -694,19 +694,23 @@ export default function App() {
                 setDocs(prev => {
                     const nextDocs = [...prev];
                     incomingDocs.forEach(d => {
+                        // Support both compact keys (n/w/h) and legacy keys (patientName/patientWard/patientHosp)
+                        const docName = d.n || d.patientName || '';
+                        const docWard = d.w || d.patientWard || '';
+                        const docHosp = d.h || d.patientHosp || '';
                         // Prefer id-based linking; fall back to identity match
                         // (name/ward/hosp) for payloads that omit patient ids.
                         const newPatientId = oldIdToNewIdMap[d.patientId]
-                            || identityToNewIdMap[identityKey(d.patientName, d.patientWard, d.patientHosp)];
+                            || identityToNewIdMap[identityKey(docName, docWard, docHosp)];
                         if (newPatientId && addedIds.has(newPatientId)) {
                             const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
                             if (!isDuplicate) {
                                 nextDocs.unshift({
                                     id: generateId(),
                                     patientId: newPatientId,
-                                    patientName: d.patientName || '',
-                                    patientWard: d.patientWard || '',
-                                    patientHosp: d.patientHosp || '',
+                                    patientName: docName,
+                                    patientWard: docWard,
+                                    patientHosp: docHosp,
                                     text: d.text,
                                     color: d.color || 'blue',
                                     createdAt: d.createdAt || new Date().toISOString(),
@@ -777,17 +781,21 @@ export default function App() {
             setDocs(prev => {
                 const nextDocs = [...prev];
                 incomingDocs.forEach(d => {
+                    // Support both compact keys (n/w/h) and legacy keys (patientName/patientWard/patientHosp)
+                    const docName = d.n || d.patientName || '';
+                    const docWard = d.w || d.patientWard || '';
+                    const docHosp = d.h || d.patientHosp || '';
                     const newPatientId = finalMap[d.patientId]
-                        || identityMap[identityKey(d.patientName, d.patientWard, d.patientHosp)];
+                        || identityMap[identityKey(docName, docWard, docHosp)];
                     if (newPatientId && addedOrUpdatedIds.has(newPatientId)) {
                         const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === d.text.trim());
                         if (!isDuplicate) {
                             nextDocs.unshift({
                                 id: generateId(),
                                 patientId: newPatientId,
-                                patientName: d.patientName || '',
-                                patientWard: d.patientWard || '',
-                                patientHosp: d.patientHosp || '',
+                                patientName: docName,
+                                patientWard: docWard,
+                                patientHosp: docHosp,
                                 text: d.text,
                                 color: d.color || 'blue',
                                 createdAt: d.createdAt || new Date().toISOString(),

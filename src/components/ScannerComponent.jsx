@@ -170,6 +170,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     ...(payload.mortalities || []),
                 ]
                 const incomingDocs = payload.docs || []
+                console.log('[SCANNER DIAGNOSTIC] COMPLETE PAYLOAD:', {
+                    patientCount: incoming.length,
+                    docCount: incomingDocs.length,
+                    samplePatient: incoming[0],
+                    sampleDoc: incomingDocs[0],
+                    allDocs: incomingDocs,
+                })
                 setTransferProgress(null)
                 setImportedCount(incoming.length)
                 setStatus('success')

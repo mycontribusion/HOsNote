@@ -88,7 +88,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
         const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
         const includedMortalities = selectionCount > 0 ? [] : mortalities
 
-        // Ultra-compact patient array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
+        // Ultra-compact patient array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note]
         const transferPatients = patients.map((p) => {
             const row = []
             row.push(p.ward || '')
@@ -98,6 +98,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             if (p.critical) row.push(1)
             if (p.reason === 'mortality') row.push(1)
             if (p.admissionDate) row.push(p.admissionDate)
+            if (p.note) row.push(p.note)
             return row
         })
 
@@ -117,9 +118,14 @@ export default function ExportModal({ patients, allPatients, listName, selection
             return row
         })
 
-        // Ultra-compact docs: {pid, t, c, ca, ua}
+        // Ultra-compact docs: {pid, n, w, h, t, c, ca, ua}
+        // Include patient identity fields so the import side can link docs
+        // even when the exported patient carried no `id`.
         const transferDocs = selectedDocs.map((d) => ({
             pid: d.patientId,
+            n: d.patientName,
+            w: d.patientWard,
+            h: d.patientHosp,
             t: d.text,
             c: d.color,
             ca: d.createdAt,
