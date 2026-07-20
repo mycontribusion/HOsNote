@@ -260,9 +260,11 @@ export default function ExportModal({ patients, allPatients, listName, selection
         setShareError('')
         try {
             const json = JSON.stringify(sharePayload, null, 2)
-            const date = new Date().toISOString().split('T')[0]
+            const now = new Date()
+            const date = now.toISOString().split('T')[0]
+            const time = now.toTimeString().split(' ')[0].replace(/:/g, '')
             const cleanListName = (listName || 'handover').replace(/\s+/g, '_')
-            const baseName = `HOsNote_Share_${cleanListName}_${date}`
+            const baseName = `HOsNote_Share_${cleanListName}_${date}_${time}`
 
             let shared = false
 
