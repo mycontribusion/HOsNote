@@ -899,6 +899,7 @@ export default function App() {
                 ) : showMortalityForm ? (
                     <AddPatientForm
                         initialData={null}
+                        initialTeam={activeTab}
                         isMortalityMode
                         onAdd={addMortality}
                         onCancel={cancelForm}
@@ -906,6 +907,7 @@ export default function App() {
                 ) : (
                     <AddPatientForm
                         initialData={editingPatient}
+                        initialTeam={activeTab}
                         onAdd={savePatient}
                         onCancel={cancelForm}
                         isMortalityMode={editingPatient?.reason === 'mortality'}

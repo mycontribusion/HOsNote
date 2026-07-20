@@ -34,6 +34,9 @@ function decodeHtml(str) {
 export default function ScannerComponent({ onImport, onLookup, listName, onClose, onRestore }) {
     const scannerRef = useRef(null)
     const mountedRef = useRef(true)
+    // Set to true when a complete transfer fires so the tryResume loop
+    // doesn't fight onClose() and keep the scanner alive after import.
+    const transferDoneRef = useRef(false)
     const [scanMode, setScanMode] = useState('import') // 'import' | 'quick'
     const [cameraMode, setCameraMode] = useState('camera') // 'camera' | 'paste'
     const [pasteData, setPasteData] = useState('')
@@ -100,8 +103,10 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         // AFTER the success callback returns, so an immediate
                         // resume() is a no-op. We unconditionally retry calling
                         // resume() to capture the state transition without relying on getState().
+                        // Skip re-arming if the transfer has just completed — the scanner
+                        // is about to be closed and re-arming would cause a visible restart.
                         const tryResume = (attempts = 6) => {
-                            if (!mountedRef.current || !scannerRef.current) return
+                            if (!mountedRef.current || !scannerRef.current || transferDoneRef.current) return
                             try {
                                 scannerRef.current.resume()
                             } catch (e) {
@@ -181,6 +186,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 setImportedCount(incoming.length)
                 setStatus('success')
                 setStatusMsg(`Reassembled ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
+                transferDoneRef.current = true // stop resume loop before close
                 setTimeout(() => {
                     if (mountedRef.current) {
                         const success = onImport(incoming, incomingDocs)
@@ -196,6 +202,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 return
             }
             if (result.status === 'progress') {
+                transferDoneRef.current = false // new frame arrived — keep resume active
                 setTransferProgress({ received: result.received, total: result.total })
                 setStatus('scanning')
                 setStatusMsg(`Receiving transfer… ${result.received}/${result.total} frames`)
@@ -326,7 +333,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         }, 3000)
     }
 
-    // ── Restore: parse JSON and call parent callback ──────────────────────────
+    // ── Restore / Import: parse JSON file and call parent callback ─────────────
     const handleRestoreFile = (e) => {
         const file = e.target.files?.[0]
         if (!file) return
@@ -334,15 +341,39 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         reader.onload = (ev) => {
             try {
                 const data = JSON.parse(ev.target.result)
-                if (!data.patients && !data.docs) {
-                    setRestoreMsg('❌ Invalid backup file.')
-                    return
+
+                // Detect share payload format: type === 'patients' or patients is array of arrays
+                const isSharePayload = data.type === 'patients' ||
+                    (Array.isArray(data.patients) && data.patients.length > 0 && Array.isArray(data.patients[0]))
+
+                // Detect backup format
+                const isBackup = data.__type === 'hosnote-backup'
+
+                if (isSharePayload) {
+                    const incoming = [...(data.patients || []), ...(data.mortalities || [])]
+                    const incomingDocs = data.docs || []
+                    if (incoming.length === 0) {
+                        setRestoreMsg('❌ No patients found in file.')
+                        setTimeout(() => setRestoreMsg(''), 4000)
+                        return
+                    }
+                    const success = onImport(incoming, incomingDocs)
+                    if (success) {
+                        setRestoreMsg('✅ Import successful!')
+                    }
+                    // If not success, scanner closes and ReviewDuplicatesModal shows
+                    setTimeout(() => setRestoreMsg(''), 4000)
+                } else if (isBackup || data.patients || data.docs) {
+                    onRestore?.(data)
+                    setRestoreMsg('✅ Restore successful!')
+                    setTimeout(() => setRestoreMsg(''), 4000)
+                } else {
+                    setRestoreMsg('❌ Invalid file format.')
+                    setTimeout(() => setRestoreMsg(''), 4000)
                 }
-                onRestore?.(data)
-                setRestoreMsg('✅ Restore successful!')
-                setTimeout(() => setRestoreMsg(''), 4000)
             } catch {
                 setRestoreMsg('❌ Could not parse file.')
+                setTimeout(() => setRestoreMsg(''), 4000)
             }
         }
         reader.readAsText(file)

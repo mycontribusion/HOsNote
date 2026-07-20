@@ -5,18 +5,18 @@ import { buildFrames } from '../utils/chunkedQr'
 import useWakeLock from '../utils/useWakeLock'
 
 function compressMortality(p) {
-    const row = []
-    row.push(p.ward || '')
-    row.push(p.bed || '')
-    row.push(p.name || '')
-    row.push(p.hospitalNumber || '')
-    if (p.critical) row.push(1)
-    row.push(1) // mortality flag
-    if (p.admissionDate) row.push(p.admissionDate)
-    if (p.note) row.push(p.note)
-    if (p.removedAt) row.push(p.removedAt)
-    if (p.lastUpdated) row.push(p.lastUpdated)
-    return row
+    return [
+        p.ward || '',
+        p.bed || '',
+        p.name || '',
+        p.hospitalNumber || '',
+        p.critical ? 1 : 0,
+        1, // mortality flag
+        p.admissionDate || '',
+        p.note || '',
+        p.removedAt || '',
+        p.lastUpdated || ''
+    ]
 }
 
 export default function ExportModal({ patients, allPatients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
@@ -42,20 +42,23 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const { supported: wakeSupported, locked: wakeLocked } = useWakeLock(true)
 
     // 1. QR Data: Ultra-compact positional array to keep QR density low.
-    // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate]
-    //  - criticalFlag: 1 if critical, else omitted
-    //  - mortalityFlag: 1 if mortality, else omitted
-    //  - lastUpdated is intentionally dropped (not needed for a handover scan)
+    // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
+    //  - criticalFlag: 1 if critical, else 0
+    //  - mortalityFlag: 1 if mortality, else 0
+    //  - compact scan only sends biodata, so note/removedAt/lastUpdated are empty strings.
     const qrCompressed = patients.map((p) => {
-        const row = []
-        row.push(p.ward || '')
-        row.push(p.bed || '')
-        row.push(p.name || '')
-        row.push(p.hospitalNumber || '')
-        if (p.critical) row.push(1)
-        if (p.reason === 'mortality') row.push(1)
-        if (p.admissionDate) row.push(p.admissionDate)
-        return row
+        return [
+            p.ward || '',
+            p.bed || '',
+            p.name || '',
+            p.hospitalNumber || '',
+            p.critical ? 1 : 0,
+            p.reason === 'mortality' ? 1 : 0,
+            p.admissionDate || '',
+            '', // no note for compact scan
+            '', // no removedAt for compact scan
+            ''  // no lastUpdated for compact scan
+        ]
     })
     const qrData = JSON.stringify(qrCompressed)
 
@@ -88,34 +91,36 @@ export default function ExportModal({ patients, allPatients, listName, selection
         const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
         const includedMortalities = selectionCount > 0 ? [] : mortalities
 
-        // Ultra-compact patient array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note]
+        // Ultra-compact patient array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
         const transferPatients = patients.map((p) => {
-            const row = []
-            row.push(p.ward || '')
-            row.push(p.bed || '')
-            row.push(p.name || '')
-            row.push(p.hospitalNumber || '')
-            if (p.critical) row.push(1)
-            if (p.reason === 'mortality') row.push(1)
-            if (p.admissionDate) row.push(p.admissionDate)
-            if (p.note) row.push(p.note)
-            return row
+            return [
+                p.ward || '',
+                p.bed || '',
+                p.name || '',
+                p.hospitalNumber || '',
+                p.critical ? 1 : 0,
+                p.reason === 'mortality' ? 1 : 0,
+                p.admissionDate || '',
+                p.note || '',
+                p.removedAt || '',
+                p.lastUpdated || ''
+            ]
         })
 
         // Ultra-compact mortality array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
         const transferMortalities = includedMortalities.map((p) => {
-            const row = []
-            row.push(p.ward || '')
-            row.push(p.bed || '')
-            row.push(p.name || '')
-            row.push(p.hospitalNumber || '')
-            if (p.critical) row.push(1)
-            row.push(1) // mortality flag
-            if (p.admissionDate) row.push(p.admissionDate)
-            if (p.note) row.push(p.note)
-            if (p.removedAt) row.push(p.removedAt)
-            if (p.lastUpdated) row.push(p.lastUpdated)
-            return row
+            return [
+                p.ward || '',
+                p.bed || '',
+                p.name || '',
+                p.hospitalNumber || '',
+                p.critical ? 1 : 0,
+                1, // mortality flag
+                p.admissionDate || '',
+                p.note || '',
+                p.removedAt || '',
+                p.lastUpdated || ''
+            ]
         })
 
         // Ultra-compact docs: {pid, n, w, h, t, c, ca, ua}
@@ -148,27 +153,46 @@ export default function ExportModal({ patients, allPatients, listName, selection
     //    (on call / my team). When some patients are selected, share only those.
     const sharePayload = useMemo(() => {
         const ptsToShare = selectionCount > 0 ? patients : (allPatients || patients)
+        // Build a lookup map so each doc can be annotated with patient identity fields
+        // (n/w/h). Since the share payload uses positional arrays (no id), the
+        // importer cannot use id-based linking — it falls back to identity matching,
+        // which requires these fields to be present on the doc.
+        const patientById = Object.fromEntries(ptsToShare.map(p => [p.id, p]))
         const allIds = new Set(ptsToShare.map(p => p.id))
         const allFullCompressed = ptsToShare.map((p) => {
-            const row = []
-            row.push(p.ward || '')
-            row.push(p.bed || '')
-            row.push(p.name || '')
-            row.push(p.hospitalNumber || '')
-            if (p.critical) row.push(1)
-            if (p.reason === 'mortality') row.push(1)
-            if (p.note) row.push(p.note)
-            if (p.removedAt) row.push(p.removedAt)
-            if (p.lastUpdated) row.push(p.lastUpdated)
-            if (p.admissionDate) row.push(p.admissionDate)
-            return row
+            return [
+                p.ward || '',
+                p.bed || '',
+                p.name || '',
+                p.hospitalNumber || '',
+                p.critical ? 1 : 0,
+                p.reason === 'mortality' ? 1 : 0,
+                p.admissionDate || '',
+                p.note || '',
+                p.removedAt || '',
+                p.lastUpdated || ''
+            ]
+        })
+        const enrichedDocs = docs.filter(d => allIds.has(d.patientId)).map(d => {
+            const pat = patientById[d.patientId]
+            return {
+                patientId: d.patientId,
+                // Identity fields so the importer can link docs even without a patient id
+                n: pat?.name || '',
+                w: pat?.ward || '',
+                h: pat?.hospitalNumber || '',
+                text: d.text,
+                color: d.color,
+                createdAt: d.createdAt,
+                updatedAt: d.updatedAt,
+            }
         })
         return {
             type: 'patients',
             listName,
             patients: allFullCompressed,
             mortalities: mortalities.map(compressMortality),
-            docs: docs.filter(d => allIds.has(d.patientId)),
+            docs: enrichedDocs,
         }
     }, [allPatients, patients, mortalities, docs, listName, selectionCount])
 
@@ -234,46 +258,44 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const handleShareCode = async () => {
         setShareError('')
         try {
-            const shareText = JSON.stringify(sharePayload)
-            if (navigator.share) {
+            const json = JSON.stringify(sharePayload, null, 2)
+            const date = new Date().toISOString().split('T')[0]
+            const fileName = `HOsNote_Share_${(listName || 'handover').replace(/\s+/g, '_')}_${date}.json`
+            const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
+            const file = new File([blob], fileName, { type: 'application/json' })
+
+            // Try Web Share API with file (supported in Chrome/Edge on Android, etc.)
+            if (navigator.share && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
                 try {
                     await navigator.share({
                         title: `HOsNote handover — ${listName}`,
-                        text: shareText,
+                        files: [file],
                     })
                     setSharedCode(true)
                     setTimeout(() => setSharedCode(false), 2000)
                     return
                 } catch (err) {
-                    // User cancelled the share sheet, or it failed — fall back
-                    // to copying the code to the clipboard.
                     if (err && err.name === 'AbortError') {
-                        // fall through to clipboard copy
+                        // User cancelled — fall through to download
                     }
+                    // Other share errors also fall through to download
                 }
             }
-            // Clipboard fallback (works in all browsers / PWA contexts).
-            if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(shareText)
-            } else {
-                const textArea = document.createElement('textarea')
-                textArea.value = shareText
-                textArea.style.position = 'fixed'
-                document.body.appendChild(textArea)
-                textArea.focus()
-                textArea.select()
-                try {
-                    document.execCommand('copy')
-                } catch {
-                    throw new Error('copy failed')
-                } finally {
-                    document.body.removeChild(textArea)
-                }
-            }
+
+            // Fallback: trigger a direct file download
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.setAttribute('href', url)
+            link.setAttribute('download', fileName)
+            link.style.visibility = 'hidden'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
             setSharedCode(true)
             setTimeout(() => setSharedCode(false), 2000)
         } catch {
-            setShareError('Could not share. Use "Copy Code" and paste it manually.')
+            setShareError('Could not share. Please try again.')
         }
     }
 

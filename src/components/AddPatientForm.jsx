@@ -58,8 +58,11 @@ function clearDraft() {
     catch { /* ignore */ }
 }
 
-export default function AddPatientForm({ onAdd, onCancel, initialData, isMortalityMode = false }) {
-    const [team] = useState('my_team')
+export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false }) {
+    const [team] = useState(() => {
+        if (initialData?.team) return initialData.team
+        return initialTeam
+    })
     
     const [fields, setFields] = useState({ name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), note: '' })
     
