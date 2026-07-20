@@ -196,7 +196,13 @@ export default function App() {
     const [showMortalityForm, setShowMortalityForm] = useState(false)
     const [showFeedback, setShowFeedback] = useState(false)
     const [showSettings, setShowSettings] = useState(false)
-    const [textSize, setTextSize] = useState(100)
+    const [textSize, setTextSize] = useState(() => {
+        try {
+            const saved = localStorage.getItem('hosnote_textsize')
+            if (saved) return JSON.parse(saved)
+        } catch { /* ignore */ }
+        return 100
+    })
     const [editingPatient, setEditingPatient] = useState(null)
     const [removalCandidateId, setRemovalCandidateId] = useState(null)
     const [pendingImport, setPendingImport] = useState(null)
@@ -225,13 +231,6 @@ export default function App() {
         } catch { /* ignore */ }
     }, [textSize])
 
-    // Load saved text size
-    useEffect(() => {
-        try {
-            const saved = localStorage.getItem('hosnote_textsize')
-            if (saved) setTextSize(JSON.parse(saved))
-        } catch { /* ignore */ }
-    }, [])
 
     const toggleDarkMode = useCallback(() => setDarkMode(prev => !prev), [])
 

@@ -180,10 +180,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         if (success) {
                             setTimeout(() => {
                                 if (mountedRef.current) {
-                                    setStatus('scanning')
-                                    setStatusMsg('Point camera at QR code')
-                                    setImportedCount(0)
-                                    receiverRef.current.reset()
+                                    onClose()
                                 }
                             }, 1500)
                         }
@@ -241,10 +238,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     if (success) {
                         setTimeout(() => {
                             if (mountedRef.current) {
-                                setStatus('scanning')
-                                setStatusMsg('Point camera at QR code')
-                                setImportedCount(0)
-                                receiverRef.current.reset()
+                                onClose()
                             }
                         }, 1500)
                     }
@@ -392,9 +386,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         if (success) {
                             setTimeout(() => {
                                 if (mountedRef.current) {
-                                    setStatus('scanning')
-                                    setStatusMsg('Point camera at QR code')
-                                    setPasteData('')
+                                    onClose()
                                 }
                             }, 1500)
                         }
@@ -447,9 +439,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         if (success) {
                             setTimeout(() => {
                                 if (mountedRef.current) {
-                                    setStatus('scanning')
-                                    setStatusMsg('Point camera at QR code')
-                                    setPasteData('')
+                                    onClose()
                                 }
                             }, 1500)
                         }
@@ -470,9 +460,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             if (success) {
                                 setTimeout(() => {
                                     if (mountedRef.current) {
-                                        setStatus('scanning')
-                                        setStatusMsg('Point camera at QR code')
-                                        setPasteData('')
+                                        onClose()
                                     }
                                 }, 1500)
                             }
