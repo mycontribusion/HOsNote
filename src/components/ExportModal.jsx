@@ -137,11 +137,13 @@ export default function ExportModal({ patients, allPatients, listName, selection
         }
     }, [patients, mortalities, docs, listName, selectionCount])
 
-    // 4. Share payload — ALWAYS the full list regardless of selection.
+    // 4. Share payload — respects selection.
+    //    When no patients are selected, share all patients from the current view
+    //    (on call / my team). When some patients are selected, share only those.
     const sharePayload = useMemo(() => {
-        const allPts = allPatients || patients
-        const allIds = new Set(allPts.map(p => p.id))
-        const allFullCompressed = allPts.map((p) => {
+        const ptsToShare = selectionCount > 0 ? patients : (allPatients || patients)
+        const allIds = new Set(ptsToShare.map(p => p.id))
+        const allFullCompressed = ptsToShare.map((p) => {
             const row = []
             row.push(p.ward || '')
             row.push(p.bed || '')
@@ -162,7 +164,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             mortalities: mortalities.map(compressMortality),
             docs: docs.filter(d => allIds.has(d.patientId)),
         }
-    }, [allPatients, patients, mortalities, docs, listName])
+    }, [allPatients, patients, mortalities, docs, listName, selectionCount])
 
     const { frames, total: frameTotal, bytes } = useMemo(
         () => buildFrames(transferPayload),
@@ -413,7 +415,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 <div className="flex flex-col gap-2 shrink-0">
                     <button className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] ${sharedCode ? 'bg-emerald-500 text-white' : 'bg-gray-900 text-white'}`} onClick={handleShareCode}>
                         {sharedCode ? <CheckCircle size={16} /> : <Share2 size={16} />}
-                        {sharedCode ? 'Code Shared!' : 'Share Complete List Code'}
+                        {sharedCode ? 'Code Shared!' : 'Share Code'}
                     </button>
                     
                     <div className="grid grid-cols-2 gap-2">
