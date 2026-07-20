@@ -261,54 +261,55 @@ export default function ExportModal({ patients, allPatients, listName, selection
         try {
             const json = JSON.stringify(sharePayload, null, 2)
             const date = new Date().toISOString().split('T')[0]
-            const baseName = `HOsNote_Share_${(listName || 'handover').replace(/\s+/g, '_')}_${date}`
-            const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
+            const cleanListName = (listName || 'handover').replace(/\s+/g, '_')
+            const baseName = `HOsNote_Share_${cleanListName}_${date}`
 
             let shared = false
 
             if (navigator.share) {
-                // 1. Try sharing as a .json file
+                // 1. Primary Method: Share as a .txt file with text/plain MIME type.
+                // Android allows text/plain files to be shared across virtually all apps (WhatsApp, Drive, Email).
                 try {
-                    const file = new File([blob], `${baseName}.json`, { type: 'application/json' })
-                    const canShareFiles = typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })
-                    if (canShareFiles) {
+                    const txtBlob = new Blob([json], { type: 'text/plain;charset=utf-8;' })
+                    const txtFile = new File([txtBlob], `${baseName}.txt`, { type: 'text/plain' })
+
+                    let canShareFile = true
+                    if (typeof navigator.canShare === 'function') {
+                        canShareFile = navigator.canShare({ files: [txtFile] })
+                    }
+
+                    if (canShareFile) {
                         await navigator.share({
                             title: `HOsNote handover — ${listName}`,
-                            files: [file],
+                            files: [txtFile],
                         })
                         shared = true
                     }
                 } catch (err) {
-                    // Fall through
-                }
-
-                // 2. Try sharing as a .txt file (more compatible for Web Share file type limitations)
-                if (!shared) {
-                    try {
-                        const txtFile = new File([blob], `${baseName}.txt`, { type: 'text/plain' })
-                        const canShareTxt = typeof navigator.canShare === 'function' && navigator.canShare({ files: [txtFile] })
-                        if (canShareTxt) {
-                            await navigator.share({
-                                title: `HOsNote handover — ${listName}`,
-                                files: [txtFile],
-                            })
-                            shared = true
-                        }
-                    } catch (err) {
-                        // Fall through
+                    // If user cancels the sheet (AbortError), mark as handled so it doesn't trigger download
+                    if (err.name === 'AbortError') {
+                        return
                     }
+                    console.warn('File share failed, trying fallback...', err)
                 }
 
-                // 3. Try sharing as raw text string (universal fallback for WhatsApp, messages, etc.)
+                // 2. Fallback Method: Share summary text + trimmed snippet if file sharing fails
                 if (!shared) {
                     try {
+                        const textSnippet = `HOsNote Handover (${listName}) - ${patients.length} Patient(s)\n\n` + json
+                        // Truncate to safe size (~2KB) if payload is too large for Android text Intent
+                        const safeText = textSnippet.length > 2000 ? textSnippet.slice(0, 2000) + '...' : textSnippet
+
                         await navigator.share({
                             title: `HOsNote handover — ${listName}`,
-                            text: json,
+                            text: safeText,
                         })
                         shared = true
                     } catch (err) {
-                        // Fall through
+                        if (err.name === 'AbortError') {
+                            return
+                        }
+                        console.warn('Text share failed...', err)
                     }
                 }
             }
@@ -319,8 +320,9 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 return
             }
 
-            // Fallback: trigger a direct file download
-            const url = URL.createObjectURL(blob)
+            // 3. Last Resort Fallback (Desktop / Unsupported Browsers): Direct JSON File Download
+            const jsonBlob = new Blob([json], { type: 'application/json;charset=utf-8;' })
+            const url = URL.createObjectURL(jsonBlob)
             const link = document.createElement('a')
             link.setAttribute('href', url)
             link.setAttribute('download', `${baseName}.json`)
