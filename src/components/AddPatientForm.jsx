@@ -58,8 +58,8 @@ function clearDraft() {
     catch { /* ignore */ }
 }
 
-export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false }) {
-    const [team, setTeam] = useState(initialTeam)
+export default function AddPatientForm({ onAdd, onCancel, initialData, isMortalityMode = false }) {
+    const [team] = useState('my_team')
     
     const [fields, setFields] = useState({ name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), note: '' })
     
@@ -79,7 +79,6 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     useEffect(() => {
         let initialFields = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), note: '' }
         if (initialData) {
-            setTeam(initialData.team || 'my_team')
             initialFields = {
                 name: initialData.name || '',
                 hospitalNumber: initialData.hospitalNumber || '',
@@ -90,13 +89,11 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
             }
             setCritical(!!initialData.critical)
         } else {
-            setTeam(initialTeam)
             setCritical(false)
 
             if (!isMortalityMode) {
                 const draft = loadDraft()
                 if (draft) {
-                    setTeam(draft.team ?? initialTeam)
                     setCritical(!!draft.critical)
                     if (draft.fields) {
                         initialFields = draft.fields
@@ -109,7 +106,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         setFields(initialFields)
         setHistory({ stack: [initialFields], index: 0 })
         isUndoRedo.current = true
-    }, [initialData, initialTeam, isMortalityMode])
+    }, [initialData, isMortalityMode])
 
     useEffect(() => {
         if (isUndoRedo.current) {
@@ -164,7 +161,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         return () => { document.body.style.overflow = '' }
     }, [])
 
-    const currentDraft = useCallback((overrides = {}) => ({ team, fields, critical, ...overrides }), [team, fields, critical])
+    const currentDraft = useCallback((overrides = {}) => ({ team: 'my_team', fields, critical, ...overrides }), [fields, critical])
     
     // Add custom field update handler
     const updateField = (key, value) => {
@@ -209,42 +206,42 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 <form id="add-patient-form" onSubmit={handleSubmit} className="flex flex-col h-full">
 
                     {/* Top Action Bar */}
-                    <div className="flex items-center justify-between px-3 py-3 sm:px-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10">
+                    <div className="flex items-center justify-between px-3 py-2 sm:px-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10">
                         {/* Undo / Redo */}
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
                             <button
                                 type="button"
                                 onClick={handleUndo}
                                 disabled={history.index <= 0}
-                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                 aria-label="Undo"
                             >
-                                <Undo2 size={20} strokeWidth={2.5} />
+                                <Undo2 size={16} strokeWidth={2.5} />
                             </button>
                             <button
                                 type="button"
                                 onClick={handleRedo}
                                 disabled={history.index >= history.stack.length - 1}
-                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                 aria-label="Redo"
                             >
-                                <Redo2 size={20} strokeWidth={2.5} />
+                                <Redo2 size={16} strokeWidth={2.5} />
                             </button>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
                             {/* Critical */}
                             {!isMortalityMode && (
                                 <button
                                     type="button"
                                     aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
                                     onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
                                         critical
                                             ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 shadow-sm'
                                             : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300'
                                     }`}
                                 >
-                                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
                                     {critical ? 'CRITICAL' : 'Critical'}
                                 </button>
                             )}
@@ -254,10 +251,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 id="btn-add-patient"
                                 type="submit"
                                 aria-label={initialData ? "Save" : "Add"}
-                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm shadow-blue-200 dark:shadow-blue-900/20 transition-all active:scale-95"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm shadow-blue-200 dark:shadow-blue-900/20 transition-all active:scale-95"
                             >
-                                {initialData ? <Save size={18} strokeWidth={2.5} /> : <Plus size={18} strokeWidth={2.5} />}
-                                <span className="text-sm font-bold">{initialData ? 'Save' : 'Add'}</span>
+                                {initialData ? <Save size={15} strokeWidth={2.5} /> : <Plus size={15} strokeWidth={2.5} />}
+                                <span className="text-xs font-bold">{initialData ? 'Save' : 'Add'}</span>
                             </button>
 
                             {/* Cancel */}
@@ -265,9 +262,9 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 type="button"
                                 onClick={onCancel}
                                 aria-label="Cancel"
-                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors active:scale-95 ml-1"
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors active:scale-95"
                             >
-                                <X size={20} strokeWidth={2.5} />
+                                <X size={16} strokeWidth={2.5} />
                             </button>
                         </div>
                     </div>
@@ -275,22 +272,6 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                     {/* Scrollable Form Body */}
                     <div className="flex-1 overflow-y-auto flex flex-col bg-white dark:bg-gray-800">
                         
-                        {/* Team toggle */}
-                        {!isMortalityMode && (
-                            <div className="flex bg-gray-100 dark:bg-gray-700/60 p-1 rounded-xl m-3 sm:m-4 shrink-0 shadow-inner">
-                                {[['my_team', 'My Team', 'text-blue-700 dark:text-blue-300'], ['other_team', 'On Call', 'text-purple-700 dark:text-purple-300']].map(([val, label, activeColor]) => (
-                                    <button
-                                        key={val}
-                                        type="button"
-                                        onClick={() => { setTeam(val); scheduleDraftSave(currentDraft({ team: val })) }}
-                                        className={`flex-1 text-sm font-bold py-2 rounded-lg transition-all ${team === val ? `bg-white dark:bg-gray-600 ${activeColor} shadow-sm` : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
                         {/* Error */}
                         {error && (
                             <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm font-bold mx-3 sm:mx-4 mb-3 shrink-0 shadow-sm">
