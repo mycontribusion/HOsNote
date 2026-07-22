@@ -6,6 +6,7 @@ import useWakeLock from '../utils/useWakeLock'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+import { copyToClipboard } from '../utils/clipboard'
 
 function compressMortality(p) {
     return [
@@ -248,11 +249,11 @@ export default function ExportModal({ patients, allPatients, listName, selection
             p.removedAt ? `"${new Date(p.removedAt).toISOString()}"` : ''
         ])
         const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-        try {
-            await navigator.clipboard.writeText(csvContent)
+        const ok = await copyToClipboard(csvContent)
+        if (ok) {
             setCopiedCsv(true)
             setTimeout(() => setCopiedCsv(false), 2500)
-        } catch {
+        } else {
             alert(csvContent)
         }
     }
@@ -376,9 +377,13 @@ export default function ExportModal({ patients, allPatients, listName, selection
         setShareError('')
         try {
             const json = JSON.stringify(sharePayload)
-            await navigator.clipboard.writeText(json)
-            setCopiedCode(true)
-            setTimeout(() => setCopiedCode(false), 2000)
+            const ok = await copyToClipboard(json)
+            if (ok) {
+                setCopiedCode(true)
+                setTimeout(() => setCopiedCode(false), 2000)
+            } else {
+                setShareError('Failed to copy code to clipboard.')
+            }
         } catch (err) {
             setShareError('Failed to copy code to clipboard.')
         }

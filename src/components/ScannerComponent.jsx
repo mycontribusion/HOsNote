@@ -382,11 +382,18 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }
 
     const handlePasteImport = () => {
+        mountedRef.current = true // Ensure component is marked as mounted for paste operations
+        console.log('[PASTE IMPORT DIAGNOSTIC] Button clicked, pasteData length:', pasteData.length)
         const rawText = decodeHtml(pasteData)
         const cleaned = rawText.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
-        if (!cleaned) return
+        console.log('[PASTE IMPORT DIAGNOSTIC] Cleaned text length:', cleaned.length, 'starts with:', cleaned.slice(0, 50))
+        if (!cleaned) {
+            console.log('[PASTE IMPORT DIAGNOSTIC] Empty cleaned text, returning early')
+            return
+        }
 
         if (cleaned.includes('HOsNote Patient List:') || cleaned.includes('Name: ') || cleaned.includes('HOsNote Handover')) {
+            console.log('[PASTE IMPORT DIAGNOSTIC] Detected readable share text, rejecting')
             setStatus('error')
             setStatusMsg('That looks like the readable "Share Text". Go back to Export and tap "Share Code" / "Copy Code" instead.')
             return
@@ -394,7 +401,9 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
         // Support pasted chunked frames (one per line) for the Full Transfer.
         const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+        console.log('[PASTE IMPORT DIAGNOSTIC] Lines count:', lines.length)
         const firstFrame = parseFrame(lines[0])
+        console.log('[PASTE IMPORT DIAGNOSTIC] First frame:', firstFrame)
         if (firstFrame && lines.length >= 1) {
             receiverRef.current.reset()
             let completed = null
@@ -416,11 +425,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             if (completed) {
                 const incoming = [...(completed.patients || []), ...(completed.mortalities || [])]
                 const incomingDocs = completed.docs || []
+                console.log('[PASTE IMPORT DIAGNOSTIC] Chunked transfer complete, patients:', incoming.length, 'docs:', incomingDocs.length)
                 setStatus('success')
                 setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
                 setTimeout(() => {
                     if (mountedRef.current) {
                         const success = onImport(incoming, incomingDocs)
+                        console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                         if (success) {
                             setTimeout(() => {
                                 if (mountedRef.current) {
@@ -467,13 +478,16 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
         try {
             const parsed = JSON.parse(jsonStr)
+            console.log('[PASTE IMPORT DIAGNOSTIC] JSON parsed, type:', typeof parsed, 'isArray:', Array.isArray(parsed))
             
             if (Array.isArray(parsed)) {
+                console.log('[PASTE IMPORT DIAGNOSTIC] Importing array of', parsed.length, 'patients')
                 setStatus('success')
                 setStatusMsg(`Loaded ${parsed.length} patient${parsed.length !== 1 ? 's' : ''}! Importing…`)
                 setTimeout(() => {
                     if (mountedRef.current) {
                         const success = onImport(parsed)
+                        console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                         if (success) {
                             setTimeout(() => {
                                 if (mountedRef.current) {
@@ -489,12 +503,14 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             if (parsed && typeof parsed === 'object') {
                 const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
                 const incomingDocs = parsed.docs || []
+                console.log('[PASTE IMPORT DIAGNOSTIC] Object payload, patients:', incoming.length, 'docs:', incomingDocs.length)
                 if (incoming.length > 0) {
                     setStatus('success')
                     setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
                     setTimeout(() => {
                         if (mountedRef.current) {
                             const success = onImport(incoming, incomingDocs)
+                            console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                             if (success) {
                                 setTimeout(() => {
                                     if (mountedRef.current) {
@@ -507,15 +523,17 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     return
                 }
             }
-            
+            console.log('[PASTE IMPORT DIAGNOSTIC] JSON parsed but no valid payload found')
             throw new Error('Not a valid payload')
-        } catch {
+        } catch (e) {
+            console.log('[PASTE IMPORT DIAGNOSTIC] JSON parse error:', e.message)
             setStatus('error')
             setStatusMsg('Invalid code. Paste the exact code from "Share Code" / "Copy Code".')
         }
     }
 
     const handlePasteQuick = () => {
+        mountedRef.current = true // Ensure component is marked as mounted for paste operations
         const rawText = decodeHtml(pasteData)
         const cleaned = rawText.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
         if (!cleaned) return
@@ -754,10 +772,24 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                 value={pasteData}
                                 onChange={(e) => setPasteData(e.target.value)}
                             />
+                            {/* Status bar for paste mode */}
+                            <div className={`rounded-xl px-3 py-2 text-xs font-bold text-center transition-colors shadow-sm ${statusColors[status] || 'bg-gray-100 text-gray-600'}`}>
+                                {status === 'success' && <span className="mr-1.5">✅</span>}
+                                {status === 'error' && <span className="mr-1.5">⚠️</span>}
+                                {status === 'found' && <Search size={14} className="inline mr-1.5" />}
+                                {statusMsg}
+                            </div>
                             <button
                                 className="w-full py-3 bg-blue-700 hover:bg-blue-800 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl font-bold text-sm shadow-sm shadow-blue-200 dark:shadow-blue-900/30 active:scale-[0.98] transition-all"
                                 disabled={!pasteData.trim()}
-                                onClick={scanMode === 'import' ? handlePasteImport : handlePasteQuick}
+                                onClick={() => {
+                                    console.log('[PASTE IMPORT DIAGNOSTIC] Button onClick fired, scanMode:', scanMode, 'pasteData trimmed:', pasteData.trim().slice(0, 30))
+                                    if (scanMode === 'import') {
+                                        handlePasteImport()
+                                    } else {
+                                        handlePasteQuick()
+                                    }
+                                }}
                             >
                                 {scanMode === 'import' ? 'Import Code' : 'Lookup / Add Patient'}
                             </button>

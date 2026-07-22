@@ -36,3 +36,12 @@ lerna-debug.log*
 # Vite & PWA
 *.local
 dev-dist/
+
+# Debug / test files
+src/test_json.js
+src/**/*.test.js
+src/**/*.spec.js
+
+# Capacitor
+android/.gradle/
+android/capacitor-cordova-android-plugins/build/
