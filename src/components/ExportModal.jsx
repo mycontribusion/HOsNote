@@ -3,6 +3,9 @@ import { QRCodeSVG } from 'qrcode.react'
 import { X, Copy, CheckCircle, Download, QrCode, Pause, Play, Smartphone, Share2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { buildFrames } from '../utils/chunkedQr'
 import useWakeLock from '../utils/useWakeLock'
+import { Capacitor } from '@capacitor/core'
+import { Share } from '@capacitor/share'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 
 function compressMortality(p) {
     return [
@@ -43,10 +46,10 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const { supported: wakeSupported, locked: wakeLocked } = useWakeLock(true)
 
     // 1. QR Data: Ultra-compact positional array to keep QR density low.
-    // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
+    // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, note, removedAt]
     //  - criticalFlag: 1 if critical, else 0
     //  - mortalityFlag: 1 if mortality, else 0
-    //  - compact scan only sends biodata, so note/removedAt/lastUpdated are empty strings.
+    //  - compact scan only sends biodata, so note/removedAt are empty strings.
     const qrCompressed = patients.map((p) => {
         return [
             p.ward || '',
@@ -55,10 +58,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
             p.hospitalNumber || '',
             p.critical ? 1 : 0,
             p.reason === 'mortality' ? 1 : 0,
-            p.admissionDate || '',
             '', // no note for compact scan
-            '', // no removedAt for compact scan
-            ''  // no lastUpdated for compact scan
+            ''  // no removedAt for compact scan
         ]
     })
     const qrData = JSON.stringify(qrCompressed)
@@ -266,6 +267,37 @@ export default function ExportModal({ patients, allPatients, listName, selection
             const cleanListName = (listName || 'handover').replace(/\s+/g, '_')
             const baseName = `HOsNote_Share_${cleanListName}_${date}_${time}`
 
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    const result = await Filesystem.writeFile({
+                        path: `${baseName}.txt`,
+                        data: json,
+                        directory: Directory.Cache,
+                        encoding: Encoding.UTF8,
+                    });
+                    
+                    await Share.share({
+                        title: `HOsNote handover — ${listName}`,
+                        url: result.uri,
+                    });
+                    
+                    setSharedCode(true);
+                    setTimeout(() => setSharedCode(false), 2000);
+                    return;
+                } catch (e) {
+                    console.error('Native file share failed:', e);
+                    const textSnippet = `HOsNote Handover (${listName}) - ${patients.length} Patient(s)\n\n` + json;
+                    const safeText = textSnippet.length > 2000 ? textSnippet.slice(0, 2000) + '...' : textSnippet;
+                    await Share.share({
+                        title: `HOsNote handover — ${listName}`,
+                        text: safeText,
+                    });
+                    setSharedCode(true);
+                    setTimeout(() => setSharedCode(false), 2000);
+                    return;
+                }
+            }
+
             let shared = false
 
             if (navigator.share) {
@@ -355,7 +387,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     // Backup: download a full JSON snapshot of the current data. The file is
     // compatible with the Import → Restore flow (restoreFromBackup), so it can
     // be re-imported later to recover patients, mortalities, discharges & docs.
-    const handleBackup = () => {
+    const handleBackup = async () => {
         const backup = {
             __type: 'hosnote-backup',
             __v: 1,
@@ -367,6 +399,30 @@ export default function ExportModal({ patients, allPatients, listName, selection
             docs,
         }
         const json = JSON.stringify(backup, null, 2)
+        const fileName = `HOsNote_Backup_${listName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const result = await Filesystem.writeFile({
+                    path: fileName,
+                    data: json,
+                    directory: Directory.Cache,
+                    encoding: Encoding.UTF8,
+                });
+                await Share.share({
+                    title: `HOsNote Backup`,
+                    url: result.uri,
+                });
+                setBackupDone(true)
+                setTimeout(() => setBackupDone(false), 2000)
+                return;
+            } catch (e) {
+                console.error("Native backup share failed:", e);
+                setShareError("Backup failed. Please try again.");
+                return;
+            }
+        }
+
         const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
@@ -381,7 +437,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
         setTimeout(() => setBackupDone(false), 2000)
     }
 
-    const downloadCSV = () => {
+    const downloadCSV = async () => {
         const headers = ['Status', 'Ward', 'Bed', 'Name', 'HospitalNumber', 'Notes', 'Critical', 'RecordedAt']
         const rows = patients.map(p => [
             p.reason === 'mortality' ? 'DECEASED' : 'ACTIVE',
@@ -394,6 +450,29 @@ export default function ExportModal({ patients, allPatients, listName, selection
             p.removedAt ? `"${new Date(p.removedAt).toISOString()}"` : ''
         ])
         const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+        const fileName = `Handover_${listName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const result = await Filesystem.writeFile({
+                    path: fileName,
+                    data: csvContent,
+                    directory: Directory.Cache,
+                    encoding: Encoding.UTF8,
+                });
+                await Share.share({
+                    title: `HOsNote CSV`,
+                    url: result.uri,
+                });
+                setCopiedCsv(true)
+                setTimeout(() => setCopiedCsv(false), 2000)
+                return;
+            } catch (e) {
+                console.error("Native CSV share failed:", e);
+                return;
+            }
+        }
+
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')

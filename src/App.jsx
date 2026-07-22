@@ -35,7 +35,7 @@ function PrintView({ patients, listName }) {
                     <p className="text-xs text-gray-600 font-medium">Generated on {new Date().toLocaleString()}</p>
                 </div>
                 <div className="text-right">
-                    <p className="text-lg font-black italic">4MyTeam</p>
+                    <p className="text-lg font-black italic">HOsNote</p>
                 </div>
             </div>
 

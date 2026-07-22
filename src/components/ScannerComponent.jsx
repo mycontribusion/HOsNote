@@ -5,7 +5,7 @@ import useWakeLock from '../utils/useWakeLock'
 
 // Supported barcode formats for healthcare scanning
 const BARCODE_FORMATS = [
-    'QR_CODE',        // 4MyTeam exports, patient info QR codes
+    'QR_CODE',        // HOsNote exports, patient info QR codes
     'CODE_128',       // Most common on hospital wristbands
     'CODE_39',        // Common on medical equipment, patient IDs
     'EAN_13',         // Sometimes used on patient wristbands
@@ -260,7 +260,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             }, 800)
         } catch {
             setStatus('error')
-            setStatusMsg('Invalid QR code. Please scan a 4MyTeam export code or switch to Quick Scan mode.')
+            setStatusMsg('Invalid QR code. Please scan a HOsNote export code or switch to Quick Scan mode.')
             setTimeout(() => {
                 if (mountedRef.current && status !== 'success') {
                     setStatus('scanning')
@@ -277,7 +277,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         setLastScanned({ value: cleaned, format, timestamp: new Date() })
         setScanHistory(prev => [{ value: cleaned, format, timestamp: new Date() }, ...prev].slice(0, 10))
 
-        // Try JSON first (4MyTeam format)
+        // Try JSON first (HOsNote format)
         try {
             const parsed = JSON.parse(cleaned)
             if (Array.isArray(parsed)) {
@@ -386,7 +386,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         const cleaned = rawText.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
         if (!cleaned) return
 
-        if (cleaned.includes('4MyTeam Patient List:') || cleaned.includes('Name: ')) {
+        if (cleaned.includes('HOsNote Patient List:') || cleaned.includes('Name: ') || cleaned.includes('HOsNote Handover')) {
             setStatus('error')
             setStatusMsg('That looks like the readable "Share Text". Go back to Export and tap "Share Code" / "Copy Code" instead.')
             return
