@@ -14,6 +14,9 @@ import SettingsModal from './components/SettingsModal'
 import NotebookPage from './components/NotebookPage'
 import DocComposer from './components/DocComposer'
 import { get, set } from 'idb-keyval'
+import { Capacitor } from '@capacitor/core'
+import { Share } from '@capacitor/share'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 
 const STORAGE_KEY = '4myteam_patients'
 const MORTALITIES_KEY = '4myteam_mortalities'
@@ -384,6 +387,49 @@ export default function App() {
         }
     }, [patients, mortalities, discharges, docs])
 
+    // ── Save full JSON backup ─────────────────────────────────────────────────
+
+    const handleSaveBackup = useCallback(async () => {
+        const backup = {
+            __type: 'hosnote-backup',
+            __v: 1,
+            exportedAt: new Date().toISOString(),
+            patients,
+            mortalities,
+            discharges,
+            docs,
+        }
+        const json = JSON.stringify(backup, null, 2)
+        const fileName = `HOsNote_Backup_${new Date().toISOString().split('T')[0]}.json`
+
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const result = await Filesystem.writeFile({
+                    path: fileName,
+                    data: json,
+                    directory: Directory.Cache,
+                    encoding: Encoding.UTF8,
+                })
+                await Share.share({ title: 'HOsNote Backup', url: result.uri })
+                return true
+            } catch (e) {
+                console.error('Native backup share failed:', e)
+                return false
+            }
+        }
+
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.setAttribute('href', url)
+        link.setAttribute('download', fileName)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        return true
+    }, [patients, mortalities, discharges, docs])
 
     const savePatient = useCallback(({ team = 'my_team', name, hospitalNumber, ward, bed, note, critical = false, admissionDate }) => {
         const n = name.trim()
@@ -1031,22 +1077,22 @@ export default function App() {
                             id="btn-import"
                             className="btn-secondary text-sm"
                             onClick={() => setShowScanner(true)}
-                            aria-label="Import patient list by scanning QR code"
+                            aria-label="Receive patient records by scanning QR code"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden sm:inline-block"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /><rect width="3" height="3" x="6" y="6" rx=".5" /><rect width="3" height="3" x="17" y="6" rx=".5" /><rect width="3" height="3" x="6" y="17" rx=".5" /><path d="M21 14h-3v3h3" /><path d="M18 21v-3" /></svg>
-                            Import
+                            Receive
                         </button>
 
-                        {/* Export */}
+                        {/* Export -> Handover */}
                         <button
                             id="btn-export"
                             className="btn-primary text-sm relative"
                             onClick={() => { setShowExport(true) }}
                             disabled={activePatients.length === 0}
-                            aria-label="Export patient list as QR code"
+                            aria-label="Share handover records via QR code"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden sm:inline-block"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /><rect width="3" height="3" x="6" y="6" rx=".5" /><rect width="3" height="3" x="17" y="6" rx=".5" /><rect width="3" height="3" x="6" y="17" rx=".5" /><path d="M21 14h-3v3h3" /><path d="M18 21v-3" /></svg>
-                            Export{selectedPatientIds.size > 0 ? ` (${selectedPatientIds.size})` : ''}
+                            Handover{selectedPatientIds.size > 0 ? ` (${selectedPatientIds.size})` : ''}
                         </button>
                     </div>
                 </div>
@@ -1111,6 +1157,8 @@ export default function App() {
                     onDecreaseText={decreaseTextSize}
                     onIncreaseText={increaseTextSize}
                     onClearRequest={handleClearRequest}
+                    onSaveBackup={handleSaveBackup}
+                    onRestoreBackup={restoreFromBackup}
                 />
             )}
 
@@ -1140,7 +1188,7 @@ export default function App() {
             )}
 
             <PrintView
-                patients={activePatients}
+                patients={patientsToExport}
                 listName={listName}
             />
 

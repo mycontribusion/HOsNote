@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Save, Undo2, Redo2 } from 'lucide-react'
+import MicrophoneButton from './MicrophoneButton'
 
 const COLOR_OPTIONS = [
     { value: 'blue',   label: 'Blue',   bg: 'bg-blue-500' },
@@ -156,8 +157,19 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                         </div>
 
                         {/* Text area */}
-                        <div className="flex-1 flex flex-col min-h-[200px]">
-                            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2 shrink-0">Note Content</p>
+                        <div className="flex-1 flex flex-col min-h-[200px] relative">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest shrink-0">Note Content</p>
+                                <MicrophoneButton
+                                    onTranscript={(transcript) => {
+                                        setText(prev => {
+                                            const trimmed = prev.trim()
+                                            return trimmed ? `${trimmed} ${transcript}` : transcript
+                                        })
+                                    }}
+                                    title="Dictate note"
+                                />
+                            </div>
                             <textarea
                                 ref={textareaRef}
                                 className="w-full flex-1 bg-transparent border-0 outline-none p-0 text-gray-900 dark:text-gray-100 resize-none text-base sm:text-sm leading-relaxed"

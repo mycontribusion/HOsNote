@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { Plus, Save, X, Undo2, Redo2 } from 'lucide-react'
+import MicrophoneButton from './MicrophoneButton'
 
 const DRAFT_KEY = '4myteam_draft_patient'
 
@@ -306,7 +307,18 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 min-w-0" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} />
                             </div>
                             <div className="flex flex-col items-start gap-1 mt-1.5 flex-1 relative" onClick={e => e.stopPropagation()}>
-                                <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 pt-[1px]">Notes:</label>
+                                <div className="flex items-center justify-between w-full">
+                                    <label className="text-gray-400 dark:text-gray-500 font-bold select-none flex-shrink-0 pt-[1px]">Notes:</label>
+                                    <MicrophoneButton
+                                        onTranscript={(transcript) => {
+                                            const currentNote = fields.note
+                                            const trimmed = currentNote.trim()
+                                            const newValue = trimmed ? `${trimmed} ${transcript}` : transcript
+                                            updateField('note', newValue)
+                                        }}
+                                        title="Dictate note"
+                                    />
+                                </div>
                                 <div className="grid w-full flex-1 min-h-[150px]">
                                     <div className="col-start-1 row-start-1 w-full whitespace-pre-wrap break-words invisible pointer-events-none p-0 m-0 leading-normal" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
                                         {fields.note + ' \n'}

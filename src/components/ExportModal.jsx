@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { X, Copy, CheckCircle, Download, QrCode, Pause, Play, Smartphone, Share2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Copy, CheckCircle, Download, QrCode, Pause, Play, Smartphone, Share2, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 import { buildFrames } from '../utils/chunkedQr'
 import useWakeLock from '../utils/useWakeLock'
 import { Capacitor } from '@capacitor/core'
@@ -25,7 +25,6 @@ function compressMortality(p) {
 
 export default function ExportModal({ patients, allPatients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
     const [copiedCsv, setCopiedCsv] = useState(false)
-    const [backupDone, setBackupDone] = useState(false)
     const [sharedCode, setSharedCode] = useState(false)
     const [copiedCode, setCopiedCode] = useState(false)
     const [shareError, setShareError] = useState('')
@@ -276,12 +275,12 @@ export default function ExportModal({ patients, allPatients, listName, selection
                         directory: Directory.Cache,
                         encoding: Encoding.UTF8,
                     });
-                    
+
                     await Share.share({
                         title: `HOsNote handover — ${listName}`,
                         url: result.uri,
                     });
-                    
+
                     setSharedCode(true);
                     setTimeout(() => setSharedCode(false), 2000);
                     return;
@@ -501,7 +500,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 <div className="bg-blue-700 dark:bg-gray-900 px-4 pt-4 pb-3 shrink-0">
                     <div className="flex items-start justify-between">
                         <div className="flex-1">
-                            <h2 id="export-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1">Export List</h2>
+                            <h2 id="export-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1">Handover Records</h2>
                             <div className="flex items-center gap-2">
                                 <p className="text-[11px] font-semibold text-blue-200">{listName} • {patients.length} Patient{patients.length !== 1 ? 's' : ''}</p>
                                 {wakeSupported && wakeLocked && (
@@ -523,13 +522,13 @@ export default function ExportModal({ patients, allPatients, listName, selection
                             className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${qrMode === 'compact' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
                             onClick={() => setQrMode('compact')}
                         >
-                            <QrCode size={14} /> Compact Scan
+                            <QrCode size={14} /> Patients' Lists
                         </button>
                         <button
                             className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${qrMode === 'full' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
                             onClick={() => setQrMode('full')}
                         >
-                            <QrCode size={14} /> Full Transfer
+                            <QrCode size={14} /> Patients' Details
                         </button>
                     </div>
                 </div>
@@ -542,7 +541,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                         {qrMode === 'compact' ? (
                             <div className="w-full max-w-[320px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-center">
                                 {qrData.length > 2300 ? (
-                                    <p className="text-red-600 text-sm text-center font-semibold">⚠️ List too large for QR.<br/>Use Share Code.</p>
+                                    <p className="text-red-600 text-sm text-center font-semibold">⚠️ List too large for QR.<br />Use Share Code.</p>
                                 ) : (
                                     <QRCodeSVG value={qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#111827" bgColor="#ffffff" />
                                 )}
@@ -603,9 +602,9 @@ export default function ExportModal({ patients, allPatients, listName, selection
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
-                                onClick={handleBackup}
+                                onClick={handlePrint}
                             >
-                                {backupDone ? <CheckCircle size={13} className="text-emerald-500" /> : <Download size={13} className="text-gray-500 dark:text-gray-400" />} {backupDone ? 'Saved' : 'Save Backup'}
+                                <FileText size={13} className="text-blue-600 dark:text-blue-400" /> Save PDF
                             </button>
                             <button
                                 className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"

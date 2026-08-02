@@ -1,4 +1,5 @@
-import { X, Type, Trash2, AlertTriangle } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Type, Trash2, AlertTriangle, Database, Download, Upload, CheckCircle } from 'lucide-react'
 
 export default function SettingsModal({
     onClose,
@@ -7,7 +8,47 @@ export default function SettingsModal({
     onDecreaseText,
     onIncreaseText,
     onClearRequest,
+    onSaveBackup,
+    onRestoreBackup,
 }) {
+    const [backupDone, setBackupDone] = useState(false)
+    const [restoreMsg, setRestoreMsg] = useState('')
+    const fileInputRef = useRef(null)
+
+    const handleSaveBackupClick = async () => {
+        if (onSaveBackup) {
+            const success = await onSaveBackup()
+            if (success !== false) {
+                setBackupDone(true)
+                setTimeout(() => setBackupDone(false), 2500)
+            }
+        }
+    }
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result)
+                if (data && (data.patients || data.mortalities || data.discharges || data.docs || Array.isArray(data))) {
+                    if (onRestoreBackup) {
+                        onRestoreBackup(data)
+                        setRestoreMsg('Backup restored successfully!')
+                        setTimeout(() => setRestoreMsg(''), 3500)
+                    }
+                } else {
+                    setRestoreMsg('Invalid backup file structure.')
+                }
+            } catch {
+                setRestoreMsg('Failed to parse backup file.')
+            }
+        }
+        reader.readAsText(file)
+        e.target.value = ''
+    }
+
     const clearOptions = [
         { label: 'My Team', action: 'my_team', color: 'blue' },
         { label: 'On Call', action: 'on_call', color: 'purple' },
@@ -70,6 +111,47 @@ export default function SettingsModal({
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Backup & Restore */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                                <Database size={20} className="text-white" />
+                            </div>
+                            <div>
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">Backup & Restore</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">Save or recover full data snapshot</div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={handleSaveBackupClick}
+                                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-xs font-semibold transition-colors"
+                            >
+                                {backupDone ? <CheckCircle size={14} className="text-emerald-500" /> : <Download size={14} />}
+                                {backupDone ? 'Saved!' : 'Save Backup'}
+                            </button>
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-xs font-semibold transition-colors"
+                            >
+                                <Upload size={14} />
+                                Restore Backup
+                            </button>
+                        </div>
+                        {restoreMsg && (
+                            <p className={`text-[11px] font-semibold text-center mt-2 ${restoreMsg.includes('failed') || restoreMsg.includes('Invalid') ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {restoreMsg}
+                            </p>
+                        )}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".json,application/json,.txt,text/plain"
+                            className="hidden"
+                            onChange={handleFileChange}
+                        />
                     </div>
 
                     {/* Clear All */}

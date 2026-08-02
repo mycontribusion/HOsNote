@@ -13,7 +13,7 @@ export default function EmptyState() {
 
             <h3 className="font-bold text-gray-700 dark:text-gray-200 text-lg mb-2">No patients tracked yet</h3>
             <p className="text-gray-400 dark:text-gray-500 text-sm max-w-xs leading-relaxed mb-6">
-                Add a patient above using their Ward and Bed number, or scan a QR code to import from another device.
+                Add a patient above using their Ward and Bed number, or scan a QR code to receive handover from another device.
             </p>
 
             <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl px-4 py-3">

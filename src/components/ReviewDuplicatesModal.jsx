@@ -76,7 +76,7 @@ export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCanc
 
                     {pendingImport.newOnes.length > 0 && (
                         <div className="mt-4 p-3 bg-green-50 text-green-700 text-sm font-medium rounded-lg">
-                            + {pendingImport.newOnes.length} brand new patient(s) will also be imported.
+                            + {pendingImport.newOnes.length} brand new patient(s) will also be added.
                         </div>
                     )}
                 </div>
@@ -84,7 +84,7 @@ export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCanc
                 {/* Footer */}
                 <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-2">
                     <button className="btn-secondary flex-1 border-gray-300" onClick={onCancel}>Cancel All</button>
-                    <button className="btn-primary flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleApply}>Complete Import</button>
+                    <button className="btn-primary flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleApply}>Complete Handover</button>
                 </div>
             </div>
         </div>

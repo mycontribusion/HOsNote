@@ -37,6 +37,9 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     // Set to true when a complete transfer fires so the tryResume loop
     // doesn't fight onClose() and keep the scanner alive after import.
     const transferDoneRef = useRef(false)
+    const quickScanDoneRef = useRef(false)
+    const isProcessingRef = useRef(false)
+    const lastQuickScanRef = useRef(null) // { value, timestamp }
     const [scanMode, setScanMode] = useState('import') // 'import' | 'quick'
     const [cameraMode, setCameraMode] = useState('camera') // 'camera' | 'paste'
     const [pasteData, setPasteData] = useState('')
@@ -62,6 +65,10 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         let html5QrCode = null
 
         const startScanner = async () => {
+            quickScanDoneRef.current = false
+            transferDoneRef.current = false
+            isProcessingRef.current = false
+            lastQuickScanRef.current = null
             try {
                 const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
                 if (!mountedRef.current) return
@@ -88,7 +95,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         formatsToSupport: formatsToSupport,
                     },
                     (decodedText, decodedResult) => {
-                        if (!mountedRef.current) return
+                        if (!mountedRef.current || transferDoneRef.current || quickScanDoneRef.current || isProcessingRef.current) return
                         const format = decodedResult?.result?.format?.formatName || 'UNKNOWN'
                         setDetectedFormat(format)
 
@@ -103,10 +110,9 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         // AFTER the success callback returns, so an immediate
                         // resume() is a no-op. We unconditionally retry calling
                         // resume() to capture the state transition without relying on getState().
-                        // Skip re-arming if the transfer has just completed — the scanner
-                        // is about to be closed and re-arming would cause a visible restart.
+                        // Skip re-arming if the transfer has completed or processing
                         const tryResume = (attempts = 6) => {
-                            if (!mountedRef.current || !scannerRef.current || transferDoneRef.current) return
+                            if (!mountedRef.current || !scannerRef.current || transferDoneRef.current || quickScanDoneRef.current || isProcessingRef.current) return
                             try {
                                 scannerRef.current.resume()
                             } catch (e) {
@@ -125,7 +131,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
                 if (mountedRef.current) {
                     setStatus('scanning')
-                    setStatusMsg(scanMode === 'import' ? 'Point camera at QR code' : 'Point camera at barcode or QR code')
+                    setStatusMsg(scanMode === 'import' ? 'Point camera at handover QR code' : 'Point camera at patient wristband or ID code')
                 }
             } catch (err) {
                 if (mountedRef.current) {
@@ -160,7 +166,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }, [cameraMode, scanMode])
 
     const handleImportScan = (decodedText) => {
-        console.log('[SCANNER DIAGNOSTIC] RAW:', decodedText)
+        if (transferDoneRef.current || isProcessingRef.current) return
+
         // 1. Try chunked-transfer frame first (animated full transfer).
         const frame = parseFrame(decodedText)
         console.log('[SCANNER DIAGNOSTIC] FRAME:', frame)
@@ -168,25 +175,21 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             const result = receiverRef.current.addFrame(frame)
             console.log('[SCANNER DIAGNOSTIC] RESULT:', result)
             if (result.status === 'complete') {
-                // Reassembled payload: { type, patients, mortalities, docs, ... }
+                isProcessingRef.current = true
+                transferDoneRef.current = true
+                quickScanDoneRef.current = true
+                try { scannerRef.current?.pause(true) } catch (e) { }
+
                 const payload = result.payload
                 const incoming = [
                     ...(payload.patients || []),
                     ...(payload.mortalities || []),
                 ]
                 const incomingDocs = payload.docs || []
-                console.log('[SCANNER DIAGNOSTIC] COMPLETE PAYLOAD:', {
-                    patientCount: incoming.length,
-                    docCount: incomingDocs.length,
-                    samplePatient: incoming[0],
-                    sampleDoc: incomingDocs[0],
-                    allDocs: incomingDocs,
-                })
                 setTransferProgress(null)
                 setImportedCount(incoming.length)
                 setStatus('success')
-                setStatusMsg(`Reassembled ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
-                transferDoneRef.current = true // stop resume loop before close
+                setStatusMsg(`Reassembled ${incoming.length} patient record${incoming.length !== 1 ? 's' : ''}! Receiving…`)
                 setTimeout(() => {
                     if (mountedRef.current) {
                         const success = onImport(incoming, incomingDocs)
@@ -195,30 +198,26 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                 if (mountedRef.current) {
                                     onClose()
                                 }
-                            }, 1500)
+                            }, 1200)
                         }
                     }
-                }, 800)
+                }, 600)
                 return
             }
             if (result.status === 'progress') {
                 transferDoneRef.current = false // new frame arrived — keep resume active
                 setTransferProgress({ received: result.received, total: result.total })
                 setStatus('scanning')
-                setStatusMsg(`Receiving transfer… ${result.received}/${result.total} frames`)
-                // If no new frames arrive for 8 s, surface a stall warning but
-                // KEEP all collected chunks in the receiver — the animation just
-                // needs to loop and the scanner will fill the missing gaps without
-                // having to restart from frame 0.
+                setStatusMsg(`Receiving handover transfer… ${result.received}/${result.total} frames`)
                 if (transferTimerRef.current) clearTimeout(transferTimerRef.current)
                 transferTimerRef.current = setTimeout(() => {
                     if (mountedRef.current) {
                         setStatus('error')
-                        setStatusMsg('Stalled — keep the camera pointed at the QR animation to fill remaining frames.')
+                        setStatusMsg('Stalled — keep camera pointed at QR animation to fill remaining frames.')
                         setTimeout(() => {
                             if (mountedRef.current && status !== 'success') {
                                 setStatus('scanning')
-                                setStatusMsg(`Receiving transfer… ${result.received}/${result.total} frames`)
+                                setStatusMsg(`Receiving handover transfer… ${result.received}/${result.total} frames`)
                             }
                         }, 4000)
                     }
@@ -229,22 +228,27 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 receiverRef.current.reset()
                 setTransferProgress(null)
                 setStatus('error')
-                setStatusMsg('Transfer corrupted. Restart the Full Transfer from the beginning.')
+                setStatusMsg('Transfer corrupted. Restart Full Handover from the beginning.')
                 setTimeout(() => {
-                    if (mountedRef.current) { setStatus('scanning'); setStatusMsg('Point camera at QR code') }
+                    if (mountedRef.current) { setStatus('scanning'); setStatusMsg('Point camera at handover QR code') }
                 }, 2500)
                 return
             }
-            return // 'ignored' (shouldn't happen since frame parsed)
+            return
         }
 
         // 2. Fallback: legacy single-QR JSON array.
         try {
             const parsed = JSON.parse(decodedText)
             if (!Array.isArray(parsed)) throw new Error('Not an array')
+            isProcessingRef.current = true
+            transferDoneRef.current = true
+            quickScanDoneRef.current = true
+            try { scannerRef.current?.pause(true) } catch (e) { }
+
             setImportedCount(parsed.length)
             setStatus('success')
-            setStatusMsg(`Found ${parsed.length} patient${parsed.length !== 1 ? 's' : ''}! Importing…`)
+            setStatusMsg(`Found ${parsed.length} patient record${parsed.length !== 1 ? 's' : ''}! Receiving…`)
 
             setTimeout(() => {
                 if (mountedRef.current) {
@@ -254,50 +258,78 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             if (mountedRef.current) {
                                 onClose()
                             }
-                        }, 1500)
+                        }, 1200)
                     }
                 }
-            }, 800)
+            }, 600)
         } catch {
             setStatus('error')
-            setStatusMsg('Invalid QR code. Please scan a HOsNote export code or switch to Quick Scan mode.')
+            setStatusMsg('Invalid QR code. Please scan a HOsNote handover code or switch to Scan Wristband mode.')
             setTimeout(() => {
                 if (mountedRef.current && status !== 'success') {
                     setStatus('scanning')
-                    setStatusMsg('Point camera at QR code')
+                    setStatusMsg('Point camera at handover QR code')
                 }
             }, 2500)
         }
     }
 
     const handleQuickScan = (decodedText, format) => {
+        if (transferDoneRef.current || quickScanDoneRef.current || isProcessingRef.current) return
+
         const cleaned = decodedText.trim()
         if (!cleaned) return
+
+        // Deduplicate: ignore the same barcode/QR if scanned within the last 2 seconds.
+        const now = Date.now()
+        const last = lastQuickScanRef.current
+        if (last && last.value === cleaned && (now - last.timestamp) < 2000) {
+            return
+        }
+        lastQuickScanRef.current = { value: cleaned, timestamp: now }
 
         setLastScanned({ value: cleaned, format, timestamp: new Date() })
         setScanHistory(prev => [{ value: cleaned, format, timestamp: new Date() }, ...prev].slice(0, 10))
 
-        // Try JSON first (HOsNote format)
+        // Check if scanned code is a full JSON patient record payload
+        let parsedPayload = null
         try {
             const parsed = JSON.parse(cleaned)
             if (Array.isArray(parsed)) {
-                setStatus('success')
-                setStatusMsg(`Found ${parsed.length} patients in QR code!`)
-                setTimeout(() => {
-                    if (mountedRef.current) onImport(parsed)
-                }, 1000)
-                return
+                parsedPayload = { incoming: parsed, docs: [] }
+            } else if (parsed && typeof parsed === 'object' && (parsed.patients || parsed.mortalities)) {
+                parsedPayload = {
+                    incoming: [...(parsed.patients || []), ...(parsed.mortalities || [])],
+                    docs: parsed.docs || []
+                }
             }
-        } catch {
-            // Not JSON, continue with barcode handling
+        } catch { }
+
+        if (parsedPayload) {
+            isProcessingRef.current = true
+            quickScanDoneRef.current = true
+            transferDoneRef.current = true
+            try { scannerRef.current?.pause(true) } catch (e) { }
+
+            setStatus('success')
+            setStatusMsg(`Found ${parsedPayload.incoming.length} patient record${parsedPayload.incoming.length !== 1 ? 's' : ''}! Receiving…`)
+            setTimeout(() => {
+                if (mountedRef.current) {
+                    const success = onImport(parsedPayload.incoming, parsedPayload.docs)
+                    if (success) {
+                        setTimeout(() => {
+                            if (mountedRef.current) onClose()
+                        }, 1200)
+                    }
+                }
+            }, 600)
+            return
         }
 
-        // Try to extract hospital number from common barcode formats
-        // Many hospital wristbands encode: HOSPITAL_NUMBER or NAME|HOSPITAL_NUMBER
+        // Wristband / Barcode lookup
         let hospitalNumber = null
         let patientName = null
 
-        // Check for pipe-separated format (Name|HospNo)
         if (cleaned.includes('|')) {
             const parts = cleaned.split('|')
             if (parts.length >= 2) {
@@ -305,30 +337,38 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 hospitalNumber = parts[1].trim()
             }
         } else {
-            // Assume it's just a hospital number or patient ID
             hospitalNumber = cleaned
         }
 
         if (hospitalNumber) {
-            // Look up the patient
             const found = onLookup?.(hospitalNumber)
             if (found) {
                 setStatus('found')
                 setStatusMsg(`Found patient: ${found.name} (${found.hospitalNumber})`)
+                // Suppress repeated scanning of this same code for 10s while modal is open
+                lastQuickScanRef.current = { value: cleaned, timestamp: Date.now() + 10000 }
             } else {
+                // Patient not found — App.jsx opens the Add Patient form.
+                // Stop scanner & close modal so user can fill in form.
+                isProcessingRef.current = true
+                quickScanDoneRef.current = true
+                transferDoneRef.current = true
+                try { scannerRef.current?.pause(true) } catch (e) { }
                 setStatus('success')
-                setStatusMsg(`Scanned: ${hospitalNumber}${patientName ? ` - ${patientName}` : ''}`)
+                setStatusMsg(`Opening Add Patient form for ${hospitalNumber}…`)
+                setTimeout(() => {
+                    if (mountedRef.current) onClose()
+                }, 600)
             }
         } else {
             setStatus('success')
             setStatusMsg(`Scanned: ${cleaned}`)
         }
 
-        // Reset status after a delay
         setTimeout(() => {
-            if (mountedRef.current) {
+            if (mountedRef.current && !isProcessingRef.current) {
                 setStatus('scanning')
-                setStatusMsg('Point camera at barcode or QR code')
+                setStatusMsg('Point camera at patient wristband or ID code')
             }
         }, 3000)
     }
@@ -479,7 +519,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         try {
             const parsed = JSON.parse(jsonStr)
             console.log('[PASTE IMPORT DIAGNOSTIC] JSON parsed, type:', typeof parsed, 'isArray:', Array.isArray(parsed))
-            
+
             if (Array.isArray(parsed)) {
                 console.log('[PASTE IMPORT DIAGNOSTIC] Importing array of', parsed.length, 'patients')
                 setStatus('success')
@@ -499,7 +539,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 }, 600)
                 return
             }
-            
+
             if (parsed && typeof parsed === 'object') {
                 const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
                 const incomingDocs = parsed.docs || []
@@ -548,7 +588,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             const firstBrace = jsonStr.indexOf('{')
             let startIdx = -1
             let isArray = false
-            
+
             if (firstBracket !== -1 && firstBrace !== -1) {
                 if (firstBracket < firstBrace) { startIdx = firstBracket; isArray = true }
                 else { startIdx = firstBrace }
@@ -564,13 +604,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             }
 
             const parsed = JSON.parse(jsonStr)
-            
+
             if (Array.isArray(parsed)) {
                 onImport(parsed)
                 setTimeout(() => onClose?.(), 600)
                 return
             }
-            
+
             if (parsed && typeof parsed === 'object') {
                 const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
                 const incomingDocs = parsed.docs || []
@@ -620,7 +660,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     <div className="flex items-start justify-between">
                         <div className="flex-1">
                             <h2 id="scanner-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1 flex items-center gap-2">
-                                <Camera size={18} className="text-blue-200" /> Import
+                                <Camera size={18} className="text-blue-200" /> Receive Records
                             </h2>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <p className="text-[11px] font-semibold text-blue-200 truncate max-w-[200px]">{listName}</p>
@@ -643,26 +683,26 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             <>
                                 <button
                                     className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
-                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
+                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at handover QR code') }}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>
-                                    Bulk Import
+                                    Scan Details
                                 </button>
                                 <button
                                     className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'quick' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
-                                    onClick={() => { setScanMode('quick'); setStatus('scanning'); setStatusMsg('Point camera at barcode or QR') }}
+                                    onClick={() => { setScanMode('quick'); setStatus('scanning'); setStatusMsg('Point camera at patient wristband or ID code') }}
                                 >
                                     <Scan size={14} />
-                                    Quick Scan
+                                    Scan List
                                 </button>
                             </>
                         ) : (
                             <>
                                 <button
                                     className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
-                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at QR code') }}
+                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at handover QR code') }}
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
                                     Paste Code
                                 </button>
                                 <button
@@ -670,7 +710,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                     onClick={() => restoreInputRef.current?.click()}
                                 >
                                     <Upload size={14} />
-                                    Import File
+                                    Open File
                                 </button>
                             </>
                         )}
@@ -748,7 +788,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                     className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
                                     onClick={() => setCameraMode('paste')}
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
                                     Use Code
                                 </button>
                                 {onRestore && (
@@ -757,7 +797,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                         onClick={() => restoreInputRef.current?.click()}
                                     >
                                         <Upload size={14} />
-                                        Import File
+                                        Open File
                                     </button>
                                 )}
                             </div>
@@ -791,7 +831,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                     }
                                 }}
                             >
-                                {scanMode === 'import' ? 'Import Code' : 'Lookup / Add Patient'}
+                                {scanMode === 'import' ? 'Receive Records' : 'Lookup / Add Patient'}
                             </button>
                             <div className="grid grid-cols-2 gap-2 mt-1">
                                 <button

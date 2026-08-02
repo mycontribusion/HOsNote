@@ -202,8 +202,8 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                                 : 'text-gray-300 dark:text-gray-600 hover:text-blue-400'
                                 }`}
                             onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
-                            aria-label={isSelected ? 'Deselect patient' : 'Select patient for export'}
-                            title={isSelected ? 'Deselect' : 'Select for export'}
+                            aria-label={isSelected ? 'Deselect patient' : 'Select patient for handover'}
+                            title={isSelected ? 'Deselect' : 'Select for handover'}
                         >
                             {isSelected ? (
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

@@ -71,7 +71,7 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
                     <button
                         onClick={() => onToggleSelectAll(allIds)}
                         className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        title={allSelected ? 'Deselect all' : 'Select all for export'}
+                        title={allSelected ? 'Deselect all' : 'Select all for handover'}
                     >
                         {allSelected
                             ? <CheckSquare size={16} className="text-blue-600 dark:text-blue-400" />
