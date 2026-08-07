@@ -357,12 +357,12 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                     />
                                 </div>
                                 <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
-                                    <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
+                                    <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
                                         {fields.note + ' \n'}
                                     </div>
                                     <textarea
                                         ref={noteRef}
-                                        className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-hidden leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600"
+                                        className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
                                         value={fields.note}
                                         onChange={e => updateField('note', e.target.value)}
                                         onPaste={e => handleCleanPaste(e, 'note')}

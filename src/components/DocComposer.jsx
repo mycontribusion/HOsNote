@@ -225,7 +225,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                             </div>
                             <textarea
                                 ref={textareaRef}
-                                className="w-full flex-1 bg-transparent border-0 outline-none p-0 text-gray-900 dark:text-gray-100 resize-none text-base sm:text-sm leading-relaxed"
+                                className="w-full flex-1 bg-transparent border-0 outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto text-base sm:text-sm leading-relaxed pb-24"
                                 placeholder="Write your clinical documentation here…"
                                 value={text}
                                 onChange={(e) => {
