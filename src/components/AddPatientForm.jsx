@@ -226,7 +226,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         if (result === 'duplicate_bed')  { setError('This Ward/Bed is already occupied by another patient.'); return }
         if (result === 'duplicate')      { setError('A patient with this Hospital Number or Ward/Bed already exists.'); return }
         if (result) {
-            clearDraft()
+            if (!initialData) clearDraft()
             const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
             setFields(newBlank)
             setHistory({ stack: [newBlank], index: 0 })
