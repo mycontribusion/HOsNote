@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Save, Undo2, Redo2 } from 'lucide-react'
 import MicrophoneButton from './MicrophoneButton'
 import { cleanPastedText } from '../utils/clipboard'
@@ -12,12 +12,32 @@ const COLOR_OPTIONS = [
     { value: 'indigo', label: 'Indigo', bg: 'bg-indigo-500' },
 ]
 
+const DRAFT_KEY = 'hosnote_doc_draft'
+
+function loadDocDraft() {
+    try {
+        const raw = localStorage.getItem(DRAFT_KEY)
+        return raw ? JSON.parse(raw) : null
+    } catch { return null }
+}
+
+function saveDocDraft(data) {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)) }
+    catch { /* quota exceeded */ }
+}
+
+function clearDocDraft() {
+    try { localStorage.removeItem(DRAFT_KEY) }
+    catch { /* ignore */ }
+}
+
 export default function DocComposer({ patient, existingDoc = null, onSave, onClose }) {
     const initialText = existingDoc?.text ?? ''
     const [text, setText] = useState(initialText)
     const [color, setColor] = useState(existingDoc?.color ?? 'blue')
     const [error, setError] = useState('')
     const textareaRef = useRef(null)
+    const saveTimerRef = useRef(null)
 
     // ── Undo / Redo history (mirrors AddPatientForm pattern) ──────────────────
     const [history, setHistory] = useState({ stack: [initialText], index: 0 })
@@ -39,6 +59,36 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
         }, 500)
         return () => clearTimeout(timer)
     }, [text])
+
+    // ── Draft saving (mirrors AddPatientForm pattern) ─────────────────────────
+    const scheduleDraftSave = useCallback((patch) => {
+        if (existingDoc) return // don't draft when editing an existing doc
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = setTimeout(() => saveDocDraft(patch), 500)
+    }, [existingDoc])
+
+    useEffect(() => () => clearTimeout(saveTimerRef.current), [])
+
+    // Load draft on mount when creating a new doc
+    useEffect(() => {
+        if (existingDoc) return
+        const draft = loadDocDraft()
+        if (draft && draft.text) {
+            setText(draft.text)
+            setHistory({ stack: [draft.text], index: 0 })
+            isUndoRedo.current = true
+        }
+    }, [existingDoc])
+
+    // Save draft whenever text changes (skip undo/redo)
+    useEffect(() => {
+        if (isUndoRedo.current) {
+            isUndoRedo.current = false
+            return
+        }
+        if (existingDoc) return
+        scheduleDraftSave({ text, color })
+    }, [text, color, existingDoc, scheduleDraftSave])
 
     const handleUndo = () => {
         if (history.index <= 0) return
@@ -73,6 +123,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
 
     const handleSave = () => {
         if (!text.trim()) { setError('Note text cannot be empty.'); return }
+        clearDocDraft()
         onSave({ text: text.trim(), color })
     }
 
@@ -164,8 +215,9 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                                 <MicrophoneButton
                                     onTranscript={(transcript) => {
                                         setText(prev => {
-                                            const trimmed = prev.trim()
-                                            return trimmed ? `${trimmed} ${transcript}` : transcript
+                                            const next = prev.trim() ? `${prev.trim()} ${transcript}` : transcript
+                                            scheduleDraftSave({ text: next, color })
+                                            return next
                                         })
                                     }}
                                     title="Dictate note"
@@ -177,8 +229,10 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                                 placeholder="Write your clinical documentation here…"
                                 value={text}
                                 onChange={(e) => {
-                                    setText(e.target.value)
+                                    const next = e.target.value
+                                    setText(next)
                                     setError('')
+                                    scheduleDraftSave({ text: next, color })
                                 }}
                             />
                         </div>

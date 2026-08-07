@@ -348,8 +348,9 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                     <MicrophoneButton
                                         onTranscript={(transcript) => {
                                             setFields(prev => {
-                                                const trimmed = prev.note.trim()
-                                                return { ...prev, note: trimmed ? `${trimmed} ${transcript}` : transcript }
+                                                const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
+                                                return { ...prev, note: next }
                                             })
                                         }}
                                         title="Dictate note"
