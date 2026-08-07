@@ -55,9 +55,14 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                             <h2 id="note-detail-title" className="font-bold text-gray-900 dark:text-white text-base leading-tight truncate">
-                                {doc.patientName || 'Unknown Patient'}
+                                {(doc.diagnosis || doc.patientDiagnosis || doc.patientName || 'Unknown Patient').trim()}
                             </h2>
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                {(doc.diagnosis || doc.patientDiagnosis) && doc.patientName && (
+                                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                        Patient: {doc.patientName}
+                                    </span>
+                                )}
                                 {doc.patientWard && (
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${badge}`}>
                                         {doc.patientWard}
@@ -84,7 +89,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
                 </div>
 
                 {/* Body — full note text */}
-                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto">
+                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto custom-scrollbar">
                     <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
                         {doc.text}
                     </p>
@@ -133,6 +138,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
             .filter(d =>
                 d.patientName?.toLowerCase().includes(q) ||
                 d.patientWard?.toLowerCase().includes(q) ||
+                (d.diagnosis || d.patientDiagnosis)?.toLowerCase().includes(q) ||
                 d.text?.toLowerCase().includes(q)
             )
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -221,8 +227,13 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                     <div className={`px-4 py-2 flex items-center justify-between gap-2 ${bg}`}>
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
-                                                {doc.patientName || 'Unknown Patient'}
+                                                {(doc.diagnosis || doc.patientDiagnosis || doc.patientName || 'Unknown Patient').trim()}
                                             </span>
+                                            {(doc.diagnosis || doc.patientDiagnosis) && doc.patientName && (
+                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                                                    ({doc.patientName})
+                                                </span>
+                                            )}
                                             {doc.patientWard && (
                                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0 ${badge}`}>
                                                     {doc.patientWard}
@@ -236,7 +247,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                     </div>
                                     {/* Text preview — max 4 lines, rest scrollable */}
                                     <div className="px-4 py-2">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-[5.75rem] overflow-y-auto">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-[5.75rem] overflow-y-auto custom-scrollbar pr-1">
                                             {doc.text}
                                         </p>
                                     </div>

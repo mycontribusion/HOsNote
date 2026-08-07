@@ -49,3 +49,21 @@ export async function copyToClipboard(text) {
 
     return false
 }
+
+// Cleans raw clipboard text: strips HTML tags, hidden inline styles (e.g., width: 500px),
+// tabs (\t), non-breaking space characters (\u00A0), zero-width characters, and normalizes line breaks.
+export function cleanPastedText(rawText) {
+    if (!rawText) return ''
+    // 1. Strip HTML tags / markup if HTML source code or markup was pasted
+    let cleaned = rawText.replace(/<[^>]*>?/gm, '')
+    // 2. Convert tab characters (\t) to double spaces so tabular EHR pastes render cleanly without line blowout
+    cleaned = cleaned.replace(/\t/g, '  ')
+    // 3. Convert non-breaking spaces (\u00A0, \u202F, &nbsp;) and unusual whitespace to standard space
+    cleaned = cleaned.replace(/[\u00A0\u202F\u1680\u2000-\u200A\u2028\u2029\u205F\u3000]/g, ' ').replace(/&nbsp;/g, ' ')
+    // 4. Normalize line breaks (CRLF or CR to LF)
+    cleaned = cleaned.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    // 5. Remove zero-width spaces/joiners and hidden control chars (except standard whitespace and newlines)
+    cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF]/g, '')
+    return cleaned
+}
+

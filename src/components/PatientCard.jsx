@@ -2,7 +2,7 @@ import { Trash2, Pencil, CheckCircle2, FileText, ArrowRightLeft } from 'lucide-r
 import { useState, useRef } from 'react'
 
 export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel }) {
-    const { id, name, hospitalNumber, ward, bed, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
+    const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
 
     let durationText = '';
     if (admissionDate && !isMortality) {
@@ -188,7 +188,12 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                                 })}
                             </div>
                         )}
-                        {note && <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>{note}</div>}
+                        {diagnosis && (
+                            <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-1 truncate">
+                                Diag: {diagnosis}
+                            </div>
+                        )}
+                        {note && <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto custom-scrollbar pr-1" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>{note}</div>}
                     </div>
                 </div>
 

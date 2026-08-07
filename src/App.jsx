@@ -326,6 +326,8 @@ export default function App() {
             patientName: patient.name || '',
             patientWard: patient.ward || '',
             patientHosp: patient.hospitalNumber || '',
+            diagnosis: patient.diagnosis || patient.patientDiagnosis || '',
+            patientDiagnosis: patient.diagnosis || patient.patientDiagnosis || '',
             text: text.trim(),
             color,
             createdAt: new Date().toISOString(),
@@ -431,12 +433,13 @@ export default function App() {
         return true
     }, [patients, mortalities, discharges, docs])
 
-    const savePatient = useCallback(({ team = 'my_team', name, hospitalNumber, ward, bed, note, critical = false, admissionDate }) => {
+    const savePatient = useCallback(({ team = 'my_team', name, hospitalNumber, ward, bed, note, critical = false, admissionDate, diagnosis }) => {
         const n = name.trim()
         const h = hospitalNumber.trim()
         const w = ward.trim().toUpperCase()
         const b = bed.trim()
         const t = note.trim()
+        const diag = (diagnosis || '').trim()
         const c = !!critical
 
         if (!w && !h && !n) return false
@@ -457,18 +460,18 @@ export default function App() {
         if (editingPatient) {
             const sid = editingPatient.id
             if (t && t !== (editingPatient.note || '').trim()) {
-                addDoc({ id: sid, name: n, hospitalNumber: h, ward: w }, t)
+                addDoc({ id: sid, name: n, hospitalNumber: h, ward: w, diagnosis: diag }, t)
             }
             if (editingPatient.reason === 'mortality') {
                 setMortalities(prev => prev.map(p =>
                     p.id === sid
-                        ? { ...p, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate }
+                        ? { ...p, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, diagnosis: diag }
                         : p
                 ))
             } else {
                 setPatients((prev) => prev.map(p =>
                     p.id === sid
-                        ? { ...p, team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, lastUpdated: new Date().toISOString() }
+                        ? { ...p, team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, diagnosis: diag, lastUpdated: new Date().toISOString() }
                         : p
                 ))
             }
@@ -483,14 +486,14 @@ export default function App() {
             }, 100)
         } else {
             const newId = generateId()
-            if (t) addDoc({ id: newId, name: n, hospitalNumber: h, ward: w }, t)
+            if (t) addDoc({ id: newId, name: n, hospitalNumber: h, ward: w, diagnosis: diag }, t)
             setPatients((prev) => [
                 ...prev,
-                { id: newId, team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, lastUpdated: new Date().toISOString() },
+                { id: newId, team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, diagnosis: diag, lastUpdated: new Date().toISOString() },
             ])
         }
         return true
-    }, [patients, editingPatient])
+    }, [patients, editingPatient, addDoc])
 
     const addMortality = useCallback(({ name, hospitalNumber, ward, bed, note, critical = false }) => {
         const n = name.trim()

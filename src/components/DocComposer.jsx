@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Save, Undo2, Redo2 } from 'lucide-react'
 import MicrophoneButton from './MicrophoneButton'
+import { cleanPastedText } from '../utils/clipboard'
 
 const COLOR_OPTIONS = [
     { value: 'blue',   label: 'Blue',   bg: 'bg-blue-500' },
@@ -126,7 +127,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                     </div>
 
                     {/* Scrollable Form Body */}
-                    <div className="flex-1 overflow-y-auto flex flex-col bg-white dark:bg-gray-800 p-4 sm:p-6" onClick={() => textareaRef.current?.focus()}>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-white dark:bg-gray-800 p-4 sm:p-6" onClick={() => textareaRef.current?.focus()}>
 
                         {/* Error */}
                         {error && (
