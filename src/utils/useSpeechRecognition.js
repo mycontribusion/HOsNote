@@ -12,6 +12,9 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
     const isListeningRef = useRef(false)
     const onResultRef = useRef(onResult)
     const onErrorRef = useRef(onError)
+    // Tracks the cumulative confirmed text already emitted this session
+    // so we never re-emit text that was already sent to onResult.
+    const confirmedRef = useRef('')
 
     // Keep refs in sync with callbacks
     useEffect(() => {
@@ -39,31 +42,41 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
             setIsListening(true)
             isListeningRef.current = true
             setError('')
+            confirmedRef.current = ''  // reset accumulator for new session
         }
 
         recognition.onend = () => {
             setIsListening(false)
             isListeningRef.current = false
             setInterimTranscript('')
+            confirmedRef.current = ''
         }
 
         recognition.onresult = (event) => {
-            let finalTranscript = ''
+            // Rebuild the full confirmed transcript from ALL results.
+            // We cannot rely on event.resultIndex being correct on all
+            // Android WebView builds — some always send 0.
+            let fullFinalSoFar = ''
             let interim = ''
 
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript
+            for (let i = 0; i < event.results.length; i++) {
+                const text = event.results[i][0].transcript
                 if (event.results[i].isFinal) {
-                    finalTranscript += transcript
+                    fullFinalSoFar += text
                 } else {
-                    interim += transcript
+                    interim += text
                 }
             }
 
             setInterimTranscript(interim)
 
-            if (finalTranscript && onResultRef.current) {
-                onResultRef.current(finalTranscript)
+            // Only emit the portion that is genuinely new
+            if (fullFinalSoFar && fullFinalSoFar !== confirmedRef.current) {
+                const newChunk = fullFinalSoFar.slice(confirmedRef.current.length).trim()
+                confirmedRef.current = fullFinalSoFar
+                if (newChunk && onResultRef.current) {
+                    onResultRef.current(newChunk)
+                }
             }
         }
 
@@ -80,6 +93,7 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
             setIsListening(false)
             isListeningRef.current = false
             setInterimTranscript('')
+            confirmedRef.current = ''
             
             if (onErrorRef.current) {
                 onErrorRef.current(errorMessage)
