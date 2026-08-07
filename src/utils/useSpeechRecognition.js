@@ -13,7 +13,7 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
     const onResultRef = useRef(onResult)
     const onErrorRef = useRef(onError)
     // Tracks cumulative confirmed text for this mic session.
-    // ONLY reset when the user explicitly taps Start — NOT on onend/onstart,
+    // ONLYj reset when the user explicitly taps Start — NOT on onend/onstart,
     // because Android WebView fires onend+onstart between every word while
     // keeping the same growing results array, causing the entire accumulated
     // transcript to be re-emitted on every auto-restart.
