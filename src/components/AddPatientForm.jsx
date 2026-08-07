@@ -347,10 +347,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
                                     <MicrophoneButton
                                         onTranscript={(transcript) => {
-                                            const currentNote = fields.note
-                                            const trimmed = currentNote.trim()
-                                            const newValue = trimmed ? `${trimmed} ${transcript}` : transcript
-                                            updateField('note', newValue)
+                                            setFields(prev => {
+                                                const trimmed = prev.note.trim()
+                                                return { ...prev, note: trimmed ? `${trimmed} ${transcript}` : transcript }
+                                            })
                                         }}
                                         title="Dictate note"
                                     />
