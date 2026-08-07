@@ -49,13 +49,37 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
         recognition.onresult = (event) => {
             // Always iterate from 0 — resultIndex is unreliable on Android WebView.
             let fullFinalSoFar = ''
+            let lastFinalText = ''
             let interim = ''
+            const rawFinals = []
             for (let i = 0; i < event.results.length; i++) {
                 const text = event.results[i][0].transcript
-                if (event.results[i].isFinal) fullFinalSoFar += text
-                else interim += text
+                if (event.results[i].isFinal) {
+                    rawFinals.push(text)
+                    if (text.startsWith(lastFinalText) && lastFinalText.length > 0) {
+                        // Cumulative result (common on Android WebView) — only add the new suffix
+                        fullFinalSoFar += text.slice(lastFinalText.length)
+                    } else {
+                        // Separate segment — add the full text
+                        fullFinalSoFar += text
+                    }
+                    lastFinalText = text
+                } else {
+                    interim += text
+                }
             }
             setInterimTranscript(interim)
+
+            // Diagnostic logging — check browser console for these
+            console.log('[SpeechRecognition] onresult fired', {
+                resultCount: event.results.length,
+                resultIndex: event.resultIndex,
+                rawFinals,
+                fullFinalSoFar,
+                confirmedRef: confirmedRef.current,
+                interim,
+                isCumulative: rawFinals.length > 1 && rawFinals.some((f, i) => i > 0 && f.startsWith(rawFinals[i - 1]))
+            })
 
             if (!fullFinalSoFar || fullFinalSoFar === confirmedRef.current) return
 
@@ -63,12 +87,14 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
                 // Cumulative session — emit only the genuinely new suffix
                 const newChunk = fullFinalSoFar.slice(confirmedRef.current.length).trim()
                 confirmedRef.current = fullFinalSoFar
+                console.log('[SpeechRecognition] emitting newChunk:', JSON.stringify(newChunk))
                 if (newChunk) onResultRef.current?.(newChunk)
             } else {
                 // Browser reset its results array (new recognition session)
                 // Emit the whole new text cleanly
                 confirmedRef.current = fullFinalSoFar
                 const chunk = fullFinalSoFar.trim()
+                console.log('[SpeechRecognition] emitting full chunk (reset):', JSON.stringify(chunk))
                 if (chunk) onResultRef.current?.(chunk)
             }
         }
