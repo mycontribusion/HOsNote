@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-// Check for browser support
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
 
 export function useSpeechRecognition({ onResult, onError, lang = 'en-US', continuous = true } = {}) {
@@ -12,24 +11,18 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
     const isListeningRef = useRef(false)
     const onResultRef = useRef(onResult)
     const onErrorRef = useRef(onError)
-    // Tracks the cumulative confirmed text already emitted this session
-    // so we never re-emit text that was already sent to onResult.
+    // Tracks cumulative confirmed text for this mic session.
+    // ONLY reset when the user explicitly taps Start — NOT on onend/onstart,
+    // because Android WebView fires onend+onstart between every word while
+    // keeping the same growing results array, causing the entire accumulated
+    // transcript to be re-emitted on every auto-restart.
     const confirmedRef = useRef('')
 
-    // Keep refs in sync with callbacks
-    useEffect(() => {
-        onResultRef.current = onResult
-    }, [onResult])
+    useEffect(() => { onResultRef.current = onResult }, [onResult])
+    useEffect(() => { onErrorRef.current = onError }, [onError])
 
     useEffect(() => {
-        onErrorRef.current = onError
-    }, [onError])
-
-    useEffect(() => {
-        if (!SpeechRecognition) {
-            setIsSupported(false)
-            return
-        }
+        if (!SpeechRecognition) { setIsSupported(false); return }
         setIsSupported(true)
 
         const recognition = new SpeechRecognition()
@@ -42,113 +35,82 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
             setIsListening(true)
             isListeningRef.current = true
             setError('')
-            confirmedRef.current = ''  // reset accumulator for new session
+            // Do NOT reset confirmedRef here — onstart fires on every
+            // auto-restart and the results array persists across restarts.
         }
 
         recognition.onend = () => {
             setIsListening(false)
             isListeningRef.current = false
             setInterimTranscript('')
-            confirmedRef.current = ''
+            // Do NOT reset confirmedRef here either — same reason as onstart.
         }
 
         recognition.onresult = (event) => {
-            // Rebuild the full confirmed transcript from ALL results.
-            // We cannot rely on event.resultIndex being correct on all
-            // Android WebView builds — some always send 0.
+            // Always iterate from 0 — resultIndex is unreliable on Android WebView.
             let fullFinalSoFar = ''
             let interim = ''
-
             for (let i = 0; i < event.results.length; i++) {
                 const text = event.results[i][0].transcript
-                if (event.results[i].isFinal) {
-                    fullFinalSoFar += text
-                } else {
-                    interim += text
-                }
+                if (event.results[i].isFinal) fullFinalSoFar += text
+                else interim += text
             }
-
             setInterimTranscript(interim)
 
-            // Only emit the portion that is genuinely new
-            if (fullFinalSoFar && fullFinalSoFar !== confirmedRef.current) {
+            if (!fullFinalSoFar || fullFinalSoFar === confirmedRef.current) return
+
+            if (fullFinalSoFar.startsWith(confirmedRef.current)) {
+                // Cumulative session — emit only the genuinely new suffix
                 const newChunk = fullFinalSoFar.slice(confirmedRef.current.length).trim()
                 confirmedRef.current = fullFinalSoFar
-                if (newChunk && onResultRef.current) {
-                    onResultRef.current(newChunk)
-                }
+                if (newChunk) onResultRef.current?.(newChunk)
+            } else {
+                // Browser reset its results array (new recognition session)
+                // Emit the whole new text cleanly
+                confirmedRef.current = fullFinalSoFar
+                const chunk = fullFinalSoFar.trim()
+                if (chunk) onResultRef.current?.(chunk)
             }
         }
 
         recognition.onerror = (event) => {
-            const errorMessage = event.error === 'not-allowed'
+            const msg = event.error === 'not-allowed'
                 ? 'Microphone access denied. Please allow microphone permissions.'
                 : event.error === 'no-speech'
                 ? 'No speech detected. Please try again.'
                 : event.error === 'network'
                 ? 'Network error. Speech recognition requires an internet connection.'
                 : `Speech recognition error: ${event.error}`
-            
-            setError(errorMessage)
+            setError(msg)
             setIsListening(false)
             isListeningRef.current = false
             setInterimTranscript('')
             confirmedRef.current = ''
-            
-            if (onErrorRef.current) {
-                onErrorRef.current(errorMessage)
-            }
+            onErrorRef.current?.(msg)
         }
 
         recognitionRef.current = recognition
-
-        return () => {
-            if (recognitionRef.current) {
-                try {
-                    recognitionRef.current.abort()
-                } catch {
-                    // ignore cleanup errors
-                }
-            }
-        }
+        return () => { try { recognitionRef.current?.abort() } catch { /* ignore */ } }
     }, [lang, continuous])
 
     const startListening = useCallback(() => {
         if (!recognitionRef.current || isListeningRef.current) return
-        
-        try {
-            recognitionRef.current.start()
-        } catch (err) {
-            // Already started or other error
-            console.warn('Speech recognition start error:', err)
-        }
+        confirmedRef.current = '' // ← ONLY reset here: user explicitly started a new session
+        try { recognitionRef.current.start() }
+        catch (err) { console.warn('Speech recognition start error:', err) }
     }, [])
 
     const stopListening = useCallback(() => {
         if (!recognitionRef.current || !isListeningRef.current) return
-        
-        try {
-            recognitionRef.current.stop()
-        } catch (err) {
-            console.warn('Speech recognition stop error:', err)
-        }
+        try { recognitionRef.current.stop() }
+        catch (err) { console.warn('Speech recognition stop error:', err) }
     }, [])
 
     const toggleListening = useCallback(() => {
-        if (isListeningRef.current) {
-            stopListening()
-        } else {
-            startListening()
-        }
+        if (isListeningRef.current) stopListening()
+        else startListening()
     }, [startListening, stopListening])
 
-    return {
-        isSupported,
-        isListening,
-        interimTranscript,
-        error,
-        startListening,
-        stopListening,
-        toggleListening,
-    }
+    return { isSupported, isListening, interimTranscript, error, startListening, stopListening, toggleListening }
 }
+
