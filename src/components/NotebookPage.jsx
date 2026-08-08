@@ -172,33 +172,14 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
     const handleEditSave = ({ name, hospitalNumber, ward, bed, diagnosis, note, critical, team }) => {
         const trimmedNote = (note || '').trim()
         const trimmedDiagnosis = (diagnosis || '').trim()
-        const originalNote = (editingDoc.text || '').trim()
-        const originalDiagnosis = (editingDoc.diagnosis || editingDoc.patientDiagnosis || '').trim()
 
-        const clinicalChanged = trimmedNote !== originalNote || trimmedDiagnosis !== originalDiagnosis
-
-        // Always update the existing doc's metadata
+        // Update the existing doc's metadata and text
         onUpdateDoc(editingDoc.id, trimmedNote, editingDoc.color ?? 'blue', {
             name,
             hospitalNumber,
             ward,
             diagnosis,
         })
-
-        // If diagnosis or clinical note changed, create a new notebook entry
-        if (clinicalChanged && addDoc) {
-            addDoc(
-                {
-                    id: editingDoc.patientId,
-                    name,
-                    hospitalNumber,
-                    ward,
-                    diagnosis: trimmedDiagnosis,
-                },
-                trimmedNote,
-                editingDoc.color ?? 'blue'
-            )
-        }
 
         setEditingDoc(null)
         setSelectedDoc(null)
@@ -308,7 +289,6 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                         )}
                                         <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto">
                                             {formatMonthYear(doc.createdAt)}
-                                            {doc.updatedAt && doc.updatedAt !== doc.createdAt && ' · edited'}
                                         </span>
                                     </div>
                                     {/* Text preview — max 4 lines, rest scrollable */}
