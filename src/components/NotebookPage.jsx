@@ -33,6 +33,11 @@ function formatDate(iso) {
         ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function formatMonthYear(iso) {
+    const d = new Date(iso)
+    return d.toLocaleDateString([], { month: 'short', year: 'numeric' })
+}
+
 // Detail view modal for a single note
 function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
     const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
@@ -62,7 +67,6 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
                 <div className={`px-5 pt-4 pb-3 ${bg}`}>
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1 overflow-hidden">
-                            {/* 2 lines when diagnosis exists: Diagnosis on top, Biodata + Date on bottom */}
                             <div className="flex flex-col gap-1 overflow-hidden">
                                 {hasDiag && (
                                     <div className="overflow-x-auto whitespace-nowrap custom-scrollbar pb-0.5">
@@ -72,23 +76,23 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
                                     </div>
                                 )}
 
-                                <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-2 py-0.5 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 py-0.5">
                                     {hasName && (
-                                        <span className={`whitespace-nowrap shrink-0 ${hasDiag ? 'text-xs font-semibold text-gray-700 dark:text-gray-300' : 'font-bold text-base text-gray-900 dark:text-white'}`}>
+                                        <span className={`whitespace-nowrap ${hasDiag ? 'text-xs font-semibold text-gray-700 dark:text-gray-300' : 'font-bold text-base text-gray-900 dark:text-white'}`}>
                                             {hasDiag ? `Patient: ${nameStr}` : nameStr}
                                         </span>
                                     )}
                                     {wardStr && (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap ${badge}`}>
                                             {wardStr}
                                         </span>
                                     )}
                                     {hospStr && (
-                                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+                                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded whitespace-nowrap">
                                             {hospStr}
                                         </span>
                                     )}
-                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto">
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
                                         {formatDate(doc.createdAt)}
                                     </span>
                                 </div>
@@ -277,39 +281,35 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                     className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all`}
                                     onClick={() => setSelectedDoc(doc)}
                                 >
-                                    {/* Card header — 2 lines when diagnosis exists: Diagnosis (Top line) | Biodata + Date (Bottom line) */}
-                                    <div className={`px-4 py-2.5 flex flex-col gap-1 overflow-hidden ${bg}`}>
-                                        {/* Line 1: Diagnosis on Top */}
-                                        {hasDiag && (
-                                            <div className="overflow-x-auto whitespace-nowrap custom-scrollbar pb-0.5">
+                                    {/* Card header — single line: Diagnosis if present, else Biodata + Date */}
+                                    <div className={`px-4 py-2.5 flex items-center gap-1.5 overflow-hidden ${bg}`}>
+                                        {hasDiag ? (
+                                            <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex-1 min-w-0">
                                                 <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
                                                     {diagStr}
                                                 </span>
                                             </div>
+                                        ) : (
+                                            <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-1.5 flex-1 min-w-0">
+                                                {hasName ? (
+                                                    <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap shrink-0">
+                                                        {nameStr}
+                                                    </span>
+                                                ) : hospStr ? (
+                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
+                                                        {hospStr}
+                                                    </span>
+                                                ) : wardStr ? (
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
+                                                        {wardStr}
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                         )}
-
-                                        {/* Line 2 (or Line 1 if no diagnosis): Biodata + Date as a SINGLE scrollable entity */}
-                                        <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-1.5 py-0.5 min-w-0">
-                                            {hasName && (
-                                                <span className={`whitespace-nowrap shrink-0 ${hasDiag ? 'text-xs font-semibold text-gray-700 dark:text-gray-300' : 'font-bold text-sm text-gray-900 dark:text-white'}`}>
-                                                    {hasDiag ? `Patient: ${nameStr}` : nameStr}
-                                                </span>
-                                            )}
-                                            {wardStr && (
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
-                                                    {wardStr}
-                                                </span>
-                                            )}
-                                            {hospStr && (
-                                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
-                                                    {hospStr}
-                                                </span>
-                                            )}
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto">
-                                                {formatDate(doc.createdAt)}
-                                                {doc.updatedAt && doc.updatedAt !== doc.createdAt && ' · edited'}
-                                            </span>
-                                        </div>
+                                        <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto">
+                                            {formatMonthYear(doc.createdAt)}
+                                            {doc.updatedAt && doc.updatedAt !== doc.createdAt && ' · edited'}
+                                        </span>
                                     </div>
                                     {/* Text preview — max 4 lines, rest scrollable */}
                                     <div className="px-4 py-2">
