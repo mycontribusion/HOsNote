@@ -96,7 +96,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                 {isMortality && <div className="absolute top-0 left-0 w-1 h-full bg-red-500 opacity-20"></div>}
                 {onMoveTeam && (
                     <button
-                        className="sm:hidden absolute top-1 left-1 w-5 h-5 rounded-full bg-purple-600 dark:bg-purple-500 text-white flex items-center justify-center shadow-xs active:scale-90 transition-all z-20"
+                        className="sm:hidden absolute top-1 left-1 w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-500 text-white flex items-center justify-center shadow-xs active:scale-90 transition-all z-20"
                         onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
                         aria-label={moveTeamLabel || 'Move team'}
                         title={moveTeamLabel || 'Move team'}
@@ -222,7 +222,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                     )}
                     {onMoveTeam && (
                         <button
-                            className="btn-icon text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 focus:ring-purple-200 flex-shrink-0"
+                            className="btn-icon text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-200 flex-shrink-0"
                             onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
                             aria-label={moveTeamLabel || 'Move team'}
                             title={moveTeamLabel || 'Move team'}
