@@ -1,4 +1,4 @@
-import { Trash2, Pencil, CheckCircle2, FileText, ArrowRightLeft } from 'lucide-react'
+import { Trash2, Pencil, CheckCircle2, FileText, ChevronsLeft } from 'lucide-react'
 import { useState, useRef } from 'react'
 
 export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel }) {
@@ -94,10 +94,20 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                 onPointerCancel={handlePointerUp}
             >
                 {isMortality && <div className="absolute top-0 left-0 w-1 h-full bg-red-500 opacity-20"></div>}
+                {onMoveTeam && (
+                    <button
+                        className="sm:hidden absolute top-1 left-1 w-5 h-5 rounded-full bg-purple-600 dark:bg-purple-500 text-white flex items-center justify-center shadow-xs active:scale-90 transition-all z-20"
+                        onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
+                        aria-label={moveTeamLabel || 'Move team'}
+                        title={moveTeamLabel || 'Move team'}
+                    >
+                        <ChevronsLeft size={12} strokeWidth={3} />
+                    </button>
+                )}
                 <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
 
                     {/* Left Column (Badge + Mobile Actions) */}
-                    <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                    <div className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[64px]">
                         {/* Ward/Bed or Initial Badge */}
                         <div className={`flex flex-col items-center justify-center rounded-xl border-2 px-3 py-2 text-center w-[64px] min-h-[64px] ${badgeColor}`}>
                             {ward || bed ? (
@@ -113,35 +123,24 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                             )}
                         </div>
 
-                        {/* Mobile Actions (Under Badge) */}
-                        <div className="flex sm:hidden flex-row gap-0.5 opacity-100">
+                        {/* Mobile Actions (Under Badge - fixed 64px width) */}
+                        <div className="flex sm:hidden flex-row gap-0.5 justify-center w-full">
                             {onToggleSelect && (
                                 <button
-                                    className={`btn-icon !min-h-[36px] !min-w-[36px] rounded-lg transition-all ${isSelected ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+                                    className={`btn-icon !min-h-[30px] !min-w-[30px] rounded-lg transition-all ${isSelected ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                                     onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
                                     aria-label="Toggle selection"
                                 >
-                                    {isSelected ? <CheckCircle2 size={18} /> : <div className="w-4 h-4 rounded border-2 border-gray-300 dark:border-gray-500" />}
-                                </button>
-                            )}
-                            {onMoveTeam && (
-                                <button
-                                    className="btn-icon !min-h-[36px] !min-w-[36px] rounded-lg text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                                    onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
-                                    aria-label={moveTeamLabel || 'Move team'}
-                                    title={moveTeamLabel || 'Move team'}
-                                >
-                                    <ArrowRightLeft size={15} strokeWidth={2} />
+                                    {isSelected ? <CheckCircle2 size={16} /> : <div className="w-3.5 h-3.5 rounded border-2 border-gray-300 dark:border-gray-500" />}
                                 </button>
                             )}
                             <button
-                                className="btn-icon !min-h-[36px] !min-w-[36px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                className="btn-icon !min-h-[30px] !min-w-[30px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                                 onClick={() => onEdit(patient)}
                                 aria-label="Edit patient"
                             >
-                                <Pencil size={16} strokeWidth={2} />
+                                <Pencil size={15} strokeWidth={2} />
                             </button>
-
                         </div>
                     </div>
 
@@ -228,7 +227,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                             aria-label={moveTeamLabel || 'Move team'}
                             title={moveTeamLabel || 'Move team'}
                         >
-                            <ArrowRightLeft size={18} strokeWidth={2} />
+                            <ChevronsLeft size={18} strokeWidth={2} />
                         </button>
                     )}
                     <button

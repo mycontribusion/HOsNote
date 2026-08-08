@@ -249,7 +249,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 <form id="add-patient-form" onSubmit={handleSubmit} className="flex flex-col h-full min-w-0 max-w-full overflow-hidden">
 
                     {/* Top Action Bar */}
-                    <div className="flex items-center justify-between px-3 py-2 sm:px-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10 min-w-0 max-w-full">
+                    <div className="flex items-center justify-between px-3 sm:px-4 h-[52px] border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10 min-w-0 max-w-full">
                         {/* Undo / Redo */}
                         <div className="flex items-center gap-1">
                             <button
