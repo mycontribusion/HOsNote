@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import Header from './components/Header'
 import AddPatientForm from './components/AddPatientForm'
@@ -94,28 +94,72 @@ export default function App() {
         if (page === 'notebook') navigate('/notebook')
         else navigate(`/team/${activeTab}`)
     }, [navigate, activeTab])
-
     const goToTab = useCallback((tab) => {
         navigate(`/team/${tab}`)
     }, [navigate])
-    const [isLoaded, setIsLoaded] = useState(false)
-    const [patients, setPatients] = useState([])
-    const [mortalities, setMortalities] = useState([])
-    const [discharges, setDischarges] = useState([])
-    const [docs, setDocs] = useState([])
-    const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
-    const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
-    const [darkMode, setDarkMode] = useState(() => {
-        try {
-            const stored = localStorage.getItem(DARK_MODE_KEY)
-            if (stored !== null) return JSON.parse(stored)
-            return window.matchMedia('(prefers-color-scheme: dark)').matches
-        } catch {
-            return false
-        }
-    })
 
-    // Load from IndexedDB or migrate from localStorage
+// Navigate back to default patients page when closing a URL-triggered modal/form
+const navigateBackFromUrlRoute = useCallback(() => {
+    const path = location.pathname
+    if (path.includes('/add') || path.includes('/edit/') ||
+        path.includes('/handover') || path.includes('/recieve') || path.includes('/receive')) {
+        navigate(`/team/${activeTab}`)
+    }
+}, [location.pathname, navigate, activeTab])
+
+// Detect URL routes and trigger corresponding modals/forms
+useEffect(() => {
+    const path = location.pathname
+
+    // Reset all modal states first
+    setShowAddForm(false)
+    setShowMortalityForm(false)
+    setEditingPatient(null)
+    setShowExport(false)
+    setShowScanner(false)
+
+    if (path.endsWith('/add')) {
+        setShowAddForm(true)
+    } else if (path.includes('/edit/')) {
+        const id = path.split('/edit/')[1]
+        const allPatients = [...patientsRef.current, ...mortalitiesRef.current]
+        const patient = allPatients.find(p => p.id === id)
+        if (patient) {
+            setEditingPatient(patient)
+        } else {
+            navigate(`/team/${activeTab}`)
+        }
+    } else if (path.includes('/handover')) {
+        setShowExport(true)
+    } else if (path.includes('/recieve') || path.includes('/receive')) {
+        setShowScanner(true)
+    }
+}, [location.pathname, navigate, activeTab])
+
+const [isLoaded, setIsLoaded] = useState(false)
+const [patients, setPatients] = useState([])
+const [mortalities, setMortalities] = useState([])
+const [discharges, setDischarges] = useState([])
+const [docs, setDocs] = useState([])
+const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
+const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
+const [darkMode, setDarkMode] = useState(() => {
+    try {
+        const stored = localStorage.getItem(DARK_MODE_KEY)
+        if (stored !== null) return JSON.parse(stored)
+        return window.matchMedia('(prefers-color-scheme: dark)').matches
+    } catch {
+        return false
+    }
+})
+
+// Refs for route detection effect (avoid re-running effect on every patient change)
+const patientsRef = useRef(patients)
+patientsRef.current = patients
+const mortalitiesRef = useRef(mortalities)
+mortalitiesRef.current = mortalities
+
+// Load from IndexedDB or migrate from localStorage
     useEffect(() => {
         const loadData = async () => {
             try {
@@ -493,6 +537,7 @@ export default function App() {
                     setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2'), 2000)
                 }
             }, 100)
+            navigateBackFromUrlRoute()
         } else {
             const newId = generateId()
             if (t) addDoc({ id: newId, name: n, hospitalNumber: h, ward: w, diagnosis: diag }, t)
@@ -532,16 +577,15 @@ export default function App() {
     }, [patients, mortalities, discharges])
 
     const startEditing = useCallback((patient) => {
-        setEditingPatient(patient)
-        setShowAddForm(false)
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-    }, [])
+        navigate(`/team/${activeTab}/edit/${patient.id}`)
+    }, [navigate, activeTab])
 
     const cancelForm = useCallback(() => {
         setShowAddForm(false)
         setShowMortalityForm(false)
         setEditingPatient(null)
-    }, [])
+        navigateBackFromUrlRoute()
+    }, [navigateBackFromUrlRoute])
 
     const toggleSelectPatient = useCallback((id) => {
         setSelectedPatientIds(prev => {
@@ -943,7 +987,7 @@ export default function App() {
                     activeTab === 'mortalities' ? (
                         <button
                             className="btn-danger w-full shadow-md mb-6 h-[52px] text-base"
-                            onClick={() => setShowMortalityForm(true)}
+                            onClick={() => navigate(`/team/${activeTab}/add`)}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
                             Add Mortality Record
@@ -951,7 +995,7 @@ export default function App() {
                     ) : (
                         <button
                             className="btn-primary w-full shadow-md mb-6 h-[52px] text-base"
-                            onClick={() => setShowAddForm(true)}
+                            onClick={() => navigate(`/team/${activeTab}/add`)}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
                             Add New Patient
@@ -1033,7 +1077,7 @@ export default function App() {
                         />
                     )
                 ) : activePatients.length === 0 ? (
-                    <EmptyState onAddClick={() => setShowAddForm(true)} />
+                    <EmptyState onAddClick={() => navigate(`/team/${activeTab}/add`)} />
                 ) : (
                     <PatientList
                         patients={activePatients}
@@ -1089,7 +1133,7 @@ export default function App() {
                         <button
                             id="btn-import"
                             className="btn-secondary !min-h-0 !py-1.5 !px-3 text-xs font-bold"
-                            onClick={() => setShowScanner(true)}
+                            onClick={() => navigate(`/team/${activeTab}/receive`)}
                             aria-label="Receive patient records by scanning QR code"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden sm:inline-block"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /><rect width="3" height="3" x="6" y="6" rx=".5" /><rect width="3" height="3" x="17" y="6" rx=".5" /><rect width="3" height="3" x="6" y="17" rx=".5" /><path d="M21 14h-3v3h3" /><path d="M18 21v-3" /></svg>
@@ -1100,7 +1144,7 @@ export default function App() {
                         <button
                             id="btn-export"
                             className="btn-primary !min-h-0 !py-1.5 !px-3 text-xs font-bold relative"
-                            onClick={() => { setShowExport(true) }}
+                            onClick={() => navigate(`/team/${activeTab}/handover`)}
                             disabled={activePatients.length === 0}
                             aria-label="Share handover records via QR code"
                         >
@@ -1119,7 +1163,7 @@ export default function App() {
                     allPatients={activePatients}
                     listName={listName}
                     selectionCount={selectedPatientIds.size}
-                    onClose={() => { setShowExport(false); clearSelection() }}
+                    onClose={() => { setShowExport(false); clearSelection(); navigateBackFromUrlRoute() }}
                     mortalities={mortalities}
                     discharges={discharges}
                     dischargesResetDate={dischargesResetDate}
@@ -1132,7 +1176,7 @@ export default function App() {
                     onImport={importPatients}
                     onLookup={lookupPatient}
                     onRestore={restoreFromBackup}
-                    onClose={() => setShowScanner(false)}
+                    onClose={() => { setShowScanner(false); navigateBackFromUrlRoute() }}
                 />
             )}
             {showConfirmResetStats && (
