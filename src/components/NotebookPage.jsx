@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, X, Edit2, Trash2, BookOpen } from 'lucide-react'
 import AddPatientForm from './AddPatientForm'
 
@@ -146,10 +146,16 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
     )
 }
 
-export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc }) {
+export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, initialEditDoc, onCancelEdit, navigate }) {
     const [query, setQuery] = useState('')
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
+
+    useEffect(() => {
+        if (initialEditDoc && initialEditDoc.id !== editingDoc?.id) {
+            setEditingDoc(initialEditDoc)
+        }
+    }, [initialEditDoc, editingDoc])
 
     const filtered = useMemo(() => {
         if (!query.trim()) return [...docs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -183,6 +189,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
 
         setEditingDoc(null)
         setSelectedDoc(null)
+        onCancelEdit?.()
     }
 
     return (
@@ -309,7 +316,10 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                 <NoteDetailModal
                     doc={selectedDoc}
                     onClose={() => setSelectedDoc(null)}
-                    onEdit={() => setEditingDoc(selectedDoc)}
+                    onEdit={() => {
+                        setEditingDoc(selectedDoc)
+                        navigate(`/notebook/edit`)
+                    }}
                     onDelete={() => handleDeleteFromDetail(selectedDoc)}
                 />
             )}
@@ -329,7 +339,10 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                         team: editingDoc.team || 'my_team',
                     }}
                     onAdd={handleEditSave}
-                    onCancel={() => setEditingDoc(null)}
+                    onCancel={() => {
+                        setEditingDoc(null)
+                        onCancelEdit?.()
+                    }}
                 />
             )}
         </div>

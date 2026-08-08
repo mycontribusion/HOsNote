@@ -98,10 +98,12 @@ export default function App() {
         navigate(`/team/${tab}`)
     }, [navigate])
 
-// Navigate back to default patients page when closing a URL-triggered modal/form
+// Navigate back to default page when closing a URL-triggered modal/form
 const navigateBackFromUrlRoute = useCallback(() => {
     const path = location.pathname
-    if (path.includes('/add') || path.includes('/edit/') ||
+    if (path === '/notebook/edit') {
+        navigate('/notebook')
+    } else if (path.endsWith('/add') || path.includes('/edit') ||
         path.includes('/handover') || path.includes('/recieve') || path.includes('/receive')) {
         navigate(`/team/${activeTab}`)
     }
@@ -114,21 +116,24 @@ useEffect(() => {
     // Reset all modal states first
     setShowAddForm(false)
     setShowMortalityForm(false)
-    setEditingPatient(null)
+    if (!path.includes('/edit')) {
+        setEditingPatient(null)
+    }
     setShowExport(false)
     setShowScanner(false)
+    if (path !== '/notebook/edit') {
+        setNotebookEditDoc(null)
+    }
 
     if (path.endsWith('/add')) {
         setShowAddForm(true)
-    } else if (path.includes('/edit/')) {
-        const id = path.split('/edit/')[1]
-        const allPatients = [...patientsRef.current, ...mortalitiesRef.current]
-        const patient = allPatients.find(p => p.id === id)
-        if (patient) {
-            setEditingPatient(patient)
-        } else {
-            navigate(`/team/${activeTab}`)
+    } else if (path.includes('/edit') && !path.startsWith('/notebook/edit')) {
+        if (pendingEditRef.current) {
+            setEditingPatient(pendingEditRef.current)
+            pendingEditRef.current = null
         }
+    } else if (path === '/notebook/edit') {
+        // Notebook edit state is managed by NotebookPage component
     } else if (path.includes('/handover')) {
         setShowExport(true)
     } else if (path.includes('/recieve') || path.includes('/receive')) {
@@ -141,6 +146,7 @@ const [patients, setPatients] = useState([])
 const [mortalities, setMortalities] = useState([])
 const [discharges, setDischarges] = useState([])
 const [docs, setDocs] = useState([])
+const [notebookEditDoc, setNotebookEditDoc] = useState(null)
 const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
 const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
 const [darkMode, setDarkMode] = useState(() => {
@@ -158,6 +164,9 @@ const patientsRef = useRef(patients)
 patientsRef.current = patients
 const mortalitiesRef = useRef(mortalities)
 mortalitiesRef.current = mortalities
+const docsRef = useRef(docs)
+docsRef.current = docs
+const pendingEditRef = useRef(null)
 
 // Load from IndexedDB or migrate from localStorage
     useEffect(() => {
@@ -577,7 +586,8 @@ mortalitiesRef.current = mortalities
     }, [patients, mortalities, discharges])
 
     const startEditing = useCallback((patient) => {
-        navigate(`/team/${activeTab}/edit/${patient.id}`)
+        pendingEditRef.current = patient
+        navigate(`/team/${activeTab}/edit`)
     }, [navigate, activeTab])
 
     const cancelForm = useCallback(() => {
@@ -977,6 +987,12 @@ mortalitiesRef.current = mortalities
                     onUpdateDoc={updateDoc}
                     onDeleteDoc={deleteDoc}
                     addDoc={addDoc}
+                    initialEditDoc={notebookEditDoc}
+                    onCancelEdit={() => {
+                        setNotebookEditDoc(null)
+                        navigate('/notebook')
+                    }}
+                    navigate={navigate}
                 />
             )}
 

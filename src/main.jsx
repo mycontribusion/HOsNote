@@ -16,7 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/" element={<Navigate to="/team/my_team" replace />} />
                 <Route path="/team/:tab" element={<App />}>
                     <Route path="add" element={<App />} />
-                    <Route path="edit/:id" element={<App />} />
+                    <Route path="edit" element={<App />} />
                     <Route path="handover" element={<App />} />
                     <Route path="handover/:name" element={<App />} />
                     <Route path="recieve" element={<App />} />
@@ -24,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                     <Route path="receive/:name" element={<App />} />
                 </Route>
                 <Route path="/notebook" element={<App />} />
+                <Route path="/notebook/edit" element={<App />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </Router>
