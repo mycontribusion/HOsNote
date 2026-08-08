@@ -109,8 +109,8 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
                 </div>
 
                 {/* Body — full note text */}
-                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto custom-scrollbar">
-                    <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto custom-scrollbar min-w-0 max-w-full">
+                    <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word]">
                         {doc.text}
                     </p>
                     {doc.updatedAt && doc.updatedAt !== doc.createdAt && (
@@ -299,8 +299,8 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                         </span>
                                     </div>
                                     {/* Text preview — max 4 lines, rest scrollable */}
-                                    <div className="px-4 py-2">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap max-h-[5.75rem] overflow-y-auto custom-scrollbar pr-1">
+                                    <div className="px-4 py-2 min-w-0 max-w-full">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-y-auto custom-scrollbar pr-1">
                                             {doc.text}
                                         </p>
                                     </div>

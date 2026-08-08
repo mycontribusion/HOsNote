@@ -192,7 +192,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                                 Diag: {diagnosis}
                             </div>
                         )}
-                        {note && <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto custom-scrollbar pr-1" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>{note}</div>}
+                        {note && <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto custom-scrollbar pr-1 break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>{note}</div>}
                     </div>
                 </div>
 
