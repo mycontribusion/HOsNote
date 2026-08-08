@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Search, X, Edit2, Trash2, BookOpen } from 'lucide-react'
-import DocComposer from './DocComposer'
+import AddPatientForm from './AddPatientForm'
 
 const COLOR_BORDER = {
     blue:   'border-blue-500',
@@ -39,6 +39,14 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
     const bg = COLOR_BG[doc.color] || COLOR_BG.blue
     const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
 
+    const diagStr = (doc.diagnosis || doc.patientDiagnosis || '').trim()
+    const hasDiag = Boolean(diagStr)
+    const nameStr = (doc.patientName || '').trim()
+    const hasName = Boolean(nameStr)
+    const wardStr = (doc.patientWard || '').trim()
+    const hospStr = (doc.patientHosp || '').trim()
+    const hasBio = hasName || Boolean(wardStr) || Boolean(hospStr)
+
     return (
         <div
             className="modal-backdrop"
@@ -51,31 +59,39 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
                 aria-labelledby="note-detail-title"
             >
                 {/* Header */}
-                <div className={`px-5 pt-5 pb-3 ${bg}`}>
+                <div className={`px-5 pt-4 pb-3 ${bg}`}>
                     <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                            <h2 id="note-detail-title" className="font-bold text-gray-900 dark:text-white text-base leading-tight truncate">
-                                {(doc.diagnosis || doc.patientDiagnosis || doc.patientName || 'Unknown Patient').trim()}
-                            </h2>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                {(doc.diagnosis || doc.patientDiagnosis) && doc.patientName && (
-                                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                        Patient: {doc.patientName}
-                                    </span>
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                            {/* 2 lines when diagnosis exists: Diagnosis on top, Biodata + Date on bottom */}
+                            <div className="flex flex-col gap-1 overflow-hidden">
+                                {hasDiag && (
+                                    <div className="overflow-x-auto whitespace-nowrap custom-scrollbar pb-0.5">
+                                        <h2 id="note-detail-title" className="font-bold text-gray-900 dark:text-white text-base leading-tight inline-block whitespace-nowrap">
+                                            {diagStr}
+                                        </h2>
+                                    </div>
                                 )}
-                                {doc.patientWard && (
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${badge}`}>
-                                        {doc.patientWard}
+
+                                <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-2 py-0.5 min-w-0">
+                                    {hasName && (
+                                        <span className={`whitespace-nowrap shrink-0 ${hasDiag ? 'text-xs font-semibold text-gray-700 dark:text-gray-300' : 'font-bold text-base text-gray-900 dark:text-white'}`}>
+                                            {hasDiag ? `Patient: ${nameStr}` : nameStr}
+                                        </span>
+                                    )}
+                                    {wardStr && (
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
+                                            {wardStr}
+                                        </span>
+                                    )}
+                                    {hospStr && (
+                                        <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+                                            {hospStr}
+                                        </span>
+                                    )}
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto">
+                                        {formatDate(doc.createdAt)}
                                     </span>
-                                )}
-                                {doc.patientHosp && (
-                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                                        {doc.patientHosp}
-                                    </span>
-                                )}
-                                <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                                    {formatDate(doc.createdAt)}
-                                </span>
+                                </div>
                             </div>
                         </div>
                         <button
@@ -126,7 +142,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
     )
 }
 
-export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast }) {
+export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc }) {
     const [query, setQuery] = useState('')
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
@@ -149,8 +165,37 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
         onDeleteDoc(doc.id)
     }
 
-    const handleEditSave = ({ text, color }) => {
-        onUpdateDoc(editingDoc.id, text, color)
+    const handleEditSave = ({ name, hospitalNumber, ward, bed, diagnosis, note, critical, team }) => {
+        const trimmedNote = (note || '').trim()
+        const trimmedDiagnosis = (diagnosis || '').trim()
+        const originalNote = (editingDoc.text || '').trim()
+        const originalDiagnosis = (editingDoc.diagnosis || editingDoc.patientDiagnosis || '').trim()
+
+        const clinicalChanged = trimmedNote !== originalNote || trimmedDiagnosis !== originalDiagnosis
+
+        // Always update the existing doc's metadata
+        onUpdateDoc(editingDoc.id, trimmedNote, editingDoc.color ?? 'blue', {
+            name,
+            hospitalNumber,
+            ward,
+            diagnosis,
+        })
+
+        // If diagnosis or clinical note changed, create a new notebook entry
+        if (clinicalChanged && addDoc) {
+            addDoc(
+                {
+                    id: editingDoc.patientId,
+                    name,
+                    hospitalNumber,
+                    ward,
+                    diagnosis: trimmedDiagnosis,
+                },
+                trimmedNote,
+                editingDoc.color ?? 'blue'
+            )
+        }
+
         setEditingDoc(null)
         setSelectedDoc(null)
     }
@@ -216,6 +261,15 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                             const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
                             const bg = COLOR_BG[doc.color] || COLOR_BG.blue
                             const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
+
+                            const diagStr = (doc.diagnosis || doc.patientDiagnosis || '').trim()
+                            const hasDiag = Boolean(diagStr)
+                            const nameStr = (doc.patientName || '').trim()
+                            const hasName = Boolean(nameStr)
+                            const wardStr = (doc.patientWard || '').trim()
+                            const hospStr = (doc.patientHosp || '').trim()
+                            const hasBio = hasName || Boolean(wardStr) || Boolean(hospStr)
+
                             return (
                                 <button
                                     key={doc.id}
@@ -223,27 +277,39 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                     className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all`}
                                     onClick={() => setSelectedDoc(doc)}
                                 >
-                                    {/* Card header — compact single row */}
-                                    <div className={`px-4 py-2 flex items-center justify-between gap-2 ${bg}`}>
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
-                                                {(doc.diagnosis || doc.patientDiagnosis || doc.patientName || 'Unknown Patient').trim()}
+                                    {/* Card header — 2 lines when diagnosis exists: Diagnosis (Top line) | Biodata + Date (Bottom line) */}
+                                    <div className={`px-4 py-2.5 flex flex-col gap-1 overflow-hidden ${bg}`}>
+                                        {/* Line 1: Diagnosis on Top */}
+                                        {hasDiag && (
+                                            <div className="overflow-x-auto whitespace-nowrap custom-scrollbar pb-0.5">
+                                                <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                                                    {diagStr}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Line 2 (or Line 1 if no diagnosis): Biodata + Date as a SINGLE scrollable entity */}
+                                        <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-1.5 py-0.5 min-w-0">
+                                            {hasName && (
+                                                <span className={`whitespace-nowrap shrink-0 ${hasDiag ? 'text-xs font-semibold text-gray-700 dark:text-gray-300' : 'font-bold text-sm text-gray-900 dark:text-white'}`}>
+                                                    {hasDiag ? `Patient: ${nameStr}` : nameStr}
+                                                </span>
+                                            )}
+                                            {wardStr && (
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
+                                                    {wardStr}
+                                                </span>
+                                            )}
+                                            {hospStr && (
+                                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
+                                                    {hospStr}
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto">
+                                                {formatDate(doc.createdAt)}
+                                                {doc.updatedAt && doc.updatedAt !== doc.createdAt && ' · edited'}
                                             </span>
-                                            {(doc.diagnosis || doc.patientDiagnosis) && doc.patientName && (
-                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                                                    ({doc.patientName})
-                                                </span>
-                                            )}
-                                            {doc.patientWard && (
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0 ${badge}`}>
-                                                    {doc.patientWard}
-                                                </span>
-                                            )}
                                         </div>
-                                        <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">
-                                            {formatDate(doc.createdAt)}
-                                            {doc.updatedAt && doc.updatedAt !== doc.createdAt && ' · edited'}
-                                        </span>
                                     </div>
                                     {/* Text preview — max 4 lines, rest scrollable */}
                                     <div className="px-4 py-2">
@@ -268,17 +334,22 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                 />
             )}
 
-            {/* Edit composer */}
+            {/* Edit using AddPatientForm */}
             {editingDoc && (
-                <DocComposer
-                    patient={{
-                        name: editingDoc.patientName,
-                        ward: editingDoc.patientWard,
-                        bed: editingDoc.patientBed,
+                <AddPatientForm
+                    initialData={{
+                        name: editingDoc.patientName || '',
+                        hospitalNumber: editingDoc.patientHosp || '',
+                        ward: editingDoc.patientWard || '',
+                        bed: editingDoc.patientBed || '',
+                        admissionDate: editingDoc.admissionDate || '',
+                        diagnosis: editingDoc.diagnosis || editingDoc.patientDiagnosis || '',
+                        note: editingDoc.text || '',
+                        critical: editingDoc.critical || false,
+                        team: editingDoc.team || 'my_team',
                     }}
-                    existingDoc={editingDoc}
-                    onSave={handleEditSave}
-                    onClose={() => setEditingDoc(null)}
+                    onAdd={handleEditSave}
+                    onCancel={() => setEditingDoc(null)}
                 />
             )}
         </div>

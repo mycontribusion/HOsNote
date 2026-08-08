@@ -337,9 +337,18 @@ export default function App() {
         setComposingFor(null)
     }, [])
 
-    const updateDoc = useCallback((id, text, color) => {
+    const updateDoc = useCallback((id, text, color, fieldPatch = {}) => {
         setDocs(prev => prev.map(d =>
-            d.id === id ? { ...d, text: text.trim(), color, updatedAt: new Date().toISOString() } : d
+            d.id === id ? {
+                ...d,
+                text: text.trim(),
+                color,
+                updatedAt: new Date().toISOString(),
+                ...(fieldPatch.name !== undefined      && { patientName: fieldPatch.name }),
+                ...(fieldPatch.ward !== undefined      && { patientWard: fieldPatch.ward }),
+                ...(fieldPatch.hospitalNumber !== undefined && { patientHosp: fieldPatch.hospitalNumber }),
+                ...(fieldPatch.diagnosis !== undefined && { diagnosis: fieldPatch.diagnosis, patientDiagnosis: fieldPatch.diagnosis }),
+            } : d
         ))
     }, [])
 
@@ -923,6 +932,7 @@ export default function App() {
                     docs={docs}
                     onUpdateDoc={updateDoc}
                     onDeleteDoc={deleteDoc}
+                    addDoc={addDoc}
                 />
             )}
 

@@ -249,65 +249,78 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 <form id="add-patient-form" onSubmit={handleSubmit} className="flex flex-col h-full min-w-0 max-w-full overflow-hidden">
 
                     {/* Top Action Bar */}
-                    <div className="flex items-center justify-between px-3 sm:px-4 h-[52px] border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10 min-w-0 max-w-full">
-                        {/* Undo / Redo */}
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                onClick={handleUndo}
-                                disabled={history.index <= 0}
-                                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                aria-label="Undo"
-                            >
-                                <Undo2 size={16} strokeWidth={2.5} />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleRedo}
-                                disabled={history.index >= history.stack.length - 1}
-                                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                aria-label="Redo"
-                            >
-                                <Redo2 size={16} strokeWidth={2.5} />
-                            </button>
+                    <div className="flex items-center justify-between px-3 sm:px-4 h-[52px] border-b border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-10 min-w-0 max-w-full">
+                        {/* Left Group: Form Header Title & Segmented Undo/Redo */}
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <span className="text-xs font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 hidden sm:inline-block">
+                                {isMortalityMode ? 'Mortality Record' : initialData ? 'Edit Patient' : 'New Patient'}
+                            </span>
+
+                            {/* Segmented Undo / Redo */}
+                            <div className="flex items-center p-0.5 rounded-xl bg-gray-100/90 dark:bg-gray-700/60 border border-gray-200/60 dark:border-gray-600/60">
+                                <button
+                                    type="button"
+                                    onClick={handleUndo}
+                                    disabled={history.index <= 0}
+                                    className="p-1 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+                                    aria-label="Undo"
+                                    title="Undo"
+                                >
+                                    <Undo2 size={14} strokeWidth={2.5} />
+                                </button>
+                                <div className="w-[1px] h-3 bg-gray-200 dark:bg-gray-600 mx-0.5" />
+                                <button
+                                    type="button"
+                                    onClick={handleRedo}
+                                    disabled={history.index >= history.stack.length - 1}
+                                    className="p-1 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+                                    aria-label="Redo"
+                                    title="Redo"
+                                >
+                                    <Redo2 size={14} strokeWidth={2.5} />
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Right Group: Critical chip + Primary Save + Dismiss */}
                         <div className="flex items-center gap-1.5 sm:gap-2">
-                            {/* Critical */}
+                            {/* Critical Chip */}
                             {!isMortalityMode && (
                                 <button
                                     type="button"
                                     aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
                                     onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
-                                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all active:scale-95 ${
                                         critical
-                                            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 shadow-sm'
-                                            : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300'
+                                            ? 'bg-red-500 dark:bg-red-600 text-white shadow-xs shadow-red-500/30'
+                                            : 'bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400'
                                     }`}
                                 >
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${critical ? 'bg-red-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-500'}`} />
+                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${critical ? 'bg-white animate-pulse' : 'bg-gray-400 dark:bg-gray-500'}`} />
                                     {critical ? 'CRITICAL' : 'Critical'}
                                 </button>
                             )}
 
-                            {/* Add / Save */}
+                            {/* Add / Save Button */}
                             <button
                                 id="btn-add-patient"
                                 type="submit"
                                 aria-label={initialData ? "Save" : "Add"}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-sm shadow-blue-200 dark:shadow-blue-900/20 transition-all active:scale-95"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-xs shadow-blue-500/25 transition-all active:scale-95"
                             >
-                                {initialData ? <Save size={15} strokeWidth={2.5} /> : <Plus size={15} strokeWidth={2.5} />}
+                                {initialData ? <Save size={14} strokeWidth={2.5} /> : <Plus size={14} strokeWidth={2.5} />}
                                 <span className="text-xs font-bold">{initialData ? 'Save' : 'Add'}</span>
                             </button>
 
-                            {/* Cancel */}
+                            {/* Cancel / Dismiss */}
                             <button
                                 type="button"
                                 onClick={onCancel}
                                 aria-label="Cancel"
-                                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors active:scale-95"
+                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90 ml-0.5"
+                                title="Close"
                             >
-                                <X size={16} strokeWidth={2.5} />
+                                <X size={15} strokeWidth={2.5} />
                             </button>
                         </div>
                     </div>
