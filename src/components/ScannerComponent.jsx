@@ -31,7 +31,7 @@ function decodeHtml(str) {
         .replace(/<[^>]+>/g, ' '); // Strip HTML tags, replacing with space to preserve boundaries
 }
 
-export default function ScannerComponent({ onImport, onLookup, listName, onClose, onRestore }) {
+export default function ScannerComponent({ onImport, onLookup, listName, onClose, onRestore, onImportComplete }) {
     const scannerRef = useRef(null)
     const mountedRef = useRef(true)
     // Set to true when a complete transfer fires so the tryResume loop
@@ -194,6 +194,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     if (mountedRef.current) {
                         const success = onImport(incoming, incomingDocs)
                         if (success) {
+                            onImportComplete?.()
                             setTimeout(() => {
                                 if (mountedRef.current) {
                                     onClose()
@@ -254,6 +255,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 if (mountedRef.current) {
                     const success = onImport(parsed)
                     if (success) {
+                        onImportComplete?.()
                         setTimeout(() => {
                             if (mountedRef.current) {
                                 onClose()
@@ -317,6 +319,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 if (mountedRef.current) {
                     const success = onImport(parsedPayload.incoming, parsedPayload.docs)
                     if (success) {
+                        onImportComplete?.()
                         setTimeout(() => {
                             if (mountedRef.current) onClose()
                         }, 1200)
@@ -473,6 +476,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         const success = onImport(incoming, incomingDocs)
                         console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                         if (success) {
+                            onImportComplete?.()
                             setTimeout(() => {
                                 if (mountedRef.current) {
                                     onClose()
@@ -529,6 +533,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         const success = onImport(parsed)
                         console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                         if (success) {
+                            onImportComplete?.()
                             setTimeout(() => {
                                 if (mountedRef.current) {
                                     onClose()
@@ -552,6 +557,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             const success = onImport(incoming, incomingDocs)
                             console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                             if (success) {
+                                onImportComplete?.()
                                 setTimeout(() => {
                                     if (mountedRef.current) {
                                         onClose()
@@ -607,6 +613,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
             if (Array.isArray(parsed)) {
                 onImport(parsed)
+                onImportComplete?.()
                 setTimeout(() => onClose?.(), 600)
                 return
             }
@@ -616,6 +623,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 const incomingDocs = parsed.docs || []
                 if (incoming.length > 0) {
                     onImport(incoming, incomingDocs)
+                    onImportComplete?.()
                     setTimeout(() => onClose?.(), 600)
                     return
                 }

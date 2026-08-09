@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Edit2, Trash2, BookOpen } from 'lucide-react'
+import { Edit2, Trash2, BookOpen, X } from 'lucide-react'
 import AddPatientForm from './AddPatientForm'
 
 function HighlightText({ text, query }) {

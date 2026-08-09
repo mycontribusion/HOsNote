@@ -777,17 +777,24 @@ const pendingEditRef = useRef(null)
             identityToNewIdMap[identityKey(p.name, p.ward, p.hospitalNumber)] = generatedId;
 
             let existingMatch = null;
+            const duplicateFields = [];
             if (p.hospitalNumber) {
                 existingMatch = patients.find(ex => ex.hospitalNumber === p.hospitalNumber) ||
                     mortalities.find(ex => ex.hospitalNumber === p.hospitalNumber);
+                if (existingMatch) duplicateFields.push('hospitalNumber');
             } else {
                 const key = `${p.name}|${p.ward}|${p.bed}`;
                 existingMatch = patients.find(ex => `${ex.name}|${ex.ward}|${ex.bed}` === key) ||
                     mortalities.find(ex => `${ex.name}|${ex.ward}|${ex.bed}` === key);
+                if (existingMatch) {
+                    if (p.name) duplicateFields.push('name');
+                    if (p.ward) duplicateFields.push('ward');
+                    if (p.bed) duplicateFields.push('bed');
+                }
             }
 
             if (existingMatch) {
-                conflicts.push({ imported: p, existing: existingMatch, oldId });
+                conflicts.push({ imported: p, existing: existingMatch, oldId, duplicateFields });
             } else {
                 newOnes.push(p);
             }
@@ -866,10 +873,16 @@ const pendingEditRef = useRef(null)
             if (res.action === 'skip') return;
 
             if (res.action === 'new') {
-                addedOrUpdatedIds.add(p.id);
-                identityMap[identityKey(p.name, p.ward, p.hospitalNumber)] = p.id;
-                if (p.reason === 'mortality') toAddMortality.push(p);
-                else toAddActive.push(p);
+                // Remove duplicated biodata fields from the imported patient before adding as new
+                const dupFields = res.duplicateFields || [];
+                const cleanP = dupFields.length > 0 ? { ...p } : p;
+                dupFields.forEach(field => {
+                    delete cleanP[field];
+                });
+                addedOrUpdatedIds.add(cleanP.id);
+                identityMap[identityKey(cleanP.name, cleanP.ward, cleanP.hospitalNumber)] = cleanP.id;
+                if (cleanP.reason === 'mortality') toAddMortality.push(cleanP);
+                else toAddActive.push(cleanP);
             } else if (res.action === 'update') {
                 addedOrUpdatedIds.add(res.existing.id);
                 identityMap[identityKey(p.name, p.ward, p.hospitalNumber)] = res.existing.id;
@@ -1245,6 +1258,7 @@ const pendingEditRef = useRef(null)
                     onLookup={lookupPatient}
                     onRestore={restoreFromBackup}
                     onClose={() => { setShowScanner(false); navigateBackFromUrlRoute() }}
+                    onImportComplete={() => setShowExport(false)}
                 />
             )}
             {showConfirmResetStats && (

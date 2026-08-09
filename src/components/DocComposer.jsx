@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { X, Save, Undo2, Redo2 } from 'lucide-react'
 import MicrophoneButton from './MicrophoneButton'
 import { cleanPastedText } from '../utils/clipboard'
@@ -38,6 +38,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
     const [error, setError] = useState('')
     const textareaRef = useRef(null)
     const saveTimerRef = useRef(null)
+    const pendingScrollRef = useRef(null)
 
     // ── Undo / Redo history (mirrors AddPatientForm pattern) ──────────────────
     const [history, setHistory] = useState({ stack: [initialText], index: 0 })
@@ -92,6 +93,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
 
     const handleUndo = () => {
         if (history.index <= 0) return
+        pendingScrollRef.current = textareaRef.current?.scrollTop ?? 0
         isUndoRedo.current = true
         const prev = history.stack[history.index - 1]
         setText(prev)
@@ -101,6 +103,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
 
     const handleRedo = () => {
         if (history.index >= history.stack.length - 1) return
+        pendingScrollRef.current = textareaRef.current?.scrollTop ?? 0
         isUndoRedo.current = true
         const next = history.stack[history.index + 1]
         setText(next)
@@ -109,6 +112,16 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
+    useLayoutEffect(() => {
+        if (pendingScrollRef.current !== null) {
+            const savedScroll = pendingScrollRef.current
+            pendingScrollRef.current = null
+            if (textareaRef.current) {
+                textareaRef.current.scrollTop = savedScroll
+            }
+        }
+    }, [text])
 
     useEffect(() => {
         if (textareaRef.current) {

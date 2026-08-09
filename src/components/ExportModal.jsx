@@ -91,7 +91,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
         const sid = transferSidRef.current
         const patientIds = new Set(patients.map(p => p.id))
         const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
-        const includedMortalities = selectionCount > 0 ? [] : mortalities
+        const includedMortalities = selectionCount > 0 ? [] : (listName === 'Mortalities' ? mortalities : [])
+        console.log('[TRANSFER DIAGNOSTIC] listName:', listName, 'selectionCount:', selectionCount, 'patients count:', patients.length, 'includedMortalities count:', includedMortalities.length)
 
         // Ultra-compact patient array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
         const transferPatients = patients.map((p) => {
@@ -155,6 +156,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     //    (on call / my team). When some patients are selected, share only those.
     const sharePayload = useMemo(() => {
         const ptsToShare = selectionCount > 0 ? patients : (allPatients || patients)
+        console.log('[SHARE DIAGNOSTIC] listName:', listName, 'selectionCount:', selectionCount, 'ptsToShare count:', ptsToShare.length, 'mortalities count:', mortalities.length)
         // Build a lookup map so each doc can be annotated with patient identity fields
         // (n/w/h). Since the share payload uses positional arrays (no id), the
         // importer cannot use id-based linking — it falls back to identity matching,
@@ -193,7 +195,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             type: 'patients',
             listName,
             patients: allFullCompressed,
-            mortalities: mortalities.map(compressMortality),
+            mortalities: listName === 'Mortalities' ? mortalities.map(compressMortality) : [],
             docs: enrichedDocs,
         }
     }, [allPatients, patients, mortalities, docs, listName, selectionCount])
