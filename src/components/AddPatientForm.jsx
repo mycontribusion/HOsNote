@@ -80,6 +80,8 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     const dateRef = useRef(null)
     const diagRef = useRef(null)
     const noteRef = useRef(null)
+    const scrollContainerRef = useRef(null)
+    const scrollRestoreRef = useRef(0)
 
     const [history, setHistory] = useState({ stack: [], index: -1 })
     const isUndoRedo = useRef(false)
@@ -137,6 +139,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const handleUndo = () => {
         if (history.index > 0) {
+            scrollRestoreRef.current = scrollContainerRef.current?.scrollTop ?? 0
             isUndoRedo.current = true
             const prevFields = history.stack[history.index - 1]
             setFields(prevFields)
@@ -147,6 +150,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const handleRedo = () => {
         if (history.index < history.stack.length - 1) {
+            scrollRestoreRef.current = scrollContainerRef.current?.scrollTop ?? 0
             isUndoRedo.current = true
             const nextFields = history.stack[history.index + 1]
             setFields(nextFields)
@@ -163,6 +167,13 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     }, [initialData, isMortalityMode])
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
+
+    useLayoutEffect(() => {
+        if (isUndoRedo.current && scrollRestoreRef.current > 0) {
+            scrollContainerRef.current?.scrollTo({ top: scrollRestoreRef.current, behavior: 'instant' })
+            scrollRestoreRef.current = 0
+        }
+    }, [fields])
 
     useEffect(() => {
         // Lock background scroll while modal is open
@@ -326,7 +337,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                     </div>
 
                     {/* Scrollable Form Body (Unified scrolling for Biodata + Notes) */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar overflow-x-hidden flex flex-col bg-white dark:bg-gray-800 min-w-0 max-w-full">
+                    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar overflow-x-hidden flex flex-col bg-white dark:bg-gray-800 min-w-0 max-w-full">
                         
                         {/* Error */}
                         {error && (

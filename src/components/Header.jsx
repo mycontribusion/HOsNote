@@ -1,6 +1,6 @@
-import { Moon, Sun, Settings, Stethoscope, BookOpen } from 'lucide-react'
+import { Moon, Sun, Settings, Stethoscope, BookOpen, Search } from 'lucide-react'
 
-export default function Header({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange }) {
+export default function Header({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange, onOpenSearch }) {
     return (
         <header className="bg-blue-700 dark:bg-gray-900 text-white shadow-lg shadow-blue-900/30 dark:shadow-black/40 sticky top-0 z-30 transition-colors duration-300">
             <div className="max-w-2xl mx-auto px-4">
@@ -28,6 +28,16 @@ export default function Header({ patientCount, docCount = 0, darkMode, toggleDar
                             <span className="text-xs font-semibold whitespace-nowrap leading-none">
                                 {activePage === 'patients' ? `${docCount} notes` : `${patientCount} patients`}
                             </span>
+                        </button>
+
+                        {/* Search button */}
+                        <button
+                            onClick={onOpenSearch}
+                            className="p-2 rounded-xl hover:bg-white/10 transition-colors"
+                            aria-label="Search"
+                            title="Search"
+                        >
+                            <Search size={18} className="text-blue-200 dark:text-gray-400" />
                         </button>
 
                         {/* Settings button */}

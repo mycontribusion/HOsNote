@@ -11,7 +11,7 @@ const SORT_OPTIONS = [
     { value: 'hospnum', label: 'Hosp No.' },
 ]
 
-export default function PatientList({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel }) {
+export default function PatientList({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery }) {
     const [sortBy, setSortBy] = useState('none')
     const [isReviewedOpen, setIsReviewedOpen] = useState(false)
 
@@ -118,6 +118,8 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
                         isMortality={isMortality}
                         onMoveTeam={onMoveTeam}
                         moveTeamLabel={moveTeamLabel}
+                        highlightField={highlightField}
+                        highlightQuery={highlightQuery}
                     />
                 ))}
                 {sortedActive.length === 0 && reviewedPatients.length > 0 && (
@@ -162,6 +164,8 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
                                     isMortality={isMortality}
                                     onMoveTeam={onMoveTeam}
                                     moveTeamLabel={moveTeamLabel}
+                                    highlightField={highlightField}
+                                    highlightQuery={highlightQuery}
                                 />
                             ))}
                         </div>

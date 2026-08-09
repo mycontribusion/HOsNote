@@ -1,7 +1,24 @@
 import { Trash2, Pencil, CheckCircle2, FileText, ChevronsLeft } from 'lucide-react'
 import { useState, useRef } from 'react'
 
-export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel }) {
+function HighlightText({ text, query }) {
+    if (!query || !text) return <>{text}</>
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+    return (
+        <>
+            {parts.map((part, i) =>
+                part.toLowerCase() === query.toLowerCase() ? (
+                    <mark key={i} className="bg-yellow-200 dark:bg-yellow-600/40 text-gray-900 dark:text-gray-100 rounded-sm px-0.5">{part}</mark>
+                ) : (
+                    <span key={i}>{part}</span>
+                )
+            )}
+        </>
+    )
+}
+
+export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery }) {
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
 
     let durationText = '';
@@ -154,10 +171,22 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                                     CRITICAL
                                 </span>
                             )}
-                            {name && <div className={`text-lg font-bold leading-tight overflow-x-auto whitespace-nowrap ${reviewed ? 'line-through text-gray-500 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>{name}</div>}
+                            {name && (
+                                <div className={`text-lg font-bold leading-tight overflow-x-auto whitespace-nowrap ${reviewed ? 'line-through text-gray-500 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
+                                    {highlightField === 'name' && highlightQuery ? (
+                                        <HighlightText text={name} query={highlightQuery} />
+                                    ) : (
+                                        name
+                                    )}
+                                </div>
+                            )}
                             {hospitalNumber && (
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis ${reviewed ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-500 line-through' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>
-                                    {hospitalNumber}
+                                    {highlightField === 'hospitalNumber' && highlightQuery ? (
+                                        <HighlightText text={hospitalNumber} query={highlightQuery} />
+                                    ) : (
+                                        hospitalNumber
+                                    )}
                                 </span>
                             )}
                             {docCount > 0 && (
@@ -189,10 +218,22 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                         )}
                         {diagnosis && (
                             <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-1 truncate">
-                                Diag: {diagnosis}
+                                Diag: {highlightField === 'diagnosis' && highlightQuery ? (
+                                    <HighlightText text={diagnosis} query={highlightQuery} />
+                                ) : (
+                                    diagnosis
+                                )}
                             </div>
                         )}
-                        {note && <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto custom-scrollbar pr-1 break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>{note}</div>}
+                        {note && (
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto custom-scrollbar pr-1 break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>
+                                {highlightField === 'note' && highlightQuery ? (
+                                    <HighlightText text={note} query={highlightQuery} />
+                                ) : (
+                                    note
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -13,6 +13,7 @@ import FeedbackModal from './components/FeedbackModal'
 import SettingsModal from './components/SettingsModal'
 import NotebookPage from './components/NotebookPage'
 import DocComposer from './components/DocComposer'
+import SearchOverlay from './components/SearchOverlay'
 import { get, set } from 'idb-keyval'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
@@ -252,6 +253,11 @@ const pendingEditRef = useRef(null)
     const [showMortalityForm, setShowMortalityForm] = useState(false)
     const [showFeedback, setShowFeedback] = useState(false)
     const [showSettings, setShowSettings] = useState(false)
+    const [showSearch, setShowSearch] = useState(false)
+    const [initialSelectedDocId, setInitialSelectedDocId] = useState(null)
+    const [notebookSearchHighlight, setNotebookSearchHighlight] = useState('')
+    const [searchHighlightField, setSearchHighlightField] = useState(null)
+    const [searchHighlightQuery, setSearchHighlightQuery] = useState('')
     const [textSize, setTextSize] = useState(() => {
         try {
             const saved = localStorage.getItem('hosnote_textsize')
@@ -960,6 +966,43 @@ const pendingEditRef = useRef(null)
         ? activePatients.filter(p => selectedPatientIds.has(p.id))
         : activePatients
 
+    const navigateToPatient = useCallback((patientId, highlightField, highlightQuery) => {
+        // Ensure we're on the patients page
+        if (activePage !== 'patients') {
+            goToPage('patients')
+        }
+        // Store highlight info for PatientCard
+        setSearchHighlightField(highlightField)
+        setSearchHighlightQuery(highlightQuery)
+        // Find the patient and scroll to them
+        const allPatients = [...patients, ...mortalities]
+        const found = allPatients.find(p => p.id === patientId)
+        if (found) {
+            setTimeout(() => {
+                const el = document.getElementById(`patient-${patientId}`)
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2')
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2'), 3000)
+                }
+            }, 300)
+        }
+        // Clear highlight after a few seconds
+        setTimeout(() => {
+            setSearchHighlightField(null)
+            setSearchHighlightQuery('')
+        }, 5000)
+    }, [activePage, goToPage, patients, mortalities])
+
+    const navigateToNote = useCallback((noteId, highlightQuery) => {
+        // Navigate to notebook page
+        if (activePage !== 'notebook') {
+            goToPage('notebook')
+        }
+        setInitialSelectedDocId(noteId)
+        setNotebookSearchHighlight(highlightQuery)
+    }, [activePage, goToPage])
+
     if (!isLoaded) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
@@ -978,6 +1021,7 @@ const pendingEditRef = useRef(null)
                 onOpenSettings={() => setShowSettings(true)}
                 activePage={activePage}
                 onPageChange={goToPage}
+                onOpenSearch={() => setShowSearch(true)}
             />
 
             {/* Notebook Page */}
@@ -993,6 +1037,12 @@ const pendingEditRef = useRef(null)
                         navigate('/notebook')
                     }}
                     navigate={navigate}
+                    initialSelectedDocId={initialSelectedDocId}
+                    searchHighlight={notebookSearchHighlight}
+                    onDocOpened={() => {
+                        setInitialSelectedDocId(null)
+                        setNotebookSearchHighlight('')
+                    }}
                 />
             )}
 
@@ -1108,6 +1158,8 @@ const pendingEditRef = useRef(null)
                         onToggleSelectAll={toggleSelectAll}
                         onMoveTeam={activeTab === 'other_team' ? (id) => movePatientTeam(id, 'my_team') : undefined}
                         moveTeamLabel={activeTab === 'other_team' ? 'Move to My Team' : undefined}
+                        highlightField={searchHighlightField}
+                        highlightQuery={searchHighlightQuery}
                     />
                 )}
 
@@ -1232,6 +1284,15 @@ const pendingEditRef = useRef(null)
                     onClearRequest={handleClearRequest}
                     onSaveBackup={handleSaveBackup}
                     onRestoreBackup={restoreFromBackup}
+                />
+            )}
+            {showSearch && (
+                <SearchOverlay
+                    patients={patients}
+                    docs={docs}
+                    onClose={() => setShowSearch(false)}
+                    onNavigateToPatient={navigateToPatient}
+                    onNavigateToNote={navigateToNote}
                 />
             )}
 

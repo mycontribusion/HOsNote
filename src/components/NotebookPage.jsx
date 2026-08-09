@@ -1,6 +1,23 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, X, Edit2, Trash2, BookOpen } from 'lucide-react'
+import { Edit2, Trash2, BookOpen } from 'lucide-react'
 import AddPatientForm from './AddPatientForm'
+
+function HighlightText({ text, query }) {
+    if (!query || !text) return <>{text}</>
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+    return (
+        <>
+            {parts.map((part, i) =>
+                part.toLowerCase() === query.toLowerCase() ? (
+                    <mark key={i} className="bg-yellow-200 dark:bg-yellow-600/40 text-gray-900 dark:text-gray-100 rounded-sm px-0.5">{part}</mark>
+                ) : (
+                    <span key={i}>{part}</span>
+                )
+            )}
+        </>
+    )
+}
 
 const COLOR_BORDER = {
     blue:   'border-blue-500',
@@ -39,7 +56,7 @@ function formatMonthYear(iso) {
 }
 
 // Detail view modal for a single note
-function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
+function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
     const bg = COLOR_BG[doc.color] || COLOR_BG.blue
     const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
@@ -111,7 +128,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
                 {/* Body — full note text */}
                 <div className="px-5 py-4 max-h-[50vh] overflow-y-auto custom-scrollbar min-w-0 max-w-full">
                     <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word]">
-                        {doc.text}
+                        {highlightText ? <HighlightText text={doc.text} query={highlightText} /> : doc.text}
                     </p>
                     {doc.updatedAt && doc.updatedAt !== doc.createdAt && (
                         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-3 italic">
@@ -146,8 +163,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete }) {
     )
 }
 
-export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, initialEditDoc, onCancelEdit, navigate }) {
-    const [query, setQuery] = useState('')
+export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, initialEditDoc, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) {
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
 
@@ -157,18 +173,17 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
         }
     }, [initialEditDoc, editingDoc])
 
-    const filtered = useMemo(() => {
-        if (!query.trim()) return [...docs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        const q = query.trim().toLowerCase()
-        return [...docs]
-            .filter(d =>
-                d.patientName?.toLowerCase().includes(q) ||
-                d.patientWard?.toLowerCase().includes(q) ||
-                (d.diagnosis || d.patientDiagnosis)?.toLowerCase().includes(q) ||
-                d.text?.toLowerCase().includes(q)
-            )
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    }, [docs, query])
+    // Auto-open a note detail when navigating from search
+    useEffect(() => {
+        if (initialSelectedDocId && docs.length > 0) {
+            const doc = docs.find(d => d.id === initialSelectedDocId)
+            if (doc) {
+                setSelectedDoc(doc)
+                onDocOpened?.()
+            }
+        }
+    }, [initialSelectedDocId, docs, onDocOpened])
+
 
     const handleDeleteFromDetail = (doc) => {
         setSelectedDoc(null)
@@ -194,40 +209,8 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
 
     return (
         <div className="flex flex-col flex-1">
-            {/* Search bar */}
-            <div className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-950 pt-4 pb-3 px-4">
-                <div className="relative max-w-2xl mx-auto">
-                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    <input
-                        id="notebook-search"
-                        type="search"
-                        className="input-field pl-9 pr-9 text-sm"
-                        style={{ minHeight: '42px' }}
-                        placeholder="Search by patient, ward or text…"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        autoComplete="off"
-                        spellCheck={false}
-                    />
-                    {query && (
-                        <button
-                            onClick={() => setQuery('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                            aria-label="Clear search"
-                        >
-                            <X size={15} />
-                        </button>
-                    )}
-                </div>
-                {query && (
-                    <p className="text-center text-[10px] text-gray-400 mt-1.5">
-                        {filtered.length === 0 ? 'No results' : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}
-                    </p>
-                )}
-            </div>
-
             {/* Card list */}
-            <div className="flex-1 w-full max-w-2xl mx-auto px-4 pb-36">
+            <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-36">
                 {docs.length === 0 ? (
                     /* Empty state */
                     <div className="flex flex-col items-center justify-center text-center py-20 px-6">
@@ -242,14 +225,9 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                             Notes are kept here even after a patient is discharged.
                         </p>
                     </div>
-                ) : filtered.length === 0 ? (
-                    <div className="text-center py-16 px-6 text-gray-500 dark:text-gray-400">
-                        <p className="text-base font-semibold mb-1">No matches</p>
-                        <p className="text-sm">Try a different name, ward, or keyword.</p>
-                    </div>
                 ) : (
                     <div className="space-y-3">
-                        {filtered.map(doc => {
+                        {docs.map(doc => {
                             const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
                             const bg = COLOR_BG[doc.color] || COLOR_BG.blue
                             const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
@@ -321,6 +299,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                         navigate(`/notebook/edit`)
                     }}
                     onDelete={() => handleDeleteFromDetail(selectedDoc)}
+                    highlightText={searchHighlight}
                 />
             )}
 
