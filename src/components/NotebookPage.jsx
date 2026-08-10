@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Edit2, Trash2, BookOpen, X } from 'lucide-react'
+import { Edit2, Trash2, BookOpen, X, Plus } from 'lucide-react'
 import AddPatientForm from './AddPatientForm'
+import SpeedDialFAB from './SpeedDialFAB'
 
 function HighlightText({ text, query }) {
     if (!query || !text) return <>{text}</>
@@ -224,17 +225,13 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
 
     return (
         <div className="flex flex-col flex-1">
-            {/* Add New Note Button */}
+            {/* Speed Dial FAB — Notebook Page */}
             {!showAddNoteForm && !editingDoc && (
-                <div className="w-full max-w-2xl mx-auto px-4 pt-6">
-                    <button
-                        className="btn-primary w-full shadow-md mb-6 h-[52px] text-base"
-                        onClick={() => setShowAddNoteForm(true)}
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-                        Add New Note
-                    </button>
-                </div>
+                <SpeedDialFAB
+                    mainTheme="teal"
+                    ariaLabel="Add new note"
+                    onClick={() => setShowAddNoteForm(true)}
+                />
             )}
 
             {/* Card list */}

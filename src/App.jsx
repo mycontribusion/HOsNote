@@ -14,6 +14,8 @@ import SettingsModal from './components/SettingsModal'
 import NotebookPage from './components/NotebookPage'
 import DocComposer from './components/DocComposer'
 import SearchOverlay from './components/SearchOverlay'
+import SpeedDialFAB from './components/SpeedDialFAB'
+import { UserPlus, QrCode, Share2 } from 'lucide-react'
 import { get, set } from 'idb-keyval'
 import { generateUniqueValue } from './utils/uniqueSuffix'
 import { Capacitor } from '@capacitor/core'
@@ -595,9 +597,11 @@ const pendingEditRef = useRef(null)
                 ...prev,
                 { id: newId, team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, diagnosis: diag, lastUpdated: new Date().toISOString() },
             ])
+            setShowAddForm(false)
+            navigateBackFromUrlRoute()
         }
         return true
-    }, [patients, addDoc])
+    }, [patients, addDoc, navigateBackFromUrlRoute])
 
     const addMortality = useCallback(({ name, hospitalNumber, ward, bed, note, critical = false }) => {
         const n = name.trim()
@@ -623,13 +627,17 @@ const pendingEditRef = useRef(null)
         setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
         setMortalities(prev => [record, ...prev])
         setShowMortalityForm(false)
+        navigateBackFromUrlRoute()
         return true
-    }, [patients, mortalities, discharges])
+    }, [patients, mortalities, discharges, addDoc, navigateBackFromUrlRoute])
 
     const startEditing = useCallback((patient) => {
+        setEditingPatient(patient)
         pendingEditRef.current = patient
-        navigate(`/team/${activeTab}/edit`)
-    }, [navigate, activeTab])
+        if (location.pathname !== `/team/${activeTab}/edit`) {
+            navigate(`/team/${activeTab}/edit`)
+        }
+    }, [navigate, activeTab, location.pathname])
 
     const cancelForm = useCallback(() => {
         setShowAddForm(false)
@@ -1103,26 +1111,8 @@ const pendingEditRef = useRef(null)
 
             {/* Patients Page */}
             {activePage === 'patients' && (
-            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-6 pb-20">
-                {!showAddForm && !editingPatient && !showMortalityForm ? (
-                    activeTab === 'mortalities' ? (
-                        <button
-                            className="btn-danger w-full shadow-md mb-6 h-[52px] text-base"
-                            onClick={() => navigate(`/team/${activeTab}/add`)}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-                            Add Mortality Record
-                        </button>
-                    ) : (
-                        <button
-                            className="btn-primary w-full shadow-md mb-6 h-[52px] text-base"
-                            onClick={() => navigate(`/team/${activeTab}/add`)}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-                            Add New Patient
-                        </button>
-                    )
-                ) : showMortalityForm ? (
+            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-20">
+                {showMortalityForm ? (
                     <AddPatientForm
                         initialData={null}
                         initialTeam={activeTab}
@@ -1131,7 +1121,7 @@ const pendingEditRef = useRef(null)
                         onCancel={cancelForm}
                         patients={patients}
                     />
-                ) : (
+                ) : (showAddForm || editingPatient) ? (
                     <AddPatientForm
                         initialData={editingPatient}
                         initialTeam={activeTab}
@@ -1140,7 +1130,7 @@ const pendingEditRef = useRef(null)
                         isMortalityMode={editingPatient?.reason === 'mortality'}
                         patients={patients}
                     />
-                )}
+                ) : null}
 
                 {/* Tabs */}
                 {!showAddForm && !editingPatient && !showMortalityForm && (
@@ -1249,37 +1239,48 @@ const pendingEditRef = useRef(null)
             </main>
             )} {/* end activePage === 'patients' */}
 
-            {/* Bottom action bar — Patients page only */}
-            {activePage === 'patients' && (
-            <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-t border-gray-200 dark:border-gray-700 shadow-lg z-40 transition-colors duration-300">
-                <div className="max-w-2xl mx-auto px-4 h-[52px] flex gap-2 justify-center items-center">
-                    <div className="flex gap-2 flex-shrink-0">
-                        {/* Import / Scan */}
-                        <button
-                            id="btn-import"
-                            className="btn-secondary !min-h-0 !py-1.5 !px-3 text-xs font-bold"
-                            onClick={() => navigate(`/team/${activeTab}/receive`)}
-                            aria-label="Receive patient records by scanning QR code"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden sm:inline-block"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /><rect width="3" height="3" x="6" y="6" rx=".5" /><rect width="3" height="3" x="17" y="6" rx=".5" /><rect width="3" height="3" x="6" y="17" rx=".5" /><path d="M21 14h-3v3h3" /><path d="M18 21v-3" /></svg>
-                            Receive
-                        </button>
-
-                        {/* Export -> Handover */}
-                        <button
-                            id="btn-export"
-                            className="btn-primary !min-h-0 !py-1.5 !px-3 text-xs font-bold relative"
-                            onClick={() => navigate(`/team/${activeTab}/handover`)}
-                            disabled={activePatients.length === 0}
-                            aria-label="Share handover records via QR code"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden sm:inline-block"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /><rect width="3" height="3" x="6" y="6" rx=".5" /><rect width="3" height="3" x="17" y="6" rx=".5" /><rect width="3" height="3" x="6" y="17" rx=".5" /><path d="M21 14h-3v3h3" /><path d="M18 21v-3" /></svg>
-                            Handover{selectedPatientIds.size > 0 ? ` (${selectedPatientIds.size})` : ''}
-                        </button>
-                    </div>
-                </div>
-            </div>
-            )} {/* end activePage === 'patients' (action bar) */}
+            {/* Collapsible Action FAB — Tracker Page */}
+            {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (
+                <SpeedDialFAB
+                    mainTheme="blue"
+                    ariaLabel="Patient actions menu"
+                    actions={[
+                        {
+                            id: 'add',
+                            label: activeTab === 'mortalities' ? 'Add Mortality' : 'Add Patient',
+                            icon: <UserPlus size={18} />,
+                            color: activeTab === 'mortalities' ? 'purple' : 'blue',
+                            onClick: () => {
+                                if (activeTab === 'mortalities') setShowMortalityForm(true)
+                                else setShowAddForm(true)
+                                navigate(`/team/${activeTab}/add`)
+                            }
+                        },
+                        {
+                            id: 'receive',
+                            label: 'Receive',
+                            icon: <QrCode size={18} />,
+                            color: 'emerald',
+                            onClick: () => {
+                                setShowScanner(true)
+                                navigate(`/team/${activeTab}/receive`)
+                            }
+                        },
+                        {
+                            id: 'handover',
+                            label: 'Handover',
+                            icon: <Share2 size={18} />,
+                            color: 'purple',
+                            badge: selectedPatientIds.size > 0 ? selectedPatientIds.size : null,
+                            disabled: activePatients.length === 0,
+                            onClick: () => {
+                                setShowExport(true)
+                                navigate(`/team/${activeTab}/handover`)
+                            }
+                        }
+                    ]}
+                />
+            )}
 
             {/* Modals */}
             {showExport && (

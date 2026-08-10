@@ -194,7 +194,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     useEffect(() => {
         return () => {
             if (initialDataRef.current && !hasSavedRef.current) {
-                onAddRef.current({
+                Promise.resolve(onAddRef.current({
                     team: teamRef.current,
                     name: fieldsRef.current.name,
                     hospitalNumber: fieldsRef.current.hospitalNumber,
@@ -204,7 +204,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                     critical: criticalRef.current,
                     admissionDate: fieldsRef.current.admissionDate,
                     diagnosis: fieldsRef.current.diagnosis,
-                }).catch(() => {})
+                })).catch(() => {})
             }
         }
     }, [])
