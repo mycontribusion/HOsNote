@@ -301,9 +301,9 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                             {formatMonthYear(doc.createdAt)}
                                         </span>
                                     </div>
-                                    {/* Text preview — max 4 lines, rest scrollable */}
+                                    {/* Text preview — visual scrollbar without touch scrolling */}
                                     <div className="px-4 py-2 min-w-0 max-w-full">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-y-auto custom-scrollbar pr-1">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-y-auto custom-scrollbar pointer-events-none select-none pr-1">
                                             {doc.text}
                                         </p>
                                     </div>

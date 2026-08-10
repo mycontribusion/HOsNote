@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import PatientCard from './PatientCard'
+import PatientDetailModal from './PatientDetailModal'
 import { ArrowUpDown, ChevronDown, ChevronRight, RotateCcw, CheckSquare, Square } from 'lucide-react'
 
 const SORT_OPTIONS = [
@@ -14,6 +15,7 @@ const SORT_OPTIONS = [
 export default function PatientList({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery }) {
     const [sortBy, setSortBy] = useState('none')
     const [isReviewedOpen, setIsReviewedOpen] = useState(false)
+    const [selectedDetailPatient, setSelectedDetailPatient] = useState(null)
 
     const activePatients = patients.filter(p => !p.reviewed)
     const reviewedPatients = patients.filter(p => p.reviewed)
@@ -120,6 +122,7 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
                         moveTeamLabel={moveTeamLabel}
                         highlightField={highlightField}
                         highlightQuery={highlightQuery}
+                        onOpenDetail={setSelectedDetailPatient}
                     />
                 ))}
                 {sortedActive.length === 0 && reviewedPatients.length > 0 && (
@@ -166,11 +169,26 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
                                     moveTeamLabel={moveTeamLabel}
                                     highlightField={highlightField}
                                     highlightQuery={highlightQuery}
+                                    onOpenDetail={setSelectedDetailPatient}
                                 />
                             ))}
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* Patient Detail Modal */}
+            {selectedDetailPatient && (
+                <PatientDetailModal
+                    patient={selectedDetailPatient}
+                    onClose={() => setSelectedDetailPatient(null)}
+                    onEdit={onEdit}
+                    onDocument={onDocument}
+                    onToggleSelect={onToggleSelect}
+                    isSelected={selectedIds.has(selectedDetailPatient.id)}
+                    docCount={getDocCount ? getDocCount(selectedDetailPatient.id) : 0}
+                    isMortality={isMortality}
+                />
             )}
         </div>
     )

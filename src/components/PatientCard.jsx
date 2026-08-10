@@ -19,7 +19,7 @@ function HighlightText({ text, query }) {
     )
 }
 
-export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery }) {
+export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail }) {
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
 
     let durationText = '';
@@ -65,6 +65,13 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
         startX.current = null;
     }
 
+    const handleCardClick = (e) => {
+        if (e.target.closest('button') || Math.abs(offsetX) > 5) return;
+        if (onOpenDetail) {
+            onOpenDetail(patient);
+        }
+    }
+
     // Generate a color based on ward or name or id string for visual variety
     const colorStr = ward || name || id || ''
     const wardColors = isMortality ? [
@@ -101,7 +108,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
 
             {/* Fore Card */}
             <div
-                className={`card p-4 flex flex-col sm:flex-row gap-4 group relative z-10 touch-pan-y
+                className={`card p-4 flex flex-col sm:flex-row gap-4 group relative z-10 touch-pan-y cursor-pointer
                     ${isDragging ? 'transition-none' : 'transition-transform duration-300'} 
                     ${isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1' : ''}
                     ${reviewed ? 'opacity-70 bg-gray-50 dark:bg-gray-800/50 grayscale-[15%]' : isMortality ? 'bg-white dark:bg-gray-800 border-red-100 dark:border-red-950 shadow-sm' : critical ? 'bg-red-50/40 dark:bg-red-900/10 border-red-200 dark:border-red-800 shadow-sm shadow-red-100/50' : 'bg-white dark:bg-gray-800'}`}
@@ -110,6 +117,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
+                onClick={handleCardClick}
             >
                 {isMortality && <div className="absolute top-0 left-0 w-1 h-full bg-red-500 opacity-20"></div>}
                 {onMoveTeam && (
@@ -154,7 +162,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                             )}
                             <button
                                 className="btn-icon !min-h-[30px] !min-w-[30px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                                onClick={() => onEdit(patient)}
+                                onClick={(e) => { e.stopPropagation(); onEdit(patient) }}
                                 aria-label="Edit patient"
                             >
                                 <Pencil size={15} strokeWidth={2} />
@@ -227,7 +235,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                             </div>
                         )}
                         {note && (
-                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 overflow-y-auto custom-scrollbar pr-1 break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full" style={{ whiteSpace: 'pre-wrap', maxHeight: '6.5rem' }}>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 max-h-[5.5rem] overflow-y-auto custom-scrollbar pointer-events-none select-none pr-1 break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full" style={{ whiteSpace: 'pre-wrap' }}>
                                 {highlightField === 'note' && highlightQuery ? (
                                     <HighlightText text={note} query={highlightQuery} />
                                 ) : (
