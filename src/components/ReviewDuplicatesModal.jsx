@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
+import SuffixedValue from './SuffixedValue';
 
 export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCancel }) {
     // pendingImport.conflicts = [ { imported, existing } ]
@@ -51,8 +52,8 @@ export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCanc
                                 <div key={idx} className="bg-orange-50 border border-orange-100 rounded-xl p-3">
                                     <div className="font-semibold text-gray-900 mb-1">{p.name || 'Unnamed'}</div>
                                     <div className="text-xs text-gray-500 mb-3 space-y-1">
-                                        {p.hospitalNumber && <div>Hosp ID: <span className="font-medium text-gray-700">{p.hospitalNumber}</span></div>}
-                                        {p.ward && <div>Ward/Bed: <span className="font-medium text-gray-700">{p.ward} {p.bed}</span></div>}
+                                        {p.hospitalNumber && <div>Hosp ID: <span className="font-medium text-gray-700"><SuffixedValue value={p.hospitalNumber} /></span></div>}
+                                        {p.ward && <div>Ward/Bed: <span className="font-medium text-gray-700">{p.ward} <SuffixedValue value={p.bed} /></span></div>}
                                     </div>
 
                                     <div className="flex flex-wrap gap-2 mt-2">

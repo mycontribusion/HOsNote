@@ -1,5 +1,6 @@
 import { Trash2, Pencil, CheckCircle2, FileText, ChevronsLeft } from 'lucide-react'
 import { useState, useRef } from 'react'
+import SuffixedValue from './SuffixedValue'
 
 function HighlightText({ text, query }) {
     if (!query || !text) return <>{text}</>
@@ -130,7 +131,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                             {ward || bed ? (
                                 <>
                                     {ward && <div className="text-xs font-semibold uppercase tracking-wider opacity-70 leading-none mb-1">{ward}</div>}
-                                    {bed && <div className="text-xl font-extrabold leading-tight">{bed}</div>}
+                                    {bed && <div className="text-xl font-extrabold leading-tight"><SuffixedValue value={bed} /></div>}
                                     {!bed && ward && <div className="text-xl font-extrabold leading-tight">-</div>}
                                 </>
                             ) : (
@@ -185,7 +186,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                                     {highlightField === 'hospitalNumber' && highlightQuery ? (
                                         <HighlightText text={hospitalNumber} query={highlightQuery} />
                                     ) : (
-                                        hospitalNumber
+                                        <SuffixedValue value={hospitalNumber} />
                                     )}
                                 </span>
                             )}

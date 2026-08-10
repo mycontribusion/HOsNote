@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Search, X, User, BookOpen, ChevronRight } from 'lucide-react'
+import SuffixedValue from './SuffixedValue'
 
 export default function SearchOverlay({ patients, docs, onClose, onNavigateToPatient, onNavigateToNote }) {
     const [query, setQuery] = useState('')
@@ -110,9 +111,10 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                                                         </p>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                                             {patient.ward && patient.bed
-                                                                ? `Ward ${patient.ward} · Bed ${patient.bed}`
-                                                                : patient.ward || patient.bed || 'No ward/bed'}
-                                                            {patient.hospitalNumber && ` · ${patient.hospitalNumber}`}
+                                                                ? `Ward ${patient.ward} · Bed `
+                                                                : (patient.ward || patient.bed ? '' : 'No ward/bed')}
+                                                            {patient.bed && <SuffixedValue value={patient.bed} />}
+                                                            {patient.hospitalNumber && <span> · <SuffixedValue value={patient.hospitalNumber} /></span>}
                                                         </p>
                                                     </div>
                                                     <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />

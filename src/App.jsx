@@ -15,6 +15,7 @@ import NotebookPage from './components/NotebookPage'
 import DocComposer from './components/DocComposer'
 import SearchOverlay from './components/SearchOverlay'
 import { get, set } from 'idb-keyval'
+import { generateUniqueValue } from './utils/uniqueSuffix'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
@@ -266,6 +267,10 @@ const pendingEditRef = useRef(null)
         return 100
     })
     const [editingPatient, setEditingPatient] = useState(null)
+    const editingPatientRef = useRef(editingPatient)
+    useEffect(() => {
+        editingPatientRef.current = editingPatient
+    })
     const [removalCandidateId, setRemovalCandidateId] = useState(null)
     const [pendingImport, setPendingImport] = useState(null)
     const [history, setHistory] = useState([]) // Stack of { patients, mortalities, discharges } objects
@@ -396,6 +401,23 @@ const pendingEditRef = useRef(null)
         setComposingFor(null)
     }, [])
 
+    const addStandaloneDoc = useCallback((text, diagnosis = '') => {
+        const entry = {
+            id: generateId(),
+            patientId: null,
+            patientName: '',
+            patientWard: '',
+            patientHosp: '',
+            diagnosis: diagnosis.trim(),
+            patientDiagnosis: diagnosis.trim(),
+            text: text.trim(),
+            color: 'blue',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        }
+        setDocs(prev => [entry, ...prev])
+    }, [])
+
     const updateDoc = useCallback((id, text, color, fieldPatch = {}) => {
         setDocs(prev => prev.map(d =>
             d.id === id ? {
@@ -512,25 +534,38 @@ const pendingEditRef = useRef(null)
 
         if (!w && !h && !n) return false
 
+        const ep = editingPatientRef.current
         // Duplicate check: same hospital number OR same ward+bed combo
         const duplicateHosp = h && patients.some((p) => {
-            if (editingPatient && p.id === editingPatient.id) return false;
+            if (ep && p.id === ep.id) return false;
             return p.hospitalNumber === h;
         });
-        if (duplicateHosp) return 'duplicate_hosp';
+        if (duplicateHosp) {
+            const existing = patients.find((p) => {
+                if (ep && p.id === ep.id) return false;
+                return p.hospitalNumber === h;
+            });
+            return { type: 'duplicate_hosp', field: 'hospitalNumber', value: h, existing };
+        }
 
         const duplicateBed = w && b && patients.some((p) => {
-            if (editingPatient && p.id === editingPatient.id) return false;
+            if (ep && p.id === ep.id) return false;
             return p.ward === w && p.bed === b;
         });
-        if (duplicateBed) return 'duplicate_bed';
+        if (duplicateBed) {
+            const existing = patients.find((p) => {
+                if (ep && p.id === ep.id) return false;
+                return p.ward === w && p.bed === b;
+            });
+            return { type: 'duplicate_bed', field: 'bed', value: b, ward: w, existing };
+        }
 
-        if (editingPatient) {
-            const sid = editingPatient.id
-            if (t && t !== (editingPatient.note || '').trim()) {
+        if (ep) {
+            const sid = ep.id
+            if (t && t !== (ep.note || '').trim()) {
                 addDoc({ id: sid, name: n, hospitalNumber: h, ward: w, diagnosis: diag }, t)
             }
-            if (editingPatient.reason === 'mortality') {
+            if (ep.reason === 'mortality') {
                 setMortalities(prev => prev.map(p =>
                     p.id === sid
                         ? { ...p, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical: c, admissionDate, diagnosis: diag }
@@ -562,7 +597,7 @@ const pendingEditRef = useRef(null)
             ])
         }
         return true
-    }, [patients, editingPatient, addDoc])
+    }, [patients, addDoc])
 
     const addMortality = useCallback(({ name, hospitalNumber, ward, bed, note, critical = false }) => {
         const n = name.trim()
@@ -873,11 +908,17 @@ const pendingEditRef = useRef(null)
             if (res.action === 'skip') return;
 
             if (res.action === 'new') {
-                // Remove duplicated biodata fields from the imported patient before adding as new
+                // Add counter suffix to duplicated fields before adding as new
                 const dupFields = res.duplicateFields || [];
-                const cleanP = dupFields.length > 0 ? { ...p } : p;
+                const cleanP = { ...p };
                 dupFields.forEach(field => {
-                    delete cleanP[field];
+                    if (field === 'hospitalNumber' && cleanP.hospitalNumber) {
+                        const allPatients = [...patients, ...mortalities, ...toAddActive, ...toAddMortality];
+                        cleanP.hospitalNumber = generateUniqueValue(allPatients, 'hospitalNumber', cleanP.hospitalNumber);
+                    } else if (field === 'bed' && cleanP.bed && cleanP.ward) {
+                        const allPatients = [...patients, ...mortalities, ...toAddActive, ...toAddMortality];
+                        cleanP.bed = generateUniqueValue(allPatients, 'bed', cleanP.bed, cleanP.ward);
+                    }
                 });
                 addedOrUpdatedIds.add(cleanP.id);
                 identityMap[identityKey(cleanP.name, cleanP.ward, cleanP.hospitalNumber)] = cleanP.id;
@@ -1044,6 +1085,7 @@ const pendingEditRef = useRef(null)
                     onUpdateDoc={updateDoc}
                     onDeleteDoc={deleteDoc}
                     addDoc={addDoc}
+                    addStandaloneDoc={addStandaloneDoc}
                     initialEditDoc={notebookEditDoc}
                     onCancelEdit={() => {
                         setNotebookEditDoc(null)
@@ -1087,6 +1129,7 @@ const pendingEditRef = useRef(null)
                         isMortalityMode
                         onAdd={addMortality}
                         onCancel={cancelForm}
+                        patients={patients}
                     />
                 ) : (
                     <AddPatientForm
@@ -1095,6 +1138,7 @@ const pendingEditRef = useRef(null)
                         onAdd={savePatient}
                         onCancel={cancelForm}
                         isMortalityMode={editingPatient?.reason === 'mortality'}
+                        patients={patients}
                     />
                 )}
 

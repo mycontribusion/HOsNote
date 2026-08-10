@@ -163,9 +163,10 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
-export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, initialEditDoc, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) {
+export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) {
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
+    const [showAddNoteForm, setShowAddNoteForm] = useState(false)
 
     useEffect(() => {
         if (initialEditDoc && initialEditDoc.id !== editingDoc?.id) {
@@ -207,8 +208,35 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
         onCancelEdit?.()
     }
 
+    const handleAddNote = ({ text, diagnosis }) => {
+        const trimmedNote = (text || '').trim()
+        const trimmedDiagnosis = (diagnosis || '').trim()
+        if (!trimmedNote) return false
+
+        addStandaloneDoc(trimmedNote, trimmedDiagnosis)
+        setShowAddNoteForm(false)
+        return true
+    }
+
+    const handleCancelAddNote = () => {
+        setShowAddNoteForm(false)
+    }
+
     return (
         <div className="flex flex-col flex-1">
+            {/* Add New Note Button */}
+            {!showAddNoteForm && !editingDoc && (
+                <div className="w-full max-w-2xl mx-auto px-4 pt-6">
+                    <button
+                        className="btn-primary w-full shadow-md mb-6 h-[52px] text-base"
+                        onClick={() => setShowAddNoteForm(true)}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+                        Add New Note
+                    </button>
+                </div>
+            )}
+
             {/* Card list */}
             <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-36">
                 {docs.length === 0 ? (
@@ -322,6 +350,15 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                         setEditingDoc(null)
                         onCancelEdit?.()
                     }}
+                />
+            )}
+
+            {/* Add New Note using AddPatientForm in note mode */}
+            {showAddNoteForm && (
+                <AddPatientForm
+                    isNoteMode
+                    onAdd={handleAddNote}
+                    onCancel={handleCancelAddNote}
                 />
             )}
         </div>

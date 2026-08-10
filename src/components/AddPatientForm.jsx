@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react
 import { Plus, Save, X, Undo2, Redo2 } from 'lucide-react'
 import MicrophoneButton from './MicrophoneButton'
 import { cleanPastedText } from '../utils/clipboard'
+import { generateUniqueValue } from '../utils/uniqueSuffix'
+import DuplicatePromptModal from './DuplicatePromptModal'
 
 const DRAFT_KEY = '4myteam_draft_patient'
 
@@ -62,7 +64,7 @@ function clearDraft() {
     catch { /* ignore */ }
 }
 
-export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false }) {
+export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false, patients = [], isNoteMode = false }) {
     const [team] = useState(() => {
         if (initialData?.team) return initialData.team
         return initialTeam
@@ -72,6 +74,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     
     const [critical, setCritical] = useState(false)
     const [error, setError] = useState('')
+    const [duplicateInfo, setDuplicateInfo] = useState(null)
 
     const nameRef = useRef(null)
     const hospRef = useRef(null)
@@ -83,10 +86,18 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     const scrollContainerRef = useRef(null)
     const scrollRestoreRef = useRef(0)
 
+    const hasSavedRef = useRef(false)
+    const fieldsRef = useRef(fields)
+    const teamRef = useRef(team)
+    const criticalRef = useRef(critical)
+    const initialDataRef = useRef(initialData)
+    const onAddRef = useRef(onAdd)
+
     const [history, setHistory] = useState({ stack: [], index: -1 })
     const isUndoRedo = useRef(false)
 
     useEffect(() => {
+        hasSavedRef.current = false
         let initialFields = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
         if (initialData) {
             initialFields = {
@@ -99,6 +110,8 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 note: initialData.note || ''
             }
             setCritical(!!initialData.critical)
+        } else if (isNoteMode) {
+            setCritical(false)
         } else {
             setCritical(false)
 
@@ -117,7 +130,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         setFields(initialFields)
         setHistory({ stack: [initialFields], index: 0 })
         isUndoRedo.current = true
-    }, [initialData, isMortalityMode])
+    }, [initialData, isMortalityMode, isNoteMode])
 
     useEffect(() => {
         if (isUndoRedo.current) {
@@ -167,6 +180,34 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     }, [initialData, isMortalityMode])
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
+
+    // Keep refs in sync with latest values for cleanup auto-save
+    useEffect(() => {
+        fieldsRef.current = fields
+        teamRef.current = team
+        criticalRef.current = critical
+        initialDataRef.current = initialData
+        onAddRef.current = onAdd
+    })
+
+    // Auto-save on unmount when in edit mode (e.g., browser back button / URL navigation)
+    useEffect(() => {
+        return () => {
+            if (initialDataRef.current && !hasSavedRef.current) {
+                onAddRef.current({
+                    team: teamRef.current,
+                    name: fieldsRef.current.name,
+                    hospitalNumber: fieldsRef.current.hospitalNumber,
+                    ward: fieldsRef.current.ward,
+                    bed: fieldsRef.current.bed,
+                    note: fieldsRef.current.note,
+                    critical: criticalRef.current,
+                    admissionDate: fieldsRef.current.admissionDate,
+                    diagnosis: fieldsRef.current.diagnosis,
+                }).catch(() => {})
+            }
+        }
+    }, [])
 
     useLayoutEffect(() => {
         if (isUndoRedo.current && scrollRestoreRef.current > 0) {
@@ -230,12 +271,32 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     const handleSubmit = (e) => {
         e.preventDefault()
         setError('')
+        if (isNoteMode) {
+            hasSavedRef.current = true
+            const result = onAdd({ text: fields.note, diagnosis: fields.diagnosis, isStandaloneNote: true })
+            if (result) {
+                if (!initialData) {
+                    const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
+                    setFields(newBlank)
+                    setHistory({ stack: [newBlank], index: 0 })
+                    isUndoRedo.current = true
+                }
+                setError('')
+            }
+            return
+        }
         const { name: n, hospitalNumber: h, ward: w } = fields
         if (!w && !h && !n) { setError('Please fill in at least Name, Hospital # or Ward.'); return }
+        hasSavedRef.current = true
         const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: fields.bed, note: fields.note, critical, admissionDate: fields.admissionDate, diagnosis: fields.diagnosis })
-        if (result === 'duplicate_hosp') { setError('A patient with this Hospital Number already exists.'); return }
-        if (result === 'duplicate_bed')  { setError('This Ward/Bed is already occupied by another patient.'); return }
-        if (result === 'duplicate')      { setError('A patient with this Hospital Number or Ward/Bed already exists.'); return }
+        if (result && result.type === 'duplicate_hosp') {
+            setDuplicateInfo({ ...result, fieldLabel: 'Hospital Number' })
+            return
+        }
+        if (result && result.type === 'duplicate_bed') {
+            setDuplicateInfo({ ...result, fieldLabel: 'Ward/Bed' })
+            return
+        }
         if (result) {
             if (!initialData) clearDraft()
             const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
@@ -245,6 +306,80 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
             setCritical(false)
             setError('')
         }
+    }
+
+    const handleAddAsNew = () => {
+        if (!duplicateInfo) return
+        const { field, value, ward } = duplicateInfo
+        let newValue = value
+        if (field === 'hospitalNumber') {
+            newValue = generateUniqueValue(patients, 'hospitalNumber', value)
+        } else if (field === 'bed') {
+            newValue = generateUniqueValue(patients, 'bed', value, ward)
+        }
+        setFields(prev => ({ ...prev, [field]: newValue }))
+        setDuplicateInfo(null)
+        setError('')
+        hasSavedRef.current = true
+        // Re-submit with the new unique value
+        const { name: n, hospitalNumber: h, ward: w, bed: b, note: t, admissionDate: ad, diagnosis: d } = { ...fields, [field]: newValue }
+        const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical, admissionDate: ad, diagnosis: d })
+        if (result && result.type === 'duplicate_hosp') {
+            setDuplicateInfo({ ...result, fieldLabel: 'Hospital Number' })
+            return
+        }
+        if (result && result.type === 'duplicate_bed') {
+            setDuplicateInfo({ ...result, fieldLabel: 'Ward/Bed' })
+            return
+        }
+        if (result) {
+            if (!initialData) clearDraft()
+            const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
+            setFields(newBlank)
+            setHistory({ stack: [newBlank], index: 0 })
+            isUndoRedo.current = true
+            setCritical(false)
+            setError('')
+        }
+    }
+
+    const handleCancel = () => {
+        if (initialData) {
+            hasSavedRef.current = true
+            // Auto-save changes when exiting edit mode
+            if (isNoteMode) {
+                const result = onAdd({ text: fields.note, diagnosis: fields.diagnosis, isStandaloneNote: true })
+                if (result && result.type === 'duplicate_hosp') {
+                    setError('A patient with this Hospital Number already exists.')
+                    return
+                }
+                if (result && result.type === 'duplicate_bed') {
+                    setError('This Ward/Bed is already occupied by another patient.')
+                    return
+                }
+            } else {
+                const result = onAdd({
+                    team,
+                    name: fields.name,
+                    hospitalNumber: fields.hospitalNumber,
+                    ward: fields.ward,
+                    bed: fields.bed,
+                    note: fields.note,
+                    critical,
+                    admissionDate: fields.admissionDate,
+                    diagnosis: fields.diagnosis,
+                })
+                if (result && result.type === 'duplicate_hosp') {
+                    setError('A patient with this Hospital Number already exists.')
+                    return
+                }
+                if (result && result.type === 'duplicate_bed') {
+                    setError('This Ward/Bed is already occupied by another patient.')
+                    return
+                }
+            }
+        }
+        onCancel()
     }
 
     const handleEnter = (e, nextRef) => {
@@ -264,7 +399,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         {/* Left Group: Form Header Title & Segmented Undo/Redo */}
                         <div className="flex items-center gap-2 sm:gap-3">
                             <span className="text-xs font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 hidden sm:inline-block">
-                                {isMortalityMode ? 'Mortality Record' : initialData ? 'Edit Patient' : 'New Patient'}
+                                {isNoteMode ? (initialData ? 'Edit Note' : 'New Note') : isMortalityMode ? 'Mortality Record' : initialData ? 'Edit Patient' : 'New Patient'}
                             </span>
 
                             {/* Segmented Undo / Redo */}
@@ -293,10 +428,9 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                             </div>
                         </div>
 
-                        {/* Right Group: Critical chip + Primary Save + Dismiss */}
+                        {/* Right Group: Primary Save + Dismiss */}
                         <div className="flex items-center gap-1.5 sm:gap-2">
-                            {/* Critical Chip */}
-                            {!isMortalityMode && (
+                            {!isNoteMode && !isMortalityMode && (
                                 <button
                                     type="button"
                                     aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
@@ -314,7 +448,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
                             {/* Add / Save Button */}
                             <button
-                                id="btn-add-patient"
+                                id={isNoteMode ? "btn-add-note" : "btn-add-patient"}
                                 type="submit"
                                 aria-label={initialData ? "Save" : "Add"}
                                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-xs shadow-blue-500/25 transition-all active:scale-95"
@@ -326,7 +460,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                             {/* Cancel / Dismiss */}
                             <button
                                 type="button"
-                                onClick={onCancel}
+                                onClick={handleCancel}
                                 aria-label="Cancel"
                                 className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90 ml-0.5"
                                 title="Close"
@@ -349,53 +483,92 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
                         {/* Faux-textarea container */}
                         <div className="text-left py-2 px-4 sm:px-6 font-sans leading-relaxed flex flex-col cursor-text min-h-[300px] min-w-0 max-w-full text-sm sm:text-base" onClick={() => noteRef.current?.focus()}>
-                            <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" />
-                            </div>
-                            <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.hospitalNumber} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
-                            </div>
-                            <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onPaste={e => handleCleanPaste(e, 'ward')} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} placeholder="Ward" />
-                            </div>
-                            <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.bed} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
-                            </div>
-                            <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onPaste={e => handleCleanPaste(e, 'admissionDate')} onKeyDown={e => handleEnter(e, diagRef)} autoComplete="off" spellCheck={false} placeholder="Admission date" />
-                            </div>
-                            <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Diagnosis" />
-                            </div>
-                            <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
-                                    <MicrophoneButton
-                                        onTranscript={(transcript) => {
-                                            setFields(prev => {
-                                                const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
-                                                scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
-                                                return { ...prev, note: next }
-                                            })
-                                        }}
-                                        title="Dictate note"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
-                                    <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
-                                        {fields.note + ' \n'}
+                            {isNoteMode ? (
+                                <>
+                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Note title (optional)" />
                                     </div>
-                                    <textarea
-                                        ref={noteRef}
-                                        className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
-                                        value={fields.note}
-                                        onChange={e => updateField('note', e.target.value)}
-                                        onPaste={e => handleCleanPaste(e, 'note')}
-                                        autoComplete="off"
-                                        spellCheck={false}
-                                        placeholder="Clinical notes…"
-                                    />
-                                </div>
-                            </div>
+                                    <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
+                                            <MicrophoneButton
+                                                onTranscript={(transcript) => {
+                                                    setFields(prev => {
+                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
+                                                        return { ...prev, note: next }
+                                                    })
+                                                }}
+                                                title="Dictate note"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
+                                            <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
+                                                {fields.note + ' \n'}
+                                            </div>
+                                            <textarea
+                                                ref={noteRef}
+                                                className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
+                                                value={fields.note}
+                                                onChange={e => updateField('note', e.target.value)}
+                                                onPaste={e => handleCleanPaste(e, 'note')}
+                                                autoComplete="off"
+                                                spellCheck={false}
+                                                placeholder="Clinical notes…"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.hospitalNumber} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onPaste={e => handleCleanPaste(e, 'ward')} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} placeholder="Ward" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.bed} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onPaste={e => handleCleanPaste(e, 'admissionDate')} onKeyDown={e => handleEnter(e, diagRef)} autoComplete="off" spellCheck={false} placeholder="Admission date" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Diagnosis" />
+                                    </div>
+                                    <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
+                                            <MicrophoneButton
+                                                onTranscript={(transcript) => {
+                                                    setFields(prev => {
+                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
+                                                        return { ...prev, note: next }
+                                                    })
+                                                }}
+                                                title="Dictate note"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
+                                            <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
+                                                {fields.note + ' \n'}
+                                            </div>
+                                            <textarea
+                                                ref={noteRef}
+                                                className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
+                                                value={fields.note}
+                                                onChange={e => updateField('note', e.target.value)}
+                                                onPaste={e => handleCleanPaste(e, 'note')}
+                                                autoComplete="off"
+                                                spellCheck={false}
+                                                placeholder="Clinical notes…"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Non-interactive buffer zone below the form to prevent text from hiding behind mobile keyboards */}
@@ -403,6 +576,13 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         
                     </div>
                 </form>
+                {duplicateInfo && (
+                    <DuplicatePromptModal
+                        duplicate={duplicateInfo}
+                        onAddAsNew={handleAddAsNew}
+                        onCancel={() => setDuplicateInfo(null)}
+                    />
+                )}
             </div>
         </div>
     )
