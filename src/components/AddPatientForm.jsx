@@ -6,6 +6,7 @@ import { generateUniqueValue } from '../utils/uniqueSuffix'
 import DuplicatePromptModal from './DuplicatePromptModal'
 
 const DRAFT_KEY = '4myteam_draft_patient'
+const EDIT_DRAFT_KEY = '4myteam_edit_draft_patient'
 
 function today() {
     return new Date().toISOString().split('T')[0]
@@ -64,6 +65,23 @@ function clearDraft() {
     catch { /* ignore */ }
 }
 
+function loadEditDraft() {
+    try {
+        const raw = localStorage.getItem(EDIT_DRAFT_KEY)
+        return raw ? JSON.parse(raw) : null
+    } catch { return null }
+}
+
+function saveEditDraft(data) {
+    try { localStorage.setItem(EDIT_DRAFT_KEY, JSON.stringify(data)) }
+    catch { /* quota exceeded */ }
+}
+
+function clearEditDraft() {
+    try { localStorage.removeItem(EDIT_DRAFT_KEY) }
+    catch { /* ignore */ }
+}
+
 export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false, patients = [], isNoteMode = false }) {
     const [team] = useState(() => {
         if (initialData?.team) return initialData.team
@@ -100,16 +118,23 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         hasSavedRef.current = false
         let initialFields = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
         if (initialData) {
-            initialFields = {
-                name: initialData.name || '',
-                hospitalNumber: initialData.hospitalNumber || '',
-                ward: initialData.ward || '',
-                bed: initialData.bed || '',
-                admissionDate: initialData.admissionDate || today(),
-                diagnosis: initialData.diagnosis || '',
-                note: initialData.note || ''
+            // Check for edit draft first — retains unsaved changes across tab closes
+            const editDraft = loadEditDraft()
+            if (editDraft && editDraft.patientId === initialData.id) {
+                initialFields = editDraft.fields || initialFields
+                setCritical(!!editDraft.critical)
+            } else {
+                initialFields = {
+                    name: initialData.name || '',
+                    hospitalNumber: initialData.hospitalNumber || '',
+                    ward: initialData.ward || '',
+                    bed: initialData.bed || '',
+                    admissionDate: initialData.admissionDate || today(),
+                    diagnosis: initialData.diagnosis || '',
+                    note: initialData.note || ''
+                }
+                setCritical(!!initialData.critical)
             }
-            setCritical(!!initialData.critical)
         } else if (isNoteMode) {
             setCritical(false)
         } else {
@@ -174,9 +199,13 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const saveTimerRef = useRef(null)
     const scheduleDraftSave = useCallback((patch) => {
-        if (initialData || isMortalityMode) return
+        if (isMortalityMode) return
         clearTimeout(saveTimerRef.current)
-        saveTimerRef.current = setTimeout(() => saveDraft(patch), 500)
+        if (initialData) {
+            saveTimerRef.current = setTimeout(() => saveEditDraft(patch), 500)
+        } else {
+            saveTimerRef.current = setTimeout(() => saveDraft(patch), 500)
+        }
     }, [initialData, isMortalityMode])
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
@@ -209,6 +238,30 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
     }, [])
 
+    // Save edit draft immediately on tab/browser close
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            if (initialData && !hasSavedRef.current) {
+                saveEditDraft({
+                    patientId: initialData.id,
+                    team: teamRef.current,
+                    fields: {
+                        name: fieldsRef.current.name,
+                        hospitalNumber: fieldsRef.current.hospitalNumber,
+                        ward: fieldsRef.current.ward,
+                        bed: fieldsRef.current.bed,
+                        admissionDate: fieldsRef.current.admissionDate,
+                        diagnosis: fieldsRef.current.diagnosis,
+                        note: fieldsRef.current.note,
+                    },
+                    critical: criticalRef.current,
+                })
+            }
+        }
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    }, [initialData])
+
     useLayoutEffect(() => {
         if (isUndoRedo.current && scrollRestoreRef.current > 0) {
             scrollContainerRef.current?.scrollTo({ top: scrollRestoreRef.current, behavior: 'instant' })
@@ -222,7 +275,13 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         return () => { document.body.style.overflow = '' }
     }, [])
 
-    const currentDraft = useCallback((overrides = {}) => ({ team: 'my_team', fields, critical, ...overrides }), [fields, critical])
+    const currentDraft = useCallback((overrides = {}) => {
+        const base = { team: 'my_team', fields, critical }
+        if (initialData) {
+            return { ...base, patientId: initialData.id, ...overrides }
+        }
+        return { ...base, ...overrides }
+    }, [fields, critical, initialData])
     
     // Add custom field update handler
     const updateField = (key, value) => {
@@ -299,6 +358,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
         if (result) {
             if (!initialData) clearDraft()
+            else clearEditDraft()
             const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
             setFields(newBlank)
             setHistory({ stack: [newBlank], index: 0 })
@@ -334,6 +394,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
         if (result) {
             if (!initialData) clearDraft()
+            else clearEditDraft()
             const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
             setFields(newBlank)
             setHistory({ stack: [newBlank], index: 0 })
@@ -345,6 +406,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const handleCancel = () => {
         if (initialData) {
+            clearEditDraft()
             hasSavedRef.current = true
             // Auto-save changes when exiting edit mode
             if (isNoteMode) {
