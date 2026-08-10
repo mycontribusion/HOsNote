@@ -537,13 +537,13 @@ const pendingEditRef = useRef(null)
         if (!w && !h && !n) return false
 
         const ep = editingPatientRef.current
-        // Duplicate check: same hospital number OR same ward+bed combo
-        const duplicateHosp = h && patients.some((p) => {
+        // Duplicate check: same hospital number (includes mortalities) OR same ward+bed combo (active patients only)
+        const duplicateHosp = h && [...patients, ...mortalities].some((p) => {
             if (ep && p.id === ep.id) return false;
             return p.hospitalNumber === h;
         });
         if (duplicateHosp) {
-            const existing = patients.find((p) => {
+            const existing = [...patients, ...mortalities].find((p) => {
                 if (ep && p.id === ep.id) return false;
                 return p.hospitalNumber === h;
             });
@@ -827,8 +827,7 @@ const pendingEditRef = useRef(null)
                 if (existingMatch) duplicateFields.push('hospitalNumber');
             } else {
                 const key = `${p.name}|${p.ward}|${p.bed}`;
-                existingMatch = patients.find(ex => `${ex.name}|${ex.ward}|${ex.bed}` === key) ||
-                    mortalities.find(ex => `${ex.name}|${ex.ward}|${ex.bed}` === key);
+                existingMatch = patients.find(ex => `${ex.name}|${ex.ward}|${ex.bed}` === key);
                 if (existingMatch) {
                     if (p.name) duplicateFields.push('name');
                     if (p.ward) duplicateFields.push('ward');
@@ -924,7 +923,7 @@ const pendingEditRef = useRef(null)
                         const allPatients = [...patients, ...mortalities, ...toAddActive, ...toAddMortality];
                         cleanP.hospitalNumber = generateUniqueValue(allPatients, 'hospitalNumber', cleanP.hospitalNumber);
                     } else if (field === 'bed' && cleanP.bed && cleanP.ward) {
-                        const allPatients = [...patients, ...mortalities, ...toAddActive, ...toAddMortality];
+                        const allPatients = [...patients, ...toAddActive];
                         cleanP.bed = generateUniqueValue(allPatients, 'bed', cleanP.bed, cleanP.ward);
                     }
                 });
