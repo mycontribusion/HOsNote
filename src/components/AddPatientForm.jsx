@@ -82,6 +82,19 @@ function clearEditDraft() {
     catch { /* ignore */ }
 }
 
+function toTitleCase(str) {
+    if (!str) return str
+    return str
+        .split('')
+        .map((char, index, arr) => {
+            if (index === 0 || arr[index - 1] === ' ') {
+                return char.toUpperCase()
+            }
+            return char.toLowerCase()
+        })
+        .join('')
+}
+
 export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false, patients = [], isNoteMode = false }) {
     const [team] = useState(() => {
         if (initialData?.team) return initialData.team
@@ -125,7 +138,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 setCritical(!!editDraft.critical)
             } else {
                 initialFields = {
-                    name: initialData.name || '',
+                    name: toTitleCase(initialData.name || ''),
                     hospitalNumber: initialData.hospitalNumber || '',
                     ward: initialData.ward || '',
                     bed: initialData.bed || '',
@@ -145,7 +158,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 if (draft) {
                     setCritical(!!draft.critical)
                     if (draft.fields) {
-                        initialFields = draft.fields
+                        initialFields = {
+                            ...draft.fields,
+                            name: toTitleCase(draft.fields.name || '')
+                        }
                     } else if (draft.text && draft.text.trim()) {
                         initialFields = parsePatientText(draft.text)
                     }
@@ -286,7 +302,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     // Add custom field update handler
     const updateField = (key, value) => {
         setFields(prev => {
-            const next = { ...prev, [key]: value }
+            const next = { ...prev, [key]: key === 'name' ? toTitleCase(value) : value }
             scheduleDraftSave(currentDraft({ fields: next }))
             return next
         })
@@ -583,7 +599,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                             ) : (
                                 <>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" />
+                                        <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" autoCapitalize="words" inputMode="text" />
                                     </div>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
                                         <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.hospitalNumber} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
