@@ -1096,7 +1096,19 @@ const pendingEditRef = useRef(null)
         }
         setInitialSelectedDocId(noteId)
         setNotebookSearchHighlight(highlightQuery)
-    }, [activePage, goToPage])
+        // Scroll to the note card and add purple ring (mirrors patient search behavior)
+        const found = docs.find(d => d.id === noteId)
+        if (found) {
+            setTimeout(() => {
+                const el = document.getElementById(`note-card-${noteId}`)
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2')
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2'), 3000)
+                }
+            }, 300)
+        }
+    }, [activePage, goToPage, docs])
 
     if (!isLoaded) {
         return (

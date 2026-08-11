@@ -145,15 +145,23 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                                                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                                                             {note.patientName || 'Unnamed'}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                            {note.patientWard && `Ward ${note.patientWard}`}
-                                                            {note.patientDiagnosis || note.diagnosis
-                                                                ? ` · ${(note.patientDiagnosis || note.diagnosis).substring(0, 30)}`
-                                                                : ''}
-                                                        </p>
-                                                        <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
-                                                            {note.text?.substring(0, 60)}{note.text?.length > 60 ? '...' : ''}
-                                                        </p>
+                                                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                             {note.patientWard && `Ward ${note.patientWard}`}
+                                                             {note.patientDiagnosis || note.diagnosis
+                                                                 ? ` · ${(note.patientDiagnosis || note.diagnosis).substring(0, 30)}`
+                                                                 : ''}
+                                                         </p>
+                                                         {note.createdAt && (
+                                                             <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
+                                                                 {new Date(note.createdAt).toLocaleString([], {
+                                                                     day: 'numeric', month: 'short', year: 'numeric',
+                                                                     hour: '2-digit', minute: '2-digit', second: '2-digit'
+                                                                 })}
+                                                             </p>
+                                                         )}
+                                                         <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
+                                                             {note.text?.substring(0, 60)}{note.text?.length > 60 ? '...' : ''}
+                                                         </p>
                                                     </div>
                                                     <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
                                                 </button>
