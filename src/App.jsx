@@ -17,7 +17,7 @@ import SearchOverlay from './components/SearchOverlay'
 import SpeedDialFAB from './components/SpeedDialFAB'
 import { UserPlus, QrCode, Share2 } from 'lucide-react'
 import { get, set } from 'idb-keyval'
-import { generateUniqueValue } from './utils/uniqueSuffix'
+import { generateUniqueValue, updateSuffixesAfterRemoval } from './utils/uniqueSuffix'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
@@ -313,14 +313,20 @@ const pendingEditRef = useRef(null)
 
     const clearMyTeam = useCallback(() => {
         setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
-        setPatients(prev => prev.filter(p => p.team !== 'my_team'))
+        const removedPatients = patients.filter(p => p.team === 'my_team')
+        const remainingPatients = patients.filter(p => p.team !== 'my_team')
+        const updatedPatients = updateSuffixesAfterRemoval(remainingPatients, removedPatients)
+        setPatients(updatedPatients)
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
     }, [patients, mortalities, discharges, docs])
 
     const clearOnCall = useCallback(() => {
         setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
-        setPatients(prev => prev.filter(p => p.team !== 'other_team'))
+        const removedPatients = patients.filter(p => p.team === 'other_team')
+        const remainingPatients = patients.filter(p => p.team !== 'other_team')
+        const updatedPatients = updateSuffixesAfterRemoval(remainingPatients, removedPatients)
+        setPatients(updatedPatients)
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
     }, [patients, mortalities, discharges, docs])
@@ -694,7 +700,9 @@ const pendingEditRef = useRef(null)
         if (removalCandidateId) {
             const patient = patients.find(p => p.id === removalCandidateId)
             setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
-            setPatients((prev) => prev.filter((p) => p.id !== removalCandidateId))
+            const remainingPatients = patients.filter((p) => p.id !== removalCandidateId)
+            const updatedPatients = patient ? updateSuffixesAfterRemoval(remainingPatients, [patient]) : remainingPatients
+            setPatients(updatedPatients)
             if (patient) {
                 setDischarges(prev => [...prev, { id: removalCandidateId, team: patient.team || 'my_team', date: new Date().toISOString() }])
             }
@@ -716,7 +724,9 @@ const pendingEditRef = useRef(null)
                     originalTeam: deceased.team || 'my_team'
                 }
                 setMortalities(prev => [mortalityRecord, ...prev])
-                setPatients(prev => prev.filter(p => p.id !== removalCandidateId))
+                const remainingPatients = patients.filter(p => p.id !== removalCandidateId)
+                const updatedPatients = updateSuffixesAfterRemoval(remainingPatients, [deceased])
+                setPatients(updatedPatients)
             }
             setRemovalCandidateId(null)
             setShowUndoToast(true)

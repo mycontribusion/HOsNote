@@ -95,6 +95,15 @@ function toTitleCase(str) {
         .join('')
 }
 
+function splitSuffix(value) {
+    if (!value) return { base: '', suffix: '' }
+    const match = value.match(/^(.+?)\((\d+)\)$/)
+    if (match) {
+        return { base: match[1], suffix: match[2] }
+    }
+    return { base: value, suffix: '' }
+}
+
 export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false, patients = [], isNoteMode = false }) {
     const [team] = useState(() => {
         if (initialData?.team) return initialData.team
@@ -328,7 +337,9 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         if (fieldKey) {
             const target = e.target
             const finalVal = (fieldKey === 'note') ? cleaned : cleaned.replace(/[\n\r]+/g, ' ')
-            const currentVal = fields[fieldKey] || ''
+            const currentVal = (fieldKey === 'hospitalNumber' || fieldKey === 'bed')
+                ? splitSuffix(fields[fieldKey] || '').base
+                : (fields[fieldKey] || '')
             const start = target?.selectionStart ?? currentVal.length
             const end = target?.selectionEnd ?? currentVal.length
             const newVal = currentVal.slice(0, start) + finalVal + currentVal.slice(end)
@@ -508,6 +519,9 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
     }
 
+    const hospSplit = splitSuffix(fields.hospitalNumber)
+    const bedSplit = splitSuffix(fields.bed)
+
     return (
         <div className="fixed top-0 left-0 w-full h-[100dvh] z-50 bg-gray-50 dark:bg-gray-950 flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200 min-w-0 max-w-full">
             <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-[85vh] sm:max-h-[800px] sm:max-w-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:border sm:border-gray-200 dark:sm:border-gray-700 overflow-hidden min-w-0 max-w-full">
@@ -643,13 +657,23 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                         <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" autoCapitalize="words" inputMode="text" />
                                     </div>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.hospitalNumber} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
+                                        <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={hospSplit.base} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
+                                        {hospSplit.suffix && (
+                                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
+                                                ({hospSplit.suffix})
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
                                         <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onPaste={e => handleCleanPaste(e, 'ward')} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} placeholder="Ward" />
                                     </div>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.bed} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
+                                        <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={bedSplit.base} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
+                                        {bedSplit.suffix && (
+                                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
+                                                ({bedSplit.suffix})
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
                                         <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onPaste={e => handleCleanPaste(e, 'admissionDate')} onKeyDown={e => handleEnter(e, diagRef)} autoComplete="off" spellCheck={false} placeholder="Admission date" />

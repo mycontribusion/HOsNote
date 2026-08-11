@@ -51,3 +51,77 @@ export function generateUniqueValue(existingItems, field, value, ward) {
     // Return with incremented counter (start from 2 for first duplicate)
     return `${trimmed}(${maxCount + 1})`
 }
+
+/**
+ * Update suffixes of remaining patients after patients with smaller suffixes are removed.
+ * Only affects patients with larger suffix counts for the same base value.
+ *
+ * @param {Array} remainingPatients - Array of remaining patient objects
+ * @param {Array} removedPatients - Array of removed patient objects
+ * @returns {Array} Updated array of remaining patient objects
+ */
+export function updateSuffixesAfterRemoval(remainingPatients, removedPatients) {
+    if (!removedPatients || removedPatients.length === 0) return remainingPatients
+
+    const updatedPatients = remainingPatients.map(p => ({ ...p }))
+
+    // Group removed suffixes by field and base value
+    const removedHospSuffixes = {} // { base: [suffix1, suffix2, ...] }
+    const removedBedSuffixes = {} // { ward: { base: [suffix1, suffix2, ...] } }
+
+    removedPatients.forEach(p => {
+        if (p.hospitalNumber) {
+            const match = p.hospitalNumber.match(/^(.+)\((\d+)\)$/)
+            if (match) {
+                const base = match[1]
+                const suffix = parseInt(match[2], 10)
+                if (!removedHospSuffixes[base]) removedHospSuffixes[base] = []
+                removedHospSuffixes[base].push(suffix)
+            }
+        }
+        if (p.ward && p.bed) {
+            const match = p.bed.match(/^(.+)\((\d+)\)$/)
+            if (match) {
+                const base = match[1]
+                const suffix = parseInt(match[2], 10)
+                const ward = p.ward.trim().toUpperCase()
+                if (!removedBedSuffixes[ward]) removedBedSuffixes[ward] = {}
+                if (!removedBedSuffixes[ward][base]) removedBedSuffixes[ward][base] = []
+                removedBedSuffixes[ward][base].push(suffix)
+            }
+        }
+    })
+
+    // Update remaining patients' suffixes
+    updatedPatients.forEach(p => {
+        if (p.hospitalNumber) {
+            const match = p.hospitalNumber.match(/^(.+)\((\d+)\)$/)
+            if (match) {
+                const base = match[1]
+                const suffix = parseInt(match[2], 10)
+                const removedSuffixes = removedHospSuffixes[base] || []
+                const smallerRemovedCount = removedSuffixes.filter(s => s < suffix).length
+                if (smallerRemovedCount > 0) {
+                    const newSuffix = suffix - smallerRemovedCount
+                    p.hospitalNumber = newSuffix === 1 ? base : `${base}(${newSuffix})`
+                }
+            }
+        }
+        if (p.ward && p.bed) {
+            const match = p.bed.match(/^(.+)\((\d+)\)$/)
+            if (match) {
+                const base = match[1]
+                const suffix = parseInt(match[2], 10)
+                const ward = p.ward.trim().toUpperCase()
+                const removedSuffixes = (removedBedSuffixes[ward] && removedBedSuffixes[ward][base]) || []
+                const smallerRemovedCount = removedSuffixes.filter(s => s < suffix).length
+                if (smallerRemovedCount > 0) {
+                    const newSuffix = suffix - smallerRemovedCount
+                    p.bed = newSuffix === 1 ? base : `${base}(${newSuffix})`
+                }
+            }
+        }
+    })
+
+    return updatedPatients
+}
