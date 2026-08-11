@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Search, X, User, BookOpen, ChevronRight } from 'lucide-react'
+import { Search, X, User, BookOpen, ChevronRight, Heart } from 'lucide-react'
 import SuffixedValue from './SuffixedValue'
 
-export default function SearchOverlay({ patients, docs, onClose, onNavigateToPatient, onNavigateToNote }) {
+export default function SearchOverlay({ patients, mortalities, docs, activePage, activeTab, onClose, onNavigateToPatient, onNavigateToNote }) {
     const [query, setQuery] = useState('')
     const inputRef = useRef(null)
 
@@ -10,8 +10,25 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
         inputRef.current?.focus()
     }, [])
 
+    // Determine result ordering based on current view
+    const getResultOrder = () => {
+        if (activePage === 'notebook') {
+            return ['notes', 'my_team', 'on_call', 'mortalities']
+        }
+        if (activeTab === 'mortalities') {
+            return ['mortalities', 'my_team', 'on_call', 'notes']
+        }
+        if (activeTab === 'other_team') {
+            return ['on_call', 'my_team', 'notes', 'mortalities']
+        }
+        // default: my_team
+        return ['my_team', 'on_call', 'notes', 'mortalities']
+    }
+
+    const resultOrder = getResultOrder()
+
     const results = useMemo(() => {
-        if (!query.trim()) return { patients: [], notes: [] }
+        if (!query.trim()) return { my_team: [], on_call: [], notes: [], mortalities: [] }
         const q = query.trim().toLowerCase()
 
         const matchedPatients = patients
@@ -23,10 +40,22 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                 else if ((p.bed || '').toLowerCase().includes(q)) matchedField = 'bed'
                 else if ((p.diagnosis || '').toLowerCase().includes(q)) matchedField = 'diagnosis'
                 else if ((p.note || '').toLowerCase().includes(q)) matchedField = 'note'
-                return { ...p, matchedField }
+                return { ...p, matchedField, team: p.team || 'my_team' }
             })
             .filter(p => p.matchedField !== null)
-            .slice(0, 20)
+
+        const matchedMortalities = mortalities
+            .map(p => {
+                let matchedField = null
+                if ((p.name || '').toLowerCase().includes(q)) matchedField = 'name'
+                else if ((p.hospitalNumber || '').toLowerCase().includes(q)) matchedField = 'hospitalNumber'
+                else if ((p.ward || '').toLowerCase().includes(q)) matchedField = 'ward'
+                else if ((p.bed || '').toLowerCase().includes(q)) matchedField = 'bed'
+                else if ((p.diagnosis || '').toLowerCase().includes(q)) matchedField = 'diagnosis'
+                else if ((p.note || '').toLowerCase().includes(q)) matchedField = 'note'
+                return { ...p, matchedField, team: 'mortalities' }
+            })
+            .filter(p => p.matchedField !== null)
 
         const matchedNotes = docs
             .filter(d =>
@@ -36,15 +65,35 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                 (d.patientDiagnosis || d.diagnosis || '').toLowerCase().includes(q) ||
                 (d.text || '').toLowerCase().includes(q)
             )
-            .slice(0, 20)
 
-        return { patients: matchedPatients, notes: matchedNotes }
-    }, [query, patients, docs])
+        // Group patients by team
+        const myTeamPatients = matchedPatients.filter(p => p.team === 'my_team').slice(0, 10)
+        const onCallPatients = matchedPatients.filter(p => p.team === 'other_team').slice(0, 10)
 
-    const totalResults = results.patients.length + results.notes.length
+        return {
+            my_team: myTeamPatients,
+            on_call: onCallPatients,
+            notes: matchedNotes.slice(0, 20),
+            mortalities: matchedMortalities.slice(0, 20)
+        }
+    }, [query, patients, mortalities, docs])
+
+    const totalResults = results.my_team.length + results.on_call.length + results.notes.length + results.mortalities.length
 
     const handleKeyDown = (e) => {
         if (e.key === 'Escape') onClose()
+    }
+
+    const renderSection = (category, title, items, icon, iconBg, iconColor, renderItem) => {
+        if (items.length === 0) return null
+        return (
+            <div className="mb-2">
+                <p className="px-4 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                    {title} ({items.length})
+                </p>
+                {items.map(renderItem)}
+            </div>
+        )
     }
 
     return (
@@ -62,7 +111,7 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                             ref={inputRef}
                             type="search"
                             className="flex-1 bg-transparent text-base font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none min-w-0"
-                            placeholder="Search patients, wards, notes..."
+                            placeholder="Search patients, wards, notes, mortalities..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             autoComplete="off"
@@ -87,17 +136,13 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                                 </div>
                             ) : (
                                 <div className="py-2">
-                                    {/* Patient results */}
-                                    {results.patients.length > 0 && (
-                                        <div className="mb-2">
-                                            <p className="px-4 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                                                Patients ({results.patients.length})
-                                            </p>
-                                            {results.patients.map((patient) => (
+                                    {resultOrder.map(category => {
+                                        if (category === 'my_team' && results.my_team.length > 0) {
+                                            return renderSection('my_team', 'My Team', results.my_team, User, 'bg-blue-100 dark:bg-blue-900/30', 'text-blue-600 dark:text-blue-400', (patient) => (
                                                 <button
                                                     key={patient.id}
                                                     onClick={() => {
-                                                        onNavigateToPatient(patient.id, patient.matchedField, query)
+                                                        onNavigateToPatient(patient.id, patient.matchedField, query, 'my_team')
                                                         onClose()
                                                     }}
                                                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
@@ -119,17 +164,41 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                                                     </div>
                                                     <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
                                                 </button>
-                                            ))}
-                                        </div>
-                                    )}
+                                            ))
+                                        }
 
-                                    {/* Note results */}
-                                    {results.notes.length > 0 && (
-                                        <div>
-                                            <p className="px-4 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                                                Notes ({results.notes.length})
-                                            </p>
-                                            {results.notes.map((note) => (
+                                        if (category === 'on_call' && results.on_call.length > 0) {
+                                            return renderSection('on_call', 'On Call', results.on_call, User, 'bg-purple-100 dark:bg-purple-900/30', 'text-purple-600 dark:text-purple-400', (patient) => (
+                                                <button
+                                                    key={patient.id}
+                                                    onClick={() => {
+                                                        onNavigateToPatient(patient.id, patient.matchedField, query, 'other_team')
+                                                        onClose()
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
+                                                >
+                                                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+                                                        <User size={14} className="text-purple-600 dark:text-purple-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                                            {patient.name || 'Unnamed'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                            {patient.ward && patient.bed
+                                                                ? `Ward ${patient.ward} · Bed `
+                                                                : (patient.ward || patient.bed ? '' : 'No ward/bed')}
+                                                            {patient.bed && <SuffixedValue value={patient.bed} />}
+                                                            {patient.hospitalNumber && <span> · <SuffixedValue value={patient.hospitalNumber} /></span>}
+                                                        </p>
+                                                    </div>
+                                                    <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                                                </button>
+                                            ))
+                                        }
+
+                                        if (category === 'notes' && results.notes.length > 0) {
+                                            return renderSection('notes', 'Notes', results.notes, BookOpen, 'bg-teal-100 dark:bg-teal-900/30', 'text-teal-600 dark:text-teal-400', (note) => (
                                                 <button
                                                     key={note.id}
                                                     onClick={() => {
@@ -165,9 +234,41 @@ export default function SearchOverlay({ patients, docs, onClose, onNavigateToPat
                                                     </div>
                                                     <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
                                                 </button>
-                                            ))}
-                                        </div>
-                                    )}
+                                            ))
+                                        }
+
+                                        if (category === 'mortalities' && results.mortalities.length > 0) {
+                                            return renderSection('mortalities', 'Mortalities', results.mortalities, Heart, 'bg-red-100 dark:bg-red-900/30', 'text-red-600 dark:text-red-400', (patient) => (
+                                                <button
+                                                    key={patient.id}
+                                                    onClick={() => {
+                                                        onNavigateToPatient(patient.id, patient.matchedField, query, 'mortalities')
+                                                        onClose()
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
+                                                >
+                                                    <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                                                        <Heart size={14} className="text-red-600 dark:text-red-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                                            {patient.name || 'Unnamed'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                            {patient.ward && patient.bed
+                                                                ? `Ward ${patient.ward} · Bed `
+                                                                : (patient.ward || patient.bed ? '' : 'No ward/bed')}
+                                                            {patient.bed && <SuffixedValue value={patient.bed} />}
+                                                            {patient.hospitalNumber && <span> · <SuffixedValue value={patient.hospitalNumber} /></span>}
+                                                        </p>
+                                                    </div>
+                                                    <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                                                </button>
+                                            ))
+                                        }
+
+                                        return null
+                                    })}
                                 </div>
                             )}
                         </div>

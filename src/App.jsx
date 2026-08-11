@@ -1061,11 +1061,22 @@ const pendingEditRef = useRef(null)
         ? activePatients.filter(p => selectedPatientIds.has(p.id))
         : activePatients
 
-    const navigateToPatient = useCallback((patientId, highlightField, highlightQuery) => {
-        // Ensure we're on the patients page
-        if (activePage !== 'patients') {
-            goToPage('patients')
+    const navigateToPatient = useCallback((patientId, highlightField, highlightQuery, targetTeam) => {
+        // Determine target tab based on patient team
+        let targetTab = activeTab
+        if (targetTeam === 'mortalities') {
+            targetTab = 'mortalities'
+        } else if (targetTeam === 'other_team') {
+            targetTab = 'other_team'
+        } else if (targetTeam === 'my_team') {
+            targetTab = 'my_team'
         }
+
+        // Navigate to correct tab if needed
+        if (activeTab !== targetTab || activePage !== 'patients') {
+            navigate(`/team/${targetTab}`)
+        }
+
         // Store highlight info for PatientCard
         setSearchHighlightField(highlightField)
         setSearchHighlightQuery(highlightQuery)
@@ -1087,7 +1098,7 @@ const pendingEditRef = useRef(null)
             setSearchHighlightField(null)
             setSearchHighlightQuery('')
         }, 5000)
-    }, [activePage, goToPage, patients, mortalities])
+    }, [activePage, activeTab, navigate, patients, mortalities])
 
     const navigateToNote = useCallback((noteId, highlightQuery) => {
         // Navigate to notebook page
@@ -1405,7 +1416,10 @@ const pendingEditRef = useRef(null)
             {showSearch && (
                 <SearchOverlay
                     patients={patients}
+                    mortalities={mortalities}
                     docs={docs}
+                    activePage={activePage}
+                    activeTab={activeTab}
                     onClose={() => setShowSearch(false)}
                     onNavigateToPatient={navigateToPatient}
                     onNavigateToNote={navigateToNote}
