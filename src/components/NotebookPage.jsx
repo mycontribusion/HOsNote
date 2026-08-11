@@ -192,17 +192,23 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
         onDeleteDoc(doc.id)
     }
 
-    const handleEditSave = ({ name, hospitalNumber, ward, bed, diagnosis, note, critical, team }) => {
-        const trimmedNote = (note || '').trim()
-        const trimmedDiagnosis = (diagnosis || '').trim()
-
-        // Update the existing doc's metadata and text
-        onUpdateDoc(editingDoc.id, trimmedNote, editingDoc.color ?? 'blue', {
-            name,
-            hospitalNumber,
-            ward,
-            diagnosis,
-        })
+    const handleEditSave = (data) => {
+        if (data.isStandaloneNote) {
+            // Note mode — only update text and diagnosis
+            onUpdateDoc(editingDoc.id, data.text, editingDoc.color ?? 'blue', {
+                diagnosis: data.diagnosis,
+            })
+        } else {
+            // Full form mode — update all biodata fields
+            const trimmedNote = (data.note || '').trim()
+            const trimmedDiagnosis = (data.diagnosis || '').trim()
+            onUpdateDoc(editingDoc.id, trimmedNote, editingDoc.color ?? 'blue', {
+                name: data.name,
+                hospitalNumber: data.hospitalNumber,
+                ward: data.ward,
+                diagnosis: trimmedDiagnosis,
+            })
+        }
 
         setEditingDoc(null)
         setSelectedDoc(null)
@@ -328,9 +334,10 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                 />
             )}
 
-            {/* Edit using AddPatientForm */}
+            {/* Edit using AddPatientForm — use same UI style as how it was added */}
             {editingDoc && (
                 <AddPatientForm
+                    isNoteMode={!editingDoc.patientId}
                     initialData={{
                         name: editingDoc.patientName || '',
                         hospitalNumber: editingDoc.patientHosp || '',
