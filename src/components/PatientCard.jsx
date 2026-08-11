@@ -227,7 +227,7 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                         )}
                         {diagnosis && (
                             <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-1 truncate">
-                                Diag: {highlightField === 'diagnosis' && highlightQuery ? (
+                                {highlightField === 'diagnosis' && highlightQuery ? (
                                     <HighlightText text={diagnosis} query={highlightQuery} />
                                 ) : (
                                     diagnosis
