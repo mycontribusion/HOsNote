@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Edit2, Trash2, BookOpen, X, Plus } from 'lucide-react'
+import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
 import SpeedDialFAB from './SpeedDialFAB'
 
@@ -46,9 +47,8 @@ const COLOR_BADGE = {
 }
 
 function formatDate(iso) {
-    const d = new Date(iso)
-    return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) +
-        ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (!iso) return ''
+    return formatFullDate(iso)
 }
 
 function formatMonthYear(iso) {
@@ -133,7 +133,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
                     </p>
                     {doc.updatedAt && doc.updatedAt !== doc.createdAt && (
                         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-3 italic">
-                            Edited: {formatDate(doc.updatedAt)}
+                            Edited: {formatSmartDate(doc.updatedAt)}
                         </p>
                     )}
                 </div>
@@ -303,9 +303,14 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                                 ) : null}
                                             </div>
                                         )}
-                                        <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto">
-                                            {formatMonthYear(doc.createdAt)}
-                                        </span>
+                                        <div className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto text-right leading-tight">
+                                            {formatSmartDateParts(doc.createdAt).date && (
+                                                <div>{formatSmartDateParts(doc.createdAt).date}</div>
+                                            )}
+                                            {formatSmartDateParts(doc.createdAt).time && (
+                                                <div>{formatSmartDateParts(doc.createdAt).time}</div>
+                                            )}
+                                        </div>
                                     </div>
                                     {/* Text preview — visual scrollbar without touch scrolling */}
                                     <div className="px-4 py-2 min-w-0 max-w-full">

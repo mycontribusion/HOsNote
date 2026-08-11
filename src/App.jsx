@@ -18,6 +18,7 @@ import SpeedDialFAB from './components/SpeedDialFAB'
 import { Plus, UserPlus, QrCode, Share2 } from 'lucide-react'
 import { get, set } from 'idb-keyval'
 import { generateUniqueValue, updateSuffixesAfterRemoval } from './utils/uniqueSuffix'
+import { formatSmartDate } from './utils/formatSmartDate'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
@@ -39,7 +40,7 @@ function PrintView({ patients, listName }) {
             <div className="flex justify-between items-end border-b-2 border-black pb-2 mb-4">
                 <div>
                     <h1 className="text-2xl font-bold uppercase tracking-tighter">Handover Report: {listName}</h1>
-                    <p className="text-xs text-gray-600 font-medium">Generated on {new Date().toLocaleString()}</p>
+                    <p className="text-xs text-gray-600 font-medium">Generated on {formatSmartDate(new Date().toISOString())}</p>
                 </div>
                 <div className="text-right">
                     <p className="text-lg font-black italic">HOsNote</p>

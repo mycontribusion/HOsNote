@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Search, X, User, BookOpen, ChevronRight, Heart } from 'lucide-react'
+import { formatSmartDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
 
 export default function SearchOverlay({ patients, mortalities, docs, activePage, activeTab, onClose, onNavigateToPatient, onNavigateToNote }) {
@@ -222,10 +223,7 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
                                                          </p>
                                                          {note.createdAt && (
                                                              <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
-                                                                 {new Date(note.createdAt).toLocaleString([], {
-                                                                     day: 'numeric', month: 'short', year: 'numeric',
-                                                                     hour: '2-digit', minute: '2-digit', second: '2-digit'
-                                                                 })}
+                                                                 {formatSmartDate(note.createdAt)}
                                                              </p>
                                                          )}
                                                          <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">

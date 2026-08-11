@@ -1,5 +1,6 @@
 import { Trash2, Pencil, CheckCircle2, FileText, ChevronsLeft } from 'lucide-react'
 import { useState, useRef } from 'react'
+import { formatSmartDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
 
 function HighlightText({ text, query }) {
@@ -214,15 +215,12 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                         )}
                         {isMortality && removedAt && (
                             <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 italic leading-none">
-                                Recorded: {new Date(removedAt).toLocaleString()}
+                                Recorded: {formatSmartDate(removedAt)}
                             </div>
                         )}
                         {!isMortality && lastUpdated && (
                             <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 italic leading-none">
-                                Last Update: {new Date(lastUpdated).toLocaleString([], {
-                                    day: 'numeric', month: 'short', year: 'numeric',
-                                    hour: '2-digit', minute: '2-digit'
-                                })}
+                                Last Update: {formatSmartDate(lastUpdated)}
                             </div>
                         )}
                         {diagnosis && (

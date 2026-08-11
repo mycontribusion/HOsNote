@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { X, Pencil } from 'lucide-react'
+import { formatSmartDate, formatFullDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
 
 export default function PatientDetailModal({
@@ -41,9 +42,7 @@ export default function PatientDetailModal({
 
     const formatDate = (iso) => {
         if (!iso) return ''
-        const d = new Date(iso)
-        return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) +
-            ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        return formatFullDate(iso)
     }
 
     const hasDiag = Boolean(diagnosis?.trim())
@@ -107,18 +106,18 @@ export default function PatientDetailModal({
                                     )}
                                     {admissionDate && (
                                         <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
-                                            Admitted: {new Date(admissionDate).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
+                                            Admitted: {formatSmartDate(admissionDate)}
                                             {durationText && !isMortality && <span className="text-blue-600 dark:text-blue-400 font-bold">({durationText})</span>}
                                         </span>
                                     )}
                                     {lastUpdated && !isMortality && (
                                         <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
-                                            Updated: {new Date(lastUpdated).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            Updated: {formatSmartDate(lastUpdated)}
                                         </span>
                                     )}
                                     {isMortality && removedAt && (
                                         <span className="text-[10px] text-red-500 whitespace-nowrap">
-                                            Recorded: {new Date(removedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            Recorded: {formatSmartDate(removedAt)}
                                         </span>
                                     )}
                                 </div>
