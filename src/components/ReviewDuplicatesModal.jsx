@@ -3,7 +3,7 @@ import { X, AlertTriangle } from 'lucide-react';
 import SuffixedValue from './SuffixedValue';
 
 export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCancel }) {
-    // pendingImport.conflicts = [ { imported, existing } ]
+    // pendingImport.conflicts = [ { imported, existing, duplicateFields } ]
     // Each conflict needs a choice. Default to 'skip'.
     const [choices, setChoices] = useState(() =>
         pendingImport.conflicts.reduce((acc, conflict, idx) => {
@@ -11,6 +11,14 @@ export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCanc
             return acc;
         }, {})
     );
+
+    const fieldLabel = (field) => {
+        if (field === 'hospitalNumber') return 'Hospital Number';
+        if (field === 'bed') return 'Ward/Bed';
+        if (field === 'name') return 'Name';
+        if (field === 'ward') return 'Ward';
+        return field;
+    };
 
     const handleChoiceChange = (idx, value) => {
         setChoices(prev => ({ ...prev, [idx]: value }));
@@ -55,6 +63,14 @@ export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCanc
                                         {p.hospitalNumber && <div>Hosp ID: <span className="font-medium text-gray-700"><SuffixedValue value={p.hospitalNumber} /></span></div>}
                                         {p.ward && <div>Ward/Bed: <span className="font-medium text-gray-700">{p.ward} <SuffixedValue value={p.bed} /></span></div>}
                                     </div>
+
+                                    {conflict.duplicateFields && conflict.duplicateFields.length > 0 && (
+                                        <div className="mb-2">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-orange-800 dark:text-orange-200 bg-orange-100 dark:bg-orange-900/30 rounded">
+                                                Duplicates: {conflict.duplicateFields.map(fieldLabel).join(', ')}
+                                            </span>
+                                        </div>
+                                    )}
 
                                     <div className="flex flex-wrap gap-2 mt-2">
                                         <label className={`flex-1 text-center py-2 px-1 text-xs font-semibold rounded-lg cursor-pointer border transition-colors ${choices[idx] === 'skip' ? 'bg-white border-blue-500 text-blue-700 shadow-sm' : 'border-gray-200 text-gray-500 hover:bg-white'}`}>

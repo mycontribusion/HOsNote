@@ -364,6 +364,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         if (!w && !h && !n) { setError('Please fill in at least Name, Hospital # or Ward.'); return }
         hasSavedRef.current = true
         const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: fields.bed, note: fields.note, critical, admissionDate: fields.admissionDate, diagnosis: fields.diagnosis })
+        if (result && result.type === 'duplicate_both') {
+            setDuplicateInfo({ ...result, fieldLabel: 'Hospital Number & Ward/Bed' })
+            return
+        }
         if (result && result.type === 'duplicate_hosp') {
             setDuplicateInfo({ ...result, fieldLabel: 'Hospital Number' })
             return
@@ -393,20 +397,32 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         const maxAttempts = 5
 
         while (currentDuplicate && attempts < maxAttempts) {
-            const { field, value, ward } = currentDuplicate
+            const { field, value, ward, bedValue } = currentDuplicate
             let newValue = value
+            let newBedValue = bedValue
+
             if (field === 'hospitalNumber') {
                 newValue = generateUniqueValue(patients, 'hospitalNumber', value)
             } else if (field === 'bed') {
                 newValue = generateUniqueValue(patients, 'bed', value, ward)
+            } else if (field === 'both') {
+                // Both hospital number and bed are duplicates — add suffix to both
+                newValue = generateUniqueValue(patients, 'hospitalNumber', value)
+                newBedValue = generateUniqueValue(patients, 'bed', bedValue, ward)
             }
 
-            currentFields = { ...currentFields, [field]: newValue }
+            if (field === 'both') {
+                currentFields = { ...currentFields, hospitalNumber: newValue, bed: newBedValue }
+            } else {
+                currentFields = { ...currentFields, [field]: newValue }
+            }
 
             const { name: n, hospitalNumber: h, ward: w, bed: b, note: t, admissionDate: ad, diagnosis: d } = currentFields
             const result = onAdd({ team, name: n, hospitalNumber: h, ward: w, bed: b, note: t, critical, admissionDate: ad, diagnosis: d })
 
-            if (result && result.type === 'duplicate_hosp') {
+            if (result && result.type === 'duplicate_both') {
+                currentDuplicate = { ...result, fieldLabel: 'Hospital Number & Ward/Bed' }
+            } else if (result && result.type === 'duplicate_hosp') {
                 currentDuplicate = { ...result, fieldLabel: 'Hospital Number' }
             } else if (result && result.type === 'duplicate_bed') {
                 currentDuplicate = { ...result, fieldLabel: 'Ward/Bed' }
@@ -444,6 +460,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
             // Auto-save changes when exiting edit mode
             if (isNoteMode) {
                 const result = onAdd({ text: fields.note, diagnosis: fields.diagnosis, isStandaloneNote: true })
+                if (result && result.type === 'duplicate_both') {
+                    setError('A patient with this Hospital Number and Ward/Bed already exists.')
+                    return
+                }
                 if (result && result.type === 'duplicate_hosp') {
                     setError('A patient with this Hospital Number already exists.')
                     return
@@ -464,6 +484,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                     admissionDate: fields.admissionDate,
                     diagnosis: fields.diagnosis,
                 })
+                if (result && result.type === 'duplicate_both') {
+                    setError('A patient with this Hospital Number and Ward/Bed already exists.')
+                    return
+                }
                 if (result && result.type === 'duplicate_hosp') {
                     setError('A patient with this Hospital Number already exists.')
                     return

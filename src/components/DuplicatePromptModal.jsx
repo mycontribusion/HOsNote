@@ -2,8 +2,9 @@ import { AlertTriangle, Copy } from 'lucide-react'
 import SuffixedValue from './SuffixedValue'
 
 export default function DuplicatePromptModal({ duplicate, onAddAsNew, onCancel }) {
-    // duplicate: { type: 'hospitalNumber' | 'bed', value: string, existing: object, fieldLabel: string }
-    const isHosp = duplicate.type === 'hospitalNumber'
+    // duplicate: { type: 'duplicate_hosp' | 'duplicate_bed' | 'duplicate_both', field: 'hospitalNumber' | 'bed' | 'both', value: string, existing: object, fieldLabel: string }
+    const isHosp = duplicate.field === 'hospitalNumber'
+    const isBoth = duplicate.field === 'both'
     const existing = duplicate.existing
     const fieldLabel = duplicate.fieldLabel || (isHosp ? 'Hospital Number' : 'Ward/Bed')
 
@@ -36,23 +37,55 @@ export default function DuplicatePromptModal({ duplicate, onAddAsNew, onCancel }
                             Duplicate {fieldLabel}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
-                            A patient with this {fieldLabel.toLowerCase()} already exists:
+                            {isBoth
+                                ? 'Patients with this Hospital Number and Ward/Bed already exist:'
+                                : `A patient with this ${fieldLabel.toLowerCase()} already exists:`}
                         </p>
-                        <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-                            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                                {existing.name || 'Unnamed'}
-                            </p>
-                            {isHosp && existing.hospitalNumber && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Hosp No: <span className="font-mono font-medium"><SuffixedValue value={existing.hospitalNumber} /></span>
+
+                        {isBoth ? (
+                            <div className="mt-3 space-y-2">
+                                {duplicate.existingHosp && (
+                                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                            {duplicate.existingHosp.name || 'Unnamed'}
+                                        </p>
+                                        {duplicate.existingHosp.hospitalNumber && (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Hosp No: <span className="font-mono font-medium"><SuffixedValue value={duplicate.existingHosp.hospitalNumber} /></span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                                {duplicate.existingBed && (
+                                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                            {duplicate.existingBed.name || 'Unnamed'}
+                                        </p>
+                                        {duplicate.existingBed.ward && duplicate.existingBed.bed && (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Ward/Bed: <span className="font-medium">{duplicate.existingBed.ward} <SuffixedValue value={duplicate.existingBed.bed} /></span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                                    {existing.name || 'Unnamed'}
                                 </p>
-                            )}
-                            {!isHosp && existing.ward && existing.bed && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Ward/Bed: <span className="font-medium">{existing.ward} <SuffixedValue value={existing.bed} /></span>
-                                </p>
-                            )}
-                        </div>
+                                {isHosp && existing.hospitalNumber && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Hosp No: <span className="font-mono font-medium"><SuffixedValue value={existing.hospitalNumber} /></span>
+                                    </p>
+                                )}
+                                {!isHosp && existing.ward && existing.bed && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Ward/Bed: <span className="font-medium">{existing.ward} <SuffixedValue value={existing.bed} /></span>
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col gap-3">

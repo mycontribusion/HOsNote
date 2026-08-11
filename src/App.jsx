@@ -542,6 +542,25 @@ const pendingEditRef = useRef(null)
             if (ep && p.id === ep.id) return false;
             return p.hospitalNumber === h;
         });
+        const duplicateBed = w && b && patients.some((p) => {
+            if (ep && p.id === ep.id) return false;
+            return p.ward === w && p.bed === b;
+        });
+
+        // If both hospital number and bed are duplicates, report both so suffixes
+        // can be added to both fields simultaneously.
+        if (duplicateHosp && duplicateBed) {
+            const existingHosp = [...patients, ...mortalities].find((p) => {
+                if (ep && p.id === ep.id) return false;
+                return p.hospitalNumber === h;
+            });
+            const existingBed = patients.find((p) => {
+                if (ep && p.id === ep.id) return false;
+                return p.ward === w && p.bed === b;
+            });
+            return { type: 'duplicate_both', field: 'both', value: h, bedValue: b, ward: w, existingHosp, existingBed };
+        }
+
         if (duplicateHosp) {
             const existing = [...patients, ...mortalities].find((p) => {
                 if (ep && p.id === ep.id) return false;
@@ -550,10 +569,6 @@ const pendingEditRef = useRef(null)
             return { type: 'duplicate_hosp', field: 'hospitalNumber', value: h, existing };
         }
 
-        const duplicateBed = w && b && patients.some((p) => {
-            if (ep && p.id === ep.id) return false;
-            return p.ward === w && p.bed === b;
-        });
         if (duplicateBed) {
             const existing = patients.find((p) => {
                 if (ep && p.id === ep.id) return false;
@@ -825,6 +840,15 @@ const pendingEditRef = useRef(null)
                 existingMatch = patients.find(ex => ex.hospitalNumber === p.hospitalNumber) ||
                     mortalities.find(ex => ex.hospitalNumber === p.hospitalNumber);
                 if (existingMatch) duplicateFields.push('hospitalNumber');
+                // Also check for bed duplicate (ward + bed combo) so that when both
+                // hospital number and bed are duplicates, suffixes are added to both.
+                if (p.ward && p.bed) {
+                    const bedMatch = patients.find(ex => ex.ward === p.ward && ex.bed === p.bed);
+                    if (bedMatch) {
+                        duplicateFields.push('bed');
+                        if (!existingMatch) existingMatch = bedMatch;
+                    }
+                }
             } else {
                 const key = `${p.name}|${p.ward}|${p.bed}`;
                 existingMatch = patients.find(ex => `${ex.name}|${ex.ward}|${ex.bed}` === key);
