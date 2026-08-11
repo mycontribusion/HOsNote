@@ -2,8 +2,8 @@
  * Context-Aware Date Formatting
  *
  * Rules (always includes time):
- * - Today:          time only (e.g., "4:30 PM")
- * - This week:      day name + time (e.g., "Monday, 4:30 PM")
+ * - Today:          "Today" + time (e.g., "Today, 4:30 PM")
+ * - This week:      3-letter day + time (e.g., "Mon, 4:30 PM")
  * - This year:      date + time (e.g., "Jan 5, 4:30 PM")
  * - Previous year:  date with year + time (e.g., "Jan 5, 2025, 4:30 PM")
  */
@@ -23,9 +23,9 @@ export function formatSmartDate(iso) {
 
     const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-    // Today: show time only
+    // Today: show "Today" + time
     if (diffDays === 0) {
-        return timeStr
+        return 'Today, ' + timeStr
     }
 
     // This week (within last 7 days, and same week)
@@ -35,7 +35,7 @@ export function formatSmartDate(iso) {
         startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7)) // Monday
 
         if (target >= startOfWeek) {
-            return d.toLocaleDateString([], { weekday: 'long' }) + ', ' + timeStr
+            return d.toLocaleDateString([], { weekday: 'short' }) + ', ' + timeStr
         }
     }
 
@@ -65,18 +65,18 @@ export function formatSmartDateParts(iso) {
 
     const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-    // Today: time only, no date
+    // Today: show "Today" as date, time below
     if (diffDays === 0) {
-        return { date: '', time: timeStr }
+        return { date: 'Today', time: timeStr }
     }
 
-    // This week
+    // This week: 3-letter day abbreviation
     if (diffDays > 0 && diffDays < 7) {
         const startOfWeek = new Date(today)
         startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7))
 
         if (target >= startOfWeek) {
-            return { date: d.toLocaleDateString([], { weekday: 'long' }), time: timeStr }
+            return { date: d.toLocaleDateString([], { weekday: 'short' }), time: timeStr }
         }
     }
 
