@@ -1117,6 +1117,7 @@ const pendingEditRef = useRef(null)
                 activePage={activePage}
                 onPageChange={goToPage}
                 onOpenSearch={() => setShowSearch(true)}
+                theme={activePage === 'patients' && activeTab === 'mortalities' ? 'red' : 'blue'}
             />
 
             {/* Notebook Page */}
@@ -1275,7 +1276,7 @@ const pendingEditRef = useRef(null)
             {/* Collapsible Action FAB — Tracker Page */}
             {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (
                 <SpeedDialFAB
-                    mainTheme="blue"
+                    mainTheme={activeTab === 'mortalities' ? 'red' : 'blue'}
                     ariaLabel="Patient actions menu"
                     actions={[
                         {

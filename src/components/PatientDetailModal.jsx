@@ -57,13 +57,13 @@ export default function PatientDetailModal({
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className="modal-box max-w-md w-[95%] p-0 overflow-hidden border-l-4 border-blue-500"
+                className={`modal-box max-w-md w-[95%] p-0 overflow-hidden border-l-4 ${isMortality ? 'border-red-500' : 'border-blue-500'}`}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="patient-detail-title"
             >
                 {/* Header */}
-                <div className="px-5 pt-4 pb-3 bg-blue-50 dark:bg-blue-900/10">
+                <div className={`px-5 pt-4 pb-3 ${isMortality ? 'bg-red-50 dark:bg-red-900/10' : 'bg-blue-50 dark:bg-blue-900/10'}`}>
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1 overflow-hidden">
                             <div className="flex flex-col gap-1 overflow-hidden">
@@ -81,12 +81,12 @@ export default function PatientDetailModal({
                                         </span>
                                     )}
                                     {wardStr && (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap ${isMortality ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}>
                                             {wardStr}
                                         </span>
                                     )}
                                     {bed && (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap ${isMortality ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}>
                                             Bed {bed}
                                         </span>
                                     )}
@@ -168,7 +168,7 @@ export default function PatientDetailModal({
                             onClose()
                             onEdit(patient)
                         }}
-                        className="btn-primary flex items-center gap-2 flex-1"
+                        className={`${isMortality ? 'btn-danger' : 'btn-primary'} flex items-center gap-2 flex-1`}
                         style={{ minHeight: '40px', fontSize: '0.875rem' }}
                     >
                         <Pencil size={15} />

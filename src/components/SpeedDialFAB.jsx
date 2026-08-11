@@ -49,6 +49,8 @@ export default function SpeedDialFAB({ actions = [], onClick, mainTheme = 'blue'
 
     const themeClasses = mainTheme === 'teal'
         ? 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white shadow-teal-500/30'
+        : mainTheme === 'red'
+        ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-red-500/30'
         : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/30'
 
     return (
@@ -116,7 +118,7 @@ export default function SpeedDialFAB({ actions = [], onClick, mainTheme = 'blue'
                 onClick={handleMainClick}
                 aria-expanded={isSingleAction ? undefined : isOpen}
                 aria-label={ariaLabel}
-                className={`relative z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-90 focus:outline-none focus:ring-4 focus:ring-teal-300 dark:focus:ring-teal-800 ${themeClasses}`}
+                className={`relative z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-90 focus:outline-none focus:ring-4 ${mainTheme === 'red' ? 'focus:ring-red-300 dark:focus:ring-red-800' : mainTheme === 'teal' ? 'focus:ring-teal-300 dark:focus:ring-teal-800' : 'focus:ring-blue-300 dark:focus:ring-blue-800'} ${themeClasses}`}
             >
                 <div className={`transition-transform duration-300 ${isOpen && !isSingleAction ? 'rotate-135' : 'rotate-0'}`}>
                     <Plus size={28} strokeWidth={2.5} />
