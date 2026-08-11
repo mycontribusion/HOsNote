@@ -1,13 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Plus } from 'lucide-react'
 
-export default function SpeedDialFAB({ actions = [], onClick, mainTheme = 'blue', ariaLabel = 'Actions menu' }) {
+export default function SpeedDialFAB({
+    actions = [],
+    onClick,
+    mainTheme = 'blue',
+    mainIcon,
+    sizeClass = 'w-11 h-11',
+    positionClass = 'bottom-5 right-5',
+    badge,
+    disabled = false,
+    ariaLabel = 'Actions menu'
+}) {
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef(null)
 
     const isSingleAction = Boolean(onClick || actions.length === 1)
 
     const handleMainClick = () => {
+        if (disabled) return
         if (onClick) {
             onClick()
         } else if (actions.length === 1) {
@@ -48,13 +59,17 @@ export default function SpeedDialFAB({ actions = [], onClick, mainTheme = 'blue'
     }, [isOpen])
 
     const themeClasses = mainTheme === 'teal'
-        ? 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white shadow-teal-500/30'
+        ? 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white shadow-teal-500/25'
         : mainTheme === 'red'
-        ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-red-500/30'
-        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/30'
+        ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-red-500/25'
+        : mainTheme === 'purple'
+        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/25'
+        : mainTheme === 'emerald'
+        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/25'
+        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/25'
 
     return (
-        <div ref={containerRef} className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <div ref={containerRef} className={`fixed ${positionClass} z-50 flex flex-col items-end`}>
             {/* Backdrop overlay when menu is open */}
             {isOpen && !isSingleAction && (
                 <div
@@ -68,7 +83,7 @@ export default function SpeedDialFAB({ actions = [], onClick, mainTheme = 'blue'
             {isOpen && !isSingleAction && (
                 <div
                     role="menu"
-                    className="relative z-50 flex flex-col items-end gap-3 mb-3 animate-in fade-in slide-in-from-bottom-5 duration-200 ease-out"
+                    className="relative z-50 flex flex-col items-end gap-2.5 mb-2.5 animate-in fade-in slide-in-from-bottom-4 duration-200 ease-out"
                 >
                     {actions.map((action, idx) => {
                         const iconBg = action.color === 'emerald'
@@ -88,22 +103,22 @@ export default function SpeedDialFAB({ actions = [], onClick, mainTheme = 'blue'
                                     setIsOpen(false)
                                     action.onClick()
                                 }}
-                                className={`flex items-center gap-3 group focus:outline-none transition-transform duration-150 ${
+                                className={`flex items-center gap-2.5 group focus:outline-none transition-transform duration-150 ${
                                     action.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95 cursor-pointer'
                                 }`}
                             >
                                 {/* Label card */}
-                                <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 flex items-center gap-1.5 whitespace-nowrap">
+                                <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-md border border-gray-100 dark:border-gray-700 flex items-center gap-1.5 whitespace-nowrap">
                                     {action.label}
                                     {action.badge !== undefined && action.badge !== null && (
-                                        <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+                                        <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full">
                                             {action.badge}
                                         </span>
                                     )}
                                 </span>
 
                                 {/* Circular Icon Button */}
-                                <span className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-shadow group-hover:shadow-xl ${iconBg}`}>
+                                <span className={`w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg ${iconBg}`}>
                                     {action.icon}
                                 </span>
                             </button>
@@ -115,14 +130,27 @@ export default function SpeedDialFAB({ actions = [], onClick, mainTheme = 'blue'
             {/* Main FAB Button */}
             <button
                 type="button"
+                disabled={disabled}
                 onClick={handleMainClick}
                 aria-expanded={isSingleAction ? undefined : isOpen}
                 aria-label={ariaLabel}
-                className={`relative z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 active:scale-90 focus:outline-none focus:ring-4 ${mainTheme === 'red' ? 'focus:ring-red-300 dark:focus:ring-red-800' : mainTheme === 'teal' ? 'focus:ring-teal-300 dark:focus:ring-teal-800' : 'focus:ring-blue-300 dark:focus:ring-blue-800'} ${themeClasses}`}
+                className={`relative z-50 ${sizeClass} rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-90 cursor-pointer'} focus:outline-none focus:ring-4 ${
+                    mainTheme === 'red' ? 'focus:ring-red-300 dark:focus:ring-red-800' :
+                    mainTheme === 'purple' ? 'focus:ring-purple-300 dark:focus:ring-purple-800' :
+                    mainTheme === 'teal' ? 'focus:ring-teal-300 dark:focus:ring-teal-800' :
+                    'focus:ring-blue-300 dark:focus:ring-blue-800'
+                } ${themeClasses}`}
             >
                 <div className={`transition-transform duration-300 ${isOpen && !isSingleAction ? 'rotate-135' : 'rotate-0'}`}>
-                    <Plus size={28} strokeWidth={2.5} />
+                    {mainIcon || <Plus size={20} strokeWidth={2.5} />}
                 </div>
+
+                {/* Optional Badge Indicator on Main FAB */}
+                {badge !== undefined && badge !== null && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm animate-in zoom-in-50 duration-200">
+                        {badge}
+                    </span>
+                )}
             </button>
         </div>
     )

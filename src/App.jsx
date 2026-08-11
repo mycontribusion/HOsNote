@@ -15,7 +15,7 @@ import NotebookPage from './components/NotebookPage'
 import DocComposer from './components/DocComposer'
 import SearchOverlay from './components/SearchOverlay'
 import SpeedDialFAB from './components/SpeedDialFAB'
-import { UserPlus, QrCode, Share2 } from 'lucide-react'
+import { Plus, UserPlus, QrCode, Share2 } from 'lucide-react'
 import { get, set } from 'idb-keyval'
 import { generateUniqueValue, updateSuffixesAfterRemoval } from './utils/uniqueSuffix'
 import { Capacitor } from '@capacitor/core'
@@ -1245,7 +1245,7 @@ const pendingEditRef = useRef(null)
                 )}
 
                 {activeTab === 'my_team' && (
-                    <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2">
+                    <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
                         <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
                             {dischargeCount} patient{dischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
                         </p>
@@ -1258,7 +1258,7 @@ const pendingEditRef = useRef(null)
                     </div>
                 )}
                 {activeTab === 'other_team' && (
-                    <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2">
+                    <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
                         <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
                             {otherDischargeCount} patient{otherDischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
                         </p>
@@ -1273,47 +1273,58 @@ const pendingEditRef = useRef(null)
             </main>
             )} {/* end activePage === 'patients' */}
 
-            {/* Collapsible Action FAB — Tracker Page */}
+            {/* Stacked Action FABs — Tracker Page */}
             {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (
-                <SpeedDialFAB
-                    mainTheme={activeTab === 'mortalities' ? 'red' : 'blue'}
-                    ariaLabel="Patient actions menu"
-                    actions={[
-                        {
-                            id: 'add',
-                            label: activeTab === 'mortalities' ? 'Add Mortality' : 'Add Patient',
-                            icon: <UserPlus size={18} />,
-                            color: activeTab === 'mortalities' ? 'purple' : 'blue',
-                            onClick: () => {
-                                if (activeTab === 'mortalities') setShowMortalityForm(true)
-                                else setShowAddForm(true)
-                                navigate(`/team/${activeTab}/add`)
+                <>
+                    {/* Top FAB: Plus (Add & Import) */}
+                    <SpeedDialFAB
+                        positionClass="bottom-[4.5rem] right-5"
+                        sizeClass="w-11 h-11"
+                        mainIcon={<Plus size={20} strokeWidth={2.5} />}
+                        mainTheme={activeTab === 'mortalities' ? 'red' : 'blue'}
+                        ariaLabel="Add patient or import data"
+                        actions={[
+                            {
+                                id: 'add',
+                                label: activeTab === 'mortalities' ? 'Add Mortality' : 'Add Patient',
+                                icon: <UserPlus size={16} />,
+                                color: activeTab === 'mortalities' ? 'purple' : 'blue',
+                                onClick: () => {
+                                    if (activeTab === 'mortalities') setShowMortalityForm(true)
+                                    else setShowAddForm(true)
+                                    navigate(`/team/${activeTab}/add`)
+                                }
+                            },
+                            {
+                                id: 'receive',
+                                label: 'Import',
+                                icon: <QrCode size={16} />,
+                                color: 'emerald',
+                                onClick: () => {
+                                    setShowScanner(true)
+                                    navigate(`/team/${activeTab}/receive`)
+                                }
                             }
-                        },
-                        {
-                            id: 'receive',
-                            label: 'Receive',
-                            icon: <QrCode size={18} />,
-                            color: 'emerald',
-                            onClick: () => {
-                                setShowScanner(true)
-                                navigate(`/team/${activeTab}/receive`)
-                            }
-                        },
-                        {
-                            id: 'handover',
-                            label: 'Handover',
-                            icon: <Share2 size={18} />,
-                            color: 'purple',
-                            badge: selectedPatientIds.size > 0 ? selectedPatientIds.size : null,
-                            disabled: activePatients.length === 0,
-                            onClick: () => {
+                        ]}
+                    />
+
+                    {/* Bottom FAB: Share / Handover */}
+                    <SpeedDialFAB
+                        positionClass="bottom-5 right-5"
+                        sizeClass="w-11 h-11"
+                        mainTheme={activeTab === 'mortalities' ? 'red' : 'purple'}
+                        mainIcon={<Share2 size={18} strokeWidth={2.2} />}
+                        ariaLabel="Handover patients"
+                        badge={selectedPatientIds.size > 0 ? selectedPatientIds.size : null}
+                        disabled={activePatients.length === 0}
+                        onClick={() => {
+                            if (activePatients.length > 0) {
                                 setShowExport(true)
                                 navigate(`/team/${activeTab}/handover`)
                             }
-                        }
-                    ]}
-                />
+                        }}
+                    />
+                </>
             )}
 
             {/* Modals */}
