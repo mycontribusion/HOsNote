@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Edit2, Trash2, BookOpen, X, Plus, ArrowUpDown } from 'lucide-react'
+import { Edit2, Trash2, BookOpen, X, Plus, ArrowUpDown, User, StickyNote } from 'lucide-react'
 import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
 import SpeedDialFAB from './SpeedDialFAB'
@@ -62,6 +62,12 @@ const NOTE_SORT_OPTIONS = [
     { value: 'name', label: 'Patient Name' },
     { value: 'ward', label: 'Ward' },
     { value: 'diagnosis', label: 'Diagnosis' },
+]
+
+const NOTE_FILTER_OPTIONS = [
+    { value: 'all', label: 'All', icon: null },
+    { value: 'patient', label: 'Patient', icon: User },
+    { value: 'standalone', label: 'Notes', icon: StickyNote },
 ]
 
 // Detail view modal for a single note
@@ -177,6 +183,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
     const [editingDoc, setEditingDoc] = useState(null)
     const [showAddNoteForm, setShowAddNoteForm] = useState(false)
     const [sortBy, setSortBy] = useState('default')
+    const [noteFilter, setNoteFilter] = useState('all')
 
     useEffect(() => {
         if (initialEditDoc && initialEditDoc.id !== editingDoc?.id) {
@@ -221,7 +228,13 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
         })
     }
 
-    const sortedDocs = useMemo(() => sortDocs(docs), [docs, sortBy])
+    const filteredDocs = useMemo(() => {
+        if (noteFilter === 'patient') return docs.filter(d => d.patientId != null)
+        if (noteFilter === 'standalone') return docs.filter(d => d.patientId == null)
+        return docs
+    }, [docs, noteFilter])
+
+    const sortedDocs = useMemo(() => sortDocs(filteredDocs), [filteredDocs, sortBy])
 
     const handleDeleteFromDetail = (doc) => {
         setSelectedDoc(null)
@@ -278,36 +291,70 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
 
             {/* Card list */}
             <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-36">
-                {/* Sort controls */}
+                {/* Filter & Sort controls */}
                 {docs.length > 0 && (
-                    <div className="flex items-center justify-end gap-1.5 mb-3">
-                        <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
-                            aria-label="Sort notes by"
-                        >
-                            {NOTE_SORT_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                        {/* Note type filter */}
+                        <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
+                            {NOTE_FILTER_OPTIONS.map((opt) => {
+                                const Icon = opt.icon
+                                const isActive = noteFilter === opt.value
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setNoteFilter(opt.value)}
+                                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all ${
+                                            isActive
+                                                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                        }`}
+                                        aria-pressed={isActive}
+                                        aria-label={`Filter: ${opt.label}`}
+                                    >
+                                        {Icon && <Icon size={10} />}
+                                        {opt.label}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
+                        {/* Sort controls */}
+                        <div className="flex items-center gap-1.5">
+                            <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
+                                aria-label="Sort notes by"
+                            >
+                                {NOTE_SORT_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 )}
 
-                {docs.length === 0 ? (
+                {filteredDocs.length === 0 ? (
                     /* Empty state */
                     <div className="flex flex-col items-center justify-center text-center py-20 px-6">
                         <div className="w-20 h-20 rounded-full bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center mb-5">
                             <BookOpen size={34} className="text-teal-400 dark:text-teal-500" />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No notes yet</h3>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                            {docs.length === 0 ? 'No notes yet' : 'No matching notes'}
+                        </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[240px] leading-relaxed">
-                            Tap the <strong>📝</strong> icon on any patient card to write your first documentation entry.
+                            {docs.length === 0
+                                ? <>Tap the <strong>📝</strong> icon on any patient card to write your first documentation entry.</>
+                                : <>Try switching the filter above to see other notes.</>
+                            }
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 italic">
-                            Notes are kept here even after a patient is discharged.
-                        </p>
+                        {docs.length === 0 && (
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 italic">
+                                Notes are kept here even after a patient is discharged.
+                            </p>
+                        )}
                     </div>
                 ) : (
                     <div className="space-y-3">
