@@ -294,6 +294,32 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
     }, [fields])
 
+    useLayoutEffect(() => {
+        // Focus management: new forms focus the first relevant input,
+        // editing mode focuses the textarea at the end of the last word.
+        if (initialData) {
+            if (noteRef.current) {
+                noteRef.current.focus()
+                const text = (noteRef.current.value || '').trimEnd()
+                if (text) {
+                    const match = text.match(/(\S+)\s*$/)
+                    if (match) {
+                        const lastWordEnd = match.index + match[0].length
+                        noteRef.current.setSelectionRange(lastWordEnd, lastWordEnd)
+                    } else {
+                        noteRef.current.setSelectionRange(text.length, text.length)
+                    }
+                } else {
+                    noteRef.current.setSelectionRange(0, 0)
+                }
+            }
+        } else if (isNoteMode) {
+            diagRef.current?.focus()
+        } else {
+            nameRef.current?.focus()
+        }
+    }, [initialData, isNoteMode])
+
     useEffect(() => {
         // Lock background scroll while modal is open
         document.body.style.overflow = 'hidden'

@@ -126,6 +126,18 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.focus()
+            if (existingDoc) {
+                const text = (textareaRef.current.value || '').trimEnd()
+                if (text) {
+                    const match = text.match(/(\S+)\s*$/)
+                    if (match) {
+                        const lastWordEnd = match.index + match[0].length
+                        textareaRef.current.setSelectionRange(lastWordEnd, lastWordEnd)
+                    } else {
+                        textareaRef.current.setSelectionRange(text.length, text.length)
+                    }
+                }
+            }
         }
     }, [])
 
