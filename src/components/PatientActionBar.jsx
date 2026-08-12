@@ -45,11 +45,11 @@ export default function PatientActionBar({
 
                     <Divider />
 
-                    {/* IMPORT / RECEIVE */}
+                    {/* RECEIVE */}
                     <ActionButton
-                        id="pat-action-import"
+                        id="pat-action-receive"
                         icon={<QrCode size={20} strokeWidth={2} />}
-                        label="Import"
+                        label="Receive"
                         onClick={onImport}
                         colorClass="text-emerald-600 dark:text-emerald-400 active:bg-emerald-50 dark:active:bg-emerald-900/30"
                         dotClass="bg-emerald-500"
