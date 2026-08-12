@@ -1168,7 +1168,7 @@ const pendingEditRef = useRef(null)
 
             {/* Patients Page */}
             {activePage === 'patients' && (
-            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-28">
+            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-24">
                 {showMortalityForm ? (
                     <AddPatientForm
                         initialData={null}
