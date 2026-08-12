@@ -280,6 +280,11 @@ const pendingEditRef = useRef(null)
     const [selectedPatientIds, setSelectedPatientIds] = useState(new Set())
     const [pendingClearAction, setPendingClearAction] = useState(null)
 
+    // Clear selection when switching tabs or pages
+    useEffect(() => {
+        setSelectedPatientIds(new Set())
+    }, [activeTab, activePage])
+
     // Apply dark mode class to <html>
     useEffect(() => {
         if (darkMode) {
@@ -1166,9 +1171,14 @@ const pendingEditRef = useRef(null)
                 />
             )}
 
-            {/* Patients Page */}
-            {activePage === 'patients' && (
-            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-24">
+            <main
+                className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-24"
+                onClick={() => {
+                    if (selectedPatientIds.size > 0) {
+                        setSelectedPatientIds(new Set())
+                    }
+                }}
+            >
                 {showMortalityForm ? (
                     <AddPatientForm
                         initialData={null}
@@ -1294,7 +1304,6 @@ const pendingEditRef = useRef(null)
                     </div>
                 )}
             </main>
-            )} {/* end activePage === 'patients' */}
 
             {/* Bottom Action Bar — Tracker Page */}
             {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (

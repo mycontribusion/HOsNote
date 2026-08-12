@@ -117,6 +117,7 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
                         docCount={getDocCount ? getDocCount(patient.id) : 0}
                         isSelected={selectedIds.has(patient.id)}
                         onToggleSelect={onToggleSelect}
+                        selectionMode={selectedIds.size > 0}
                         isMortality={isMortality}
                         onMoveTeam={onMoveTeam}
                         moveTeamLabel={moveTeamLabel}
@@ -164,6 +165,7 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
                                     docCount={getDocCount ? getDocCount(patient.id) : 0}
                                     isSelected={selectedIds.has(patient.id)}
                                     onToggleSelect={onToggleSelect}
+                                    selectionMode={selectedIds.size > 0}
                                     isMortality={isMortality}
                                     onMoveTeam={onMoveTeam}
                                     moveTeamLabel={moveTeamLabel}

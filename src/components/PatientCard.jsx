@@ -1,5 +1,5 @@
 import { Trash2, Pencil, CheckCircle2, FileText, ChevronsLeft } from 'lucide-react'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { formatSmartDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
 
@@ -20,7 +20,7 @@ function HighlightText({ text, query }) {
     )
 }
 
-export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail }) {
+export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail }) {
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
 
     let durationText = '';
@@ -33,44 +33,91 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
 
     const [offsetX, setOffsetX] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
+    const [pressRing, setPressRing] = useState(false)
     const startX = useRef(null)
+    const startY = useRef(null)
+    const longPressTimer = useRef(null)
+    const longPressTriggered = useRef(false)
+    // suppressClick survives pointerUp so the click event after a long-press is blocked
+    const suppressClick = useRef(false)
+
+    // Clear long-press timer on unmount
+    useEffect(() => () => clearTimeout(longPressTimer.current), [])
 
     const handlePointerDown = (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
-        // Don't intercept pointer if clicking on a button
         if (e.target.closest('button')) return;
 
         startX.current = e.clientX;
+        startY.current = e.clientY;
+        longPressTriggered.current = false;
         setIsDragging(true);
         e.currentTarget.setPointerCapture(e.pointerId);
+
+        // Long-press: 500ms hold triggers selection
+        if (onToggleSelect) {
+            longPressTimer.current = setTimeout(() => {
+                longPressTriggered.current = true;
+                suppressClick.current = true; // block the click that fires after pointerUp
+                setPressRing(true);
+                setTimeout(() => setPressRing(false), 400);
+                onToggleSelect(id);
+            }, 500);
+        }
     }
     const handlePointerMove = (e) => {
         if (!isDragging || startX.current === null) return;
-        const currentX = e.clientX;
-        let diff = currentX - startX.current;
+        const dx = e.clientX - startX.current;
+        const dy = e.clientY - (startY.current ?? e.clientY);
+        // Cancel long-press if the finger moved more than 8px
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            clearTimeout(longPressTimer.current);
+        }
+        let diff = dx;
         if (diff > 120) diff = 120 + (diff - 120) * 0.2;
         if (diff < -120) diff = -120 + (diff + 120) * 0.2;
         setOffsetX(diff);
     }
     const handlePointerUp = (e) => {
         if (!isDragging) return;
+        clearTimeout(longPressTimer.current);
         setIsDragging(false);
         e.currentTarget.releasePointerCapture(e.pointerId);
 
-        if (offsetX > 80 && onReview && !isMortality) {
-            onReview(id, !reviewed);
-        } else if (offsetX < -80) {
-            onDelete(id);
+        if (!longPressTriggered.current) {
+            if (offsetX > 80 && onReview && !isMortality) {
+                onReview(id, !reviewed);
+            } else if (offsetX < -80) {
+                onDelete(id);
+            }
         }
         setOffsetX(0);
         startX.current = null;
+        startY.current = null;
+        longPressTriggered.current = false;
+        // suppressClick.current is NOT reset here — the click event reads & resets it
     }
 
     const handleCardClick = (e) => {
         if (e.target.closest('button') || Math.abs(offsetX) > 5) return;
-        if (onOpenDetail) {
-            onOpenDetail(patient);
+
+        // If this click follows a long-press, block it and consume the flag
+        if (suppressClick.current) {
+            suppressClick.current = false;
+            e.stopPropagation();
+            return;
         }
+
+        // In selection mode: tapping any card toggles its selection
+        if (selectionMode && onToggleSelect) {
+            e.stopPropagation();
+            onToggleSelect(id);
+            return;
+        }
+
+        // Normal: open detail modal (stop propagation so it doesn't hit the main clear handler)
+        e.stopPropagation();
+        if (onOpenDetail) onOpenDetail(patient);
     }
 
     // Generate a color based on ward or name or id string for visual variety
@@ -110,9 +157,14 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
             {/* Fore Card */}
             <div
                 className={`card p-4 flex flex-col sm:flex-row gap-4 group relative z-10 touch-pan-y cursor-pointer
-                    ${isDragging ? 'transition-none' : 'transition-transform duration-300'} 
-                    ${isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1' : ''}
-                    ${reviewed ? 'opacity-70 bg-gray-50 dark:bg-gray-800/50 grayscale-[15%]' : isMortality ? 'bg-white dark:bg-gray-800 border-red-100 dark:border-red-950 shadow-sm' : critical ? 'bg-red-50/40 dark:bg-red-900/10 border-red-200 dark:border-red-800 shadow-sm shadow-red-100/50' : 'bg-white dark:bg-gray-800'}`}
+                    ${isDragging ? 'transition-none' : 'transition-all duration-300'} 
+                    ${isSelected
+                        ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-700 shadow-lg shadow-blue-100/60 dark:shadow-blue-950/60 ring-0'
+                        : reviewed ? 'opacity-70 bg-gray-50 dark:bg-gray-800/50 grayscale-[15%]'
+                        : isMortality ? 'bg-white dark:bg-gray-800 border-red-100 dark:border-red-950 shadow-sm'
+                        : critical ? 'bg-red-50/40 dark:bg-red-900/10 border-red-200 dark:border-red-800 shadow-sm shadow-red-100/50'
+                        : 'bg-white dark:bg-gray-800'
+                    }`}
                 style={{ transform: `translateX(${offsetX}px)` }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -120,7 +172,24 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                 onPointerCancel={handlePointerUp}
                 onClick={handleCardClick}
             >
-                {isMortality && <div className="absolute top-0 left-0 w-1 h-full bg-red-500 opacity-20"></div>}
+                {/* Long-press selection ring flash */}
+                {pressRing && (
+                    <span className="absolute inset-0 rounded-2xl ring-4 ring-blue-400 dark:ring-blue-500 animate-ping pointer-events-none z-30" />
+                )}
+
+                {/* Selected: blue left accent bar */}
+                {isSelected && (
+                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 dark:bg-blue-400 rounded-l-2xl" />
+                )}
+
+                {/* Selected: checkmark stamp in top-right */}
+                {isSelected && (
+                    <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-blue-500 dark:bg-blue-400 flex items-center justify-center shadow-md z-20 animate-in zoom-in-50 duration-200">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                    </div>
+                )}
                 {onMoveTeam && (
                     <button
                         className="sm:hidden absolute top-1 left-1 w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-500 text-white flex items-center justify-center shadow-xs active:scale-90 transition-all z-20"
