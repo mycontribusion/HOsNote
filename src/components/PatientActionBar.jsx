@@ -84,7 +84,18 @@ export default function PatientActionBar({
             {moreOpen && (
                 <div
                     className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200"
-                    onClick={() => setMoreOpen(false)}
+                    onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                    }}
+                    onTouchStart={(e) => {
+                        e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setMoreOpen(false);
+                    }}
                     aria-hidden="true"
                 />
             )}
