@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Edit2, Trash2, BookOpen, X, Plus } from 'lucide-react'
+import { Edit2, Trash2, BookOpen, X, Plus, ArrowUpDown } from 'lucide-react'
 import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
 import SpeedDialFAB from './SpeedDialFAB'
@@ -55,6 +55,14 @@ function formatMonthYear(iso) {
     const d = new Date(iso)
     return d.toLocaleDateString([], { month: 'short', year: 'numeric' })
 }
+
+const NOTE_SORT_OPTIONS = [
+    { value: 'default', label: 'Newest First' },
+    { value: 'date_asc', label: 'Oldest First' },
+    { value: 'name', label: 'Patient Name' },
+    { value: 'ward', label: 'Ward' },
+    { value: 'diagnosis', label: 'Diagnosis' },
+]
 
 // Detail view modal for a single note
 function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
@@ -168,6 +176,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
     const [showAddNoteForm, setShowAddNoteForm] = useState(false)
+    const [sortBy, setSortBy] = useState('default')
 
     useEffect(() => {
         if (initialEditDoc && initialEditDoc.id !== editingDoc?.id) {
@@ -186,6 +195,33 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
         }
     }, [initialSelectedDocId, docs, onDocOpened])
 
+
+    const sortDocs = (list) => {
+        if (sortBy === 'default') return list
+        return [...list].sort((a, b) => {
+            if (sortBy === 'date_asc') {
+                return new Date(a.createdAt) - new Date(b.createdAt)
+            }
+
+            if (sortBy === 'name') {
+                return (a.patientName || '').localeCompare(b.patientName || '', undefined, { numeric: true, sensitivity: 'base' })
+            }
+
+            if (sortBy === 'ward') {
+                const wardCmp = (a.patientWard || '').localeCompare(b.patientWard || '', undefined, { numeric: true, sensitivity: 'base' })
+                if (wardCmp !== 0) return wardCmp
+                return (a.patientBed || '').localeCompare(b.patientBed || '', undefined, { numeric: true, sensitivity: 'base' })
+            }
+
+            if (sortBy === 'diagnosis') {
+                return (a.diagnosis || a.patientDiagnosis || '').localeCompare(b.diagnosis || b.patientDiagnosis || '', undefined, { numeric: true, sensitivity: 'base' })
+            }
+
+            return 0
+        })
+    }
+
+    const sortedDocs = useMemo(() => sortDocs(docs), [docs, sortBy])
 
     const handleDeleteFromDetail = (doc) => {
         setSelectedDoc(null)
@@ -242,6 +278,23 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
 
             {/* Card list */}
             <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-36">
+                {/* Sort controls */}
+                {docs.length > 0 && (
+                    <div className="flex items-center justify-end gap-1.5 mb-3">
+                        <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
+                            aria-label="Sort notes by"
+                        >
+                            {NOTE_SORT_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 {docs.length === 0 ? (
                     /* Empty state */
                     <div className="flex flex-col items-center justify-center text-center py-20 px-6">
@@ -258,7 +311,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {docs.map(doc => {
+                        {sortedDocs.map(doc => {
                             const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
                             const bg = COLOR_BG[doc.color] || COLOR_BG.blue
                             const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
