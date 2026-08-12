@@ -34,7 +34,6 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
     const [offsetX, setOffsetX] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
     const startX = useRef(null)
-    const longPressTimer = useRef(null)
 
     const handlePointerDown = (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -44,26 +43,11 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
         startX.current = e.clientX;
         setIsDragging(true);
         e.currentTarget.setPointerCapture(e.pointerId);
-
-        // Long press to toggle selection (for active cards)
-        if (!isMortality && onToggleSelect) {
-            longPressTimer.current = setTimeout(() => {
-                onToggleSelect(id);
-                longPressTimer.current = null;
-            }, 500);
-        }
     }
     const handlePointerMove = (e) => {
         if (!isDragging || startX.current === null) return;
         const currentX = e.clientX;
         let diff = currentX - startX.current;
-        if (Math.abs(diff) > 10) {
-            // Cancel long press if user moves finger
-            if (longPressTimer.current) {
-                clearTimeout(longPressTimer.current);
-                longPressTimer.current = null;
-            }
-        }
         if (diff > 120) diff = 120 + (diff - 120) * 0.2;
         if (diff < -120) diff = -120 + (diff + 120) * 0.2;
         setOffsetX(diff);
@@ -72,12 +56,6 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
         if (!isDragging) return;
         setIsDragging(false);
         e.currentTarget.releasePointerCapture(e.pointerId);
-
-        // Clear long press timer
-        if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-            longPressTimer.current = null;
-        }
 
         if (offsetX > 80 && onReview && !isMortality) {
             onReview(id, !reviewed);
@@ -155,45 +133,43 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                 )}
                 <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
 
-                    {/* Left Column (Badge + Mobile Actions) - hidden for mortality */}
-                    {!isMortality && (
-                        <div className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[64px]">
-                            {/* Ward/Bed or Initial Badge */}
-                            <div className={`flex flex-col items-center justify-center rounded-xl border-2 px-3 py-2 text-center w-[64px] min-h-[64px] ${badgeColor}`}>
-                                {ward || bed ? (
-                                    <>
-                                        {ward && <div className="text-xs font-semibold uppercase tracking-wider opacity-70 leading-none mb-1">{ward}</div>}
-                                        {bed && <div className="text-xl font-extrabold leading-tight"><SuffixedValue value={bed} /></div>}
-                                        {!bed && ward && <div className="text-xl font-extrabold leading-tight">-</div>}
-                                    </>
-                                ) : (
-                                    <div className="text-2xl font-extrabold uppercase leading-none">
-                                        {name ? name.charAt(0) : '?'}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Mobile Actions (Under Badge - fixed 64px width) */}
-                            <div className="flex sm:hidden flex-row gap-0.5 justify-center w-full">
-                                {onToggleSelect && (
-                                    <button
-                                        className={`btn-icon !min-h-[30px] !min-w-[30px] rounded-lg transition-all ${isSelected ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
-                                        onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
-                                        aria-label="Toggle selection"
-                                    >
-                                        {isSelected ? <CheckCircle2 size={16} /> : <div className="w-3.5 h-3.5 rounded border-2 border-gray-300 dark:border-gray-500" />}
-                                    </button>
-                                )}
-                                <button
-                                    className="btn-icon !min-h-[30px] !min-w-[30px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                                    onClick={(e) => { e.stopPropagation(); onEdit(patient) }}
-                                    aria-label="Edit patient"
-                                >
-                                    <Pencil size={15} strokeWidth={2} />
-                                </button>
-                            </div>
+                    {/* Left Column (Badge + Mobile Actions) */}
+                    <div className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[64px]">
+                        {/* Ward/Bed or Initial Badge */}
+                        <div className={`flex flex-col items-center justify-center rounded-xl border-2 px-3 py-2 text-center w-[64px] min-h-[64px] ${badgeColor}`}>
+                            {ward || bed ? (
+                                <>
+                                    {ward && <div className="text-xs font-semibold uppercase tracking-wider opacity-70 leading-none mb-1">{ward}</div>}
+                                    {bed && <div className="text-xl font-extrabold leading-tight"><SuffixedValue value={bed} /></div>}
+                                    {!bed && ward && <div className="text-xl font-extrabold leading-tight">-</div>}
+                                </>
+                            ) : (
+                                <div className="text-2xl font-extrabold uppercase leading-none">
+                                    {name ? name.charAt(0) : '?'}
+                                </div>
+                            )}
                         </div>
-                    )}
+
+                        {/* Mobile Actions (Under Badge - fixed 64px width) */}
+                        <div className="flex sm:hidden flex-row gap-0.5 justify-center w-full">
+                            {onToggleSelect && (
+                                <button
+                                    className={`btn-icon !min-h-[30px] !min-w-[30px] rounded-lg transition-all ${isSelected ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+                                    onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
+                                    aria-label="Toggle selection"
+                                >
+                                    {isSelected ? <CheckCircle2 size={16} /> : <div className="w-3.5 h-3.5 rounded border-2 border-gray-300 dark:border-gray-500" />}
+                                </button>
+                            )}
+                            <button
+                                className="btn-icon !min-h-[30px] !min-w-[30px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                onClick={(e) => { e.stopPropagation(); onEdit(patient) }}
+                                aria-label="Edit patient"
+                            >
+                                <Pencil size={15} strokeWidth={2} />
+                            </button>
+                        </div>
+                    </div>
 
                     {/* Patient Info */}
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -269,51 +245,49 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
                 </div>
 
                 {/* Desktop Actions */}
-                {!isMortality && (
-                    <div className="hidden sm:flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity z-20">
-                        {/* Selection checkbox */}
-                        {onToggleSelect && (
-                            <button
-                                className={`btn-icon flex-shrink-0 transition-all ${isSelected
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : 'text-gray-300 dark:text-gray-600 hover:text-blue-400'
-                                    }`}
-                                onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
-                                aria-label={isSelected ? 'Deselect patient' : 'Select patient for handover'}
-                                title={isSelected ? 'Deselect' : 'Select for handover'}
-                            >
-                                {isSelected ? (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect width="18" height="18" x="3" y="3" rx="2" /><path d="m9 12 2 2 4-4" />
-                                    </svg>
-                                ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect width="18" height="18" x="3" y="3" rx="2" />
-                                    </svg>
-                                )}
-                            </button>
-                        )}
-                        {onMoveTeam && (
-                            <button
-                                className="btn-icon text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-200 flex-shrink-0"
-                                onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
-                                aria-label={moveTeamLabel || 'Move team'}
-                                title={moveTeamLabel || 'Move team'}
-                            >
-                                <ChevronsLeft size={18} strokeWidth={2} />
-                            </button>
-                        )}
+                <div className="hidden sm:flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity z-20">
+                    {/* Selection checkbox */}
+                    {onToggleSelect && (
+                        <button
+                            className={`btn-icon flex-shrink-0 transition-all ${isSelected
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-gray-300 dark:text-gray-600 hover:text-blue-400'
+                                }`}
+                            onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
+                            aria-label={isSelected ? 'Deselect patient' : 'Select patient for handover'}
+                            title={isSelected ? 'Deselect' : 'Select for handover'}
+                        >
+                            {isSelected ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect width="18" height="18" x="3" y="3" rx="2" /><path d="m9 12 2 2 4-4" />
+                                </svg>
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                                </svg>
+                            )}
+                        </button>
+                    )}
+                    {onMoveTeam && (
                         <button
                             className="btn-icon text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-200 flex-shrink-0"
-                            onClick={() => onEdit(patient)}
-                            aria-label="Edit patient"
-                            title="Edit patient"
+                            onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
+                            aria-label={moveTeamLabel || 'Move team'}
+                            title={moveTeamLabel || 'Move team'}
                         >
-                            <Pencil size={18} strokeWidth={2} />
+                            <ChevronsLeft size={18} strokeWidth={2} />
                         </button>
+                    )}
+                    <button
+                        className="btn-icon text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-200 flex-shrink-0"
+                        onClick={() => onEdit(patient)}
+                        aria-label="Edit patient"
+                        title="Edit patient"
+                    >
+                        <Pencil size={18} strokeWidth={2} />
+                    </button>
 
-                    </div>
-                )}
+                </div>
             </div>
         </div>
     )
