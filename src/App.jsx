@@ -14,8 +14,7 @@ import SettingsModal from './components/SettingsModal'
 import NotebookPage from './components/NotebookPage'
 import DocComposer from './components/DocComposer'
 import SearchOverlay from './components/SearchOverlay'
-import SpeedDialFAB from './components/SpeedDialFAB'
-import { Plus, UserPlus, QrCode, Share2 } from 'lucide-react'
+import PatientActionBar from './components/PatientActionBar'
 import { get, set } from 'idb-keyval'
 import { generateUniqueValue, updateSuffixesAfterRemoval } from './utils/uniqueSuffix'
 import { formatSmartDate } from './utils/formatSmartDate'
@@ -1169,7 +1168,7 @@ const pendingEditRef = useRef(null)
 
             {/* Patients Page */}
             {activePage === 'patients' && (
-            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-20">
+            <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-28">
                 {showMortalityForm ? (
                     <AddPatientForm
                         initialData={null}
@@ -1297,58 +1296,26 @@ const pendingEditRef = useRef(null)
             </main>
             )} {/* end activePage === 'patients' */}
 
-            {/* Stacked Action FABs — Tracker Page */}
+            {/* Bottom Action Bar — Tracker Page */}
             {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (
-                <>
-                    {/* Top FAB: Plus (Add & Import) */}
-                    <SpeedDialFAB
-                        positionClass="bottom-[4.5rem] right-5"
-                        sizeClass="w-11 h-11"
-                        mainIcon={<Plus size={20} strokeWidth={2.5} />}
-                        mainTheme={activeTab === 'mortalities' ? 'red' : 'blue'}
-                        ariaLabel="Add patient or import data"
-                        actions={[
-                            {
-                                id: 'add',
-                                label: activeTab === 'mortalities' ? 'Add Mortality' : 'Add Patient',
-                                icon: <UserPlus size={16} />,
-                                color: activeTab === 'mortalities' ? 'purple' : 'blue',
-                                onClick: () => {
-                                    if (activeTab === 'mortalities') setShowMortalityForm(true)
-                                    else setShowAddForm(true)
-                                    navigate(`/team/${activeTab}/add`)
-                                }
-                            },
-                            {
-                                id: 'receive',
-                                label: 'Import',
-                                icon: <QrCode size={16} />,
-                                color: 'emerald',
-                                onClick: () => {
-                                    setShowScanner(true)
-                                    navigate(`/team/${activeTab}/receive`)
-                                }
-                            }
-                        ]}
-                    />
-
-                    {/* Bottom FAB: Share / Handover */}
-                    <SpeedDialFAB
-                        positionClass="bottom-5 right-5"
-                        sizeClass="w-11 h-11"
-                        mainTheme={activeTab === 'mortalities' ? 'red' : 'purple'}
-                        mainIcon={<Share2 size={18} strokeWidth={2.2} />}
-                        ariaLabel="Handover patients"
-                        badge={selectedPatientIds.size > 0 ? selectedPatientIds.size : null}
-                        disabled={activePatients.length === 0}
-                        onClick={() => {
-                            if (activePatients.length > 0) {
-                                setShowExport(true)
-                                navigate(`/team/${activeTab}/handover`)
-                            }
-                        }}
-                    />
-                </>
+                <PatientActionBar
+                    isMortality={activeTab === 'mortalities'}
+                    onAdd={() => {
+                        if (activeTab === 'mortalities') setShowMortalityForm(true)
+                        else setShowAddForm(true)
+                        navigate(`/team/${activeTab}/add`)
+                    }}
+                    onImport={() => {
+                        setShowScanner(true)
+                        navigate(`/team/${activeTab}/receive`)
+                    }}
+                    onHandover={() => {
+                        setShowExport(true)
+                        navigate(`/team/${activeTab}/handover`)
+                    }}
+                    handoverBadge={selectedPatientIds.size > 0 ? selectedPatientIds.size : null}
+                    handoverDisabled={activePatients.length === 0}
+                />
             )}
 
             {/* Modals */}
