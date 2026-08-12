@@ -99,13 +99,13 @@ export default function PatientActionBar({
                     ══════════════════════════════════════════════ */}
                 {hasSelection ? (
                     <div className="flex flex-col items-end gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                        {/* Import */}
+                        {/* Receive */}
                         <SquareButton
                             id="pat-action-import-sel"
                             icon={<QrCode size={20} strokeWidth={2} />}
                             colorClass="bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-400/40 text-white"
                             ringClass="focus:ring-emerald-300 dark:focus:ring-emerald-700"
-                            ariaLabel="Import patients"
+                            ariaLabel="Receive patients"
                             onClick={onImport}
                         />
 
@@ -143,10 +143,10 @@ export default function PatientActionBar({
                                         }
                                     }}
                                 />
-                                {/* Import */}
+                                {/* Receive */}
                                 <ExpandedAction
                                     icon={<QrCode size={18} strokeWidth={2} />}
-                                    label="Import"
+                                    label="Receive"
                                     colorClass="bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-400/40"
                                     onClick={() => {
                                         setMoreOpen(false)
@@ -156,45 +156,59 @@ export default function PatientActionBar({
                             </div>
                         )}
 
-                        {/* More button */}
-                        <button
-                            id="pat-action-more"
-                            type="button"
-                            onClick={() => setMoreOpen(prev => !prev)}
-                            aria-label={moreOpen ? 'Close actions' : 'More actions'}
-                            aria-expanded={moreOpen}
-                            className={`
-                                w-12 h-12 rounded-2xl
-                                flex items-center justify-center
-                                shadow-lg
-                                transition-all duration-200
-                                focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600
-                                active:scale-90 cursor-pointer
-                                ${moreOpen
-                                    ? 'bg-gray-700 dark:bg-gray-600 text-white shadow-gray-700/40'
-                                    : 'bg-white/90 dark:bg-gray-800/95 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-gray-700/60 backdrop-blur-sm shadow-gray-200/60 dark:shadow-black/40'
-                                }
-                            `}
-                        >
-                            <div className={`transition-transform duration-300 ${moreOpen ? 'rotate-90' : 'rotate-0'}`}>
-                                {moreOpen
-                                    ? <X size={20} strokeWidth={2.5} />
-                                    : <MoreHorizontal size={20} strokeWidth={2.5} />
-                                }
-                            </div>
-                        </button>
+                        {/* More / Cancel button */}
+                        <div className="flex items-center gap-2.5">
+                            {moreOpen && (
+                                <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-md border border-gray-100 dark:border-gray-700 whitespace-nowrap">
+                                    Cancel
+                                </span>
+                            )}
+                            <button
+                                id="pat-action-more"
+                                type="button"
+                                onClick={() => setMoreOpen(prev => !prev)}
+                                aria-label={moreOpen ? 'Cancel' : 'More actions'}
+                                aria-expanded={moreOpen}
+                                className={`
+                                    w-12 h-12 rounded-2xl
+                                    flex items-center justify-center
+                                    shadow-lg
+                                    transition-all duration-200
+                                    focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600
+                                    active:scale-90 cursor-pointer
+                                    ${moreOpen
+                                        ? 'bg-gray-700 dark:bg-gray-600 text-white shadow-gray-700/40'
+                                        : 'bg-white/90 dark:bg-gray-800/95 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-gray-700/60 backdrop-blur-sm shadow-gray-200/60 dark:shadow-black/40'
+                                    }
+                                `}
+                            >
+                                <div className={`transition-transform duration-300 ${moreOpen ? 'rotate-90' : 'rotate-0'}`}>
+                                    {moreOpen
+                                        ? <X size={20} strokeWidth={2.5} />
+                                        : <MoreHorizontal size={20} strokeWidth={2.5} />
+                                    }
+                                </div>
+                            </button>
+                        </div>
                     </>
                 )}
 
                 {/* ─── BOTTOM: Add Patient — always visible ─── */}
-                <SquareButton
-                    id="pat-action-add"
-                    icon={<UserPlus size={20} strokeWidth={2} />}
-                    colorClass={`${addColor} text-white`}
-                    ringClass={addRing}
-                    ariaLabel={isMortality ? 'Add mortality record' : 'Add patient'}
-                    onClick={onAdd}
-                />
+                <div className="flex items-center gap-2.5">
+                    {moreOpen && (
+                        <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-md border border-gray-100 dark:border-gray-700 whitespace-nowrap">
+                            Add patient
+                        </span>
+                    )}
+                    <SquareButton
+                        id="pat-action-add"
+                        icon={<UserPlus size={20} strokeWidth={2} />}
+                        colorClass={`${addColor} text-white`}
+                        ringClass={addRing}
+                        ariaLabel={isMortality ? 'Add mortality record' : 'Add patient'}
+                        onClick={onAdd}
+                    />
+                </div>
             </div>
         </>
     )
