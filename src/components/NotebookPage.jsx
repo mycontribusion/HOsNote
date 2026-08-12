@@ -283,9 +283,10 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
             {/* Speed Dial FAB — Notebook Page */}
             {!showAddNoteForm && !editingDoc && (
                 <SpeedDialFAB
-                    mainTheme="teal"
+                    mainTheme="blue"
                     ariaLabel="Add new note"
                     onClick={() => setShowAddNoteForm(true)}
+                    shape="square"
                 />
             )}
 

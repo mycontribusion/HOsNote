@@ -10,7 +10,8 @@ export default function SpeedDialFAB({
     positionClass = 'bottom-5 right-5',
     badge,
     disabled = false,
-    ariaLabel = 'Actions menu'
+    ariaLabel = 'Actions menu',
+    shape = 'circle',
 }) {
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef(null)
@@ -134,7 +135,7 @@ export default function SpeedDialFAB({
                 onClick={handleMainClick}
                 aria-expanded={isSingleAction ? undefined : isOpen}
                 aria-label={ariaLabel}
-                className={`relative z-50 ${sizeClass} rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-90 cursor-pointer'} focus:outline-none focus:ring-4 ${
+                className={`relative z-50 ${shape === 'square' ? 'w-12 h-12 rounded-2xl' : `${sizeClass} rounded-full`} flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-90 cursor-pointer'} focus:outline-none focus:ring-4 ${
                     mainTheme === 'red' ? 'focus:ring-red-300 dark:focus:ring-red-800' :
                     mainTheme === 'purple' ? 'focus:ring-purple-300 dark:focus:ring-purple-800' :
                     mainTheme === 'teal' ? 'focus:ring-teal-300 dark:focus:ring-teal-800' :
