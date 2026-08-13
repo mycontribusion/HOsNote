@@ -403,12 +403,24 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     const success = onImport(incoming, incomingDocs)
                     if (success) {
                         setRestoreMsg('✅ Import successful!')
+                        onImportComplete?.()
+                        setTimeout(() => {
+                            if (mountedRef.current) {
+                                onClose?.()
+                            }
+                        }, 1500)
                     }
                     // If not success, scanner closes and ReviewDuplicatesModal shows
                     setTimeout(() => setRestoreMsg(''), 4000)
                 } else if (isBackup || data.patients || data.docs) {
                     onRestore?.(data)
                     setRestoreMsg('✅ Restore successful!')
+                    onImportComplete?.()
+                    setTimeout(() => {
+                        if (mountedRef.current) {
+                            onClose?.()
+                        }
+                    }, 1500)
                     setTimeout(() => setRestoreMsg(''), 4000)
                 } else {
                     setRestoreMsg('❌ Invalid file format.')
