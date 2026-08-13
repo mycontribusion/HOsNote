@@ -3,9 +3,8 @@ import { QrCode, Share2, UserPlus, ChevronDown, ChevronUp } from 'lucide-react'
 
 /**
  * Floating horizontal bottom action bar for the clinical tracker main view.
- * Default view: Full width action panel (Receive, Handover, Add Patient).
- * Collapsible view: Can be collapsed into a single compact rounded-square FAB button on request.
- * Auto-expands when patients are selected.
+ * Displays 3 perfectly symmetrical action buttons (Receive, Handover, Add Patient)
+ * with a subtle floating micro-collapse button that doesn't disrupt alignment.
  */
 export default function PatientActionBar({
     isMortality = false,
@@ -49,6 +48,17 @@ export default function PatientActionBar({
 
     return (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl p-1.5 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/80 dark:border-gray-700/80 rounded-2xl shadow-xl shadow-gray-900/10 dark:shadow-black/40 flex items-center justify-between animate-in fade-in slide-in-from-bottom-3 duration-200 mb-[env(safe-area-inset-bottom,0px)]">
+            {/* Subtle micro-collapse badge overlay on top-right border — zero impact on flex symmetry */}
+            <button
+                type="button"
+                onClick={() => setIsCollapsed(true)}
+                aria-label="Collapse action bar"
+                className="absolute -top-2.5 right-4 bg-white dark:bg-gray-800 border border-gray-200/80 dark:border-gray-700/80 shadow-xs text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 rounded-full transition-all active:scale-90 cursor-pointer z-10"
+                title="Collapse action bar"
+            >
+                <ChevronDown size={13} strokeWidth={2.5} />
+            </button>
+
             {/* 1. Receive / Import Button */}
             <button
                 id="pat-action-import"
@@ -103,17 +113,6 @@ export default function PatientActionBar({
             >
                 <UserPlus size={20} className={isMortality ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400"} strokeWidth={2.2} />
                 <span>{isMortality ? 'Add Record' : 'Add Patient'}</span>
-            </button>
-
-            {/* 4. Collapse Toggle Button */}
-            <button
-                type="button"
-                onClick={() => setIsCollapsed(true)}
-                aria-label="Collapse action bar"
-                className="px-2 py-2 rounded-xl text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all active:scale-90 cursor-pointer shrink-0 ml-1"
-                title="Collapse action bar"
-            >
-                <ChevronDown size={18} strokeWidth={2.5} />
             </button>
         </div>
     )
