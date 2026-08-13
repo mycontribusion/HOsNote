@@ -445,6 +445,7 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                 <AddPatientForm
                     isNoteMode={!editingDoc.patientId}
                     initialData={{
+                        id: editingDoc.id,
                         name: editingDoc.patientName || '',
                         hospitalNumber: editingDoc.patientHosp || '',
                         ward: editingDoc.patientWard || '',

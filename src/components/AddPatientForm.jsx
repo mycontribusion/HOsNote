@@ -7,6 +7,8 @@ import DuplicatePromptModal from './DuplicatePromptModal'
 
 const DRAFT_KEY = '4myteam_draft_patient'
 const EDIT_DRAFT_KEY = '4myteam_edit_draft_patient'
+const DRAFT_KEY_NOTE = '4myteam_draft_note'
+const EDIT_DRAFT_KEY_NOTE = '4myteam_edit_draft_note'
 
 function today() {
     return new Date().toISOString().split('T')[0]
@@ -82,6 +84,40 @@ function clearEditDraft() {
     catch { /* ignore */ }
 }
 
+function loadNoteDraft() {
+    try {
+        const raw = localStorage.getItem(DRAFT_KEY_NOTE)
+        return raw ? JSON.parse(raw) : null
+    } catch { return null }
+}
+
+function saveNoteDraft(data) {
+    try { localStorage.setItem(DRAFT_KEY_NOTE, JSON.stringify(data)) }
+    catch { /* quota exceeded */ }
+}
+
+function clearNoteDraft() {
+    try { localStorage.removeItem(DRAFT_KEY_NOTE) }
+    catch { /* ignore */ }
+}
+
+function loadNoteEditDraft() {
+    try {
+        const raw = localStorage.getItem(EDIT_DRAFT_KEY_NOTE)
+        return raw ? JSON.parse(raw) : null
+    } catch { return null }
+}
+
+function saveNoteEditDraft(data) {
+    try { localStorage.setItem(EDIT_DRAFT_KEY_NOTE, JSON.stringify(data)) }
+    catch { /* quota exceeded */ }
+}
+
+function clearNoteEditDraft() {
+    try { localStorage.removeItem(EDIT_DRAFT_KEY_NOTE) }
+    catch { /* ignore */ }
+}
+
 function toTitleCase(str) {
     if (!str) return str
     return str
@@ -141,7 +177,8 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         let initialFields = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
         if (initialData) {
             // Check for edit draft first — retains unsaved changes across tab closes
-            const editDraft = loadEditDraft()
+            const loadEditDraftFn = isNoteMode ? loadNoteEditDraft : loadEditDraft
+            const editDraft = loadEditDraftFn()
             if (editDraft && editDraft.patientId === initialData.id) {
                 initialFields = editDraft.fields || initialFields
                 setCritical(!!editDraft.critical)
@@ -159,6 +196,17 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
             }
         } else if (isNoteMode) {
             setCritical(false)
+            const draft = loadNoteDraft()
+            if (draft) {
+                if (draft.fields) {
+                    initialFields = {
+                        ...draft.fields,
+                        name: toTitleCase(draft.fields.name || '')
+                    }
+                } else if (draft.text && draft.text.trim()) {
+                    initialFields = parsePatientText(draft.text)
+                }
+            }
         } else {
             setCritical(false)
 
@@ -227,11 +275,13 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         if (isMortalityMode) return
         clearTimeout(saveTimerRef.current)
         if (initialData) {
-            saveTimerRef.current = setTimeout(() => saveEditDraft(patch), 500)
+            const saveFn = isNoteMode ? saveNoteEditDraft : saveEditDraft
+            saveTimerRef.current = setTimeout(() => saveFn(patch), 500)
         } else {
-            saveTimerRef.current = setTimeout(() => saveDraft(patch), 500)
+            const saveFn = isNoteMode ? saveNoteDraft : saveDraft
+            saveTimerRef.current = setTimeout(() => saveFn(patch), 500)
         }
-    }, [initialData, isMortalityMode])
+    }, [initialData, isMortalityMode, isNoteMode])
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
 
@@ -267,7 +317,8 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     useEffect(() => {
         const handleBeforeUnload = () => {
             if (initialData && !hasSavedRef.current) {
-                saveEditDraft({
+                const saveFn = isNoteMode ? saveNoteEditDraft : saveEditDraft
+                saveFn({
                     patientId: initialData.id,
                     team: teamRef.current,
                     fields: {
@@ -285,7 +336,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
         window.addEventListener('beforeunload', handleBeforeUnload)
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-    }, [initialData])
+    }, [initialData, isNoteMode])
 
     useLayoutEffect(() => {
         if (isUndoRedo.current && scrollRestoreRef.current > 0) {
@@ -388,11 +439,14 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
             const result = onAdd({ text: fields.note, diagnosis: fields.diagnosis, isStandaloneNote: true })
             if (result) {
                 if (!initialData) {
-                    const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
-                    setFields(newBlank)
-                    setHistory({ stack: [newBlank], index: 0 })
-                    isUndoRedo.current = true
+                    clearNoteDraft()
+                } else {
+                    clearNoteEditDraft()
                 }
+                const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
+                setFields(newBlank)
+                setHistory({ stack: [newBlank], index: 0 })
+                isUndoRedo.current = true
                 setError('')
             }
             return
@@ -492,7 +546,8 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const handleCancel = () => {
         if (initialData) {
-            clearEditDraft()
+            const clearFn = isNoteMode ? clearNoteEditDraft : clearEditDraft
+            clearFn()
             hasSavedRef.current = true
             // Auto-save changes when exiting edit mode
             if (isNoteMode) {
