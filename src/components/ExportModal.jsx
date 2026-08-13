@@ -495,8 +495,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
     }
 
     return (
-        <div className="modal-backdrop p-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[95vh]" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <div className="fixed top-0 left-0 w-full h-[100dvh] z-50 bg-gray-950/60 backdrop-blur-xs flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200 min-w-0 max-w-full" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-[85vh] sm:max-h-[800px] sm:max-w-md sm:rounded-3xl shadow-2xl flex flex-col sm:border sm:border-gray-200 dark:sm:border-gray-700 overflow-hidden min-w-0 max-w-full" role="dialog" aria-modal="true" aria-labelledby="export-title">
 
                 {/* Header — matches app's blue-700 header */}
                 <div className="bg-blue-700 dark:bg-gray-900 px-4 pt-4 pb-3 shrink-0">
@@ -535,8 +535,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
                     </div>
                 </div>
 
-                {/* Body */}
-                <div className="flex flex-col gap-3 p-4 overflow-y-auto">
+                {/* Body — Scrollable QR content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col p-4 gap-3 bg-white dark:bg-gray-800 min-w-0 max-w-full">
 
                     {/* QR Display Area */}
                     <div className={`flex flex-col items-center justify-center rounded-xl p-3 shrink-0 ${qrMode === 'full' ? 'bg-blue-50 dark:bg-blue-950/30' : 'bg-gray-50 dark:bg-gray-800/40'}`}>
@@ -582,42 +582,57 @@ export default function ExportModal({ patients, allPatients, listName, selection
                         )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-col gap-2 shrink-0">
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                className={`py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] ${sharedCode ? 'bg-emerald-500 text-white' : 'bg-blue-700 hover:bg-blue-800 text-white shadow-blue-200 dark:shadow-blue-900/30'}`}
-                                onClick={handleShareCode}
-                            >
-                                {sharedCode ? <CheckCircle size={14} /> : <Share2 size={14} />}
-                                {sharedCode ? 'Shared!' : 'Share File'}
-                            </button>
-                            <button
-                                className={`py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] border ${copiedCode ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
-                                onClick={handleCopyCode}
-                            >
-                                {copiedCode ? <CheckCircle size={14} /> : <Copy size={14} />}
-                                {copiedCode ? 'Copied!' : 'Copy Code'}
-                            </button>
-                        </div>
+                    {shareError && <p className="text-[10px] text-center text-red-500 font-semibold mt-1">{shareError}</p>}
+                </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                {/* Bottom Action Bar */}
+                <div className="flex flex-col gap-2 px-3 sm:px-4 py-2.5 border-t border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-20 min-w-0 max-w-full pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            className={`py-2 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 ${sharedCode ? 'bg-emerald-500 text-white' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white shadow-blue-500/25'}`}
+                            onClick={handleShareCode}
+                        >
+                            {sharedCode ? <CheckCircle size={14} /> : <Share2 size={14} />}
+                            {sharedCode ? 'Shared!' : 'Share File'}
+                        </button>
+                        <button
+                            type="button"
+                            className={`py-2 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 border ${copiedCode ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 border-gray-200/60 dark:border-gray-600/60 text-gray-700 dark:text-gray-200'}`}
+                            onClick={handleCopyCode}
+                        >
+                            {copiedCode ? <CheckCircle size={14} /> : <Copy size={14} />}
+                            {copiedCode ? 'Copied!' : 'Copy Code'}
+                        </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-1">
                             <button
-                                className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
+                                type="button"
+                                className="flex-1 py-1.5 px-2 bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200/60 dark:border-gray-600/60 text-gray-700 dark:text-gray-200 rounded-full font-bold text-[11px] flex items-center justify-center gap-1 transition-all active:scale-95"
                                 onClick={handlePrint}
                             >
                                 <FileText size={13} className="text-blue-600 dark:text-blue-400" /> Save PDF
                             </button>
                             <button
-                                className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
+                                type="button"
+                                className="flex-1 py-1.5 px-2 bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200/60 dark:border-gray-600/60 text-gray-700 dark:text-gray-200 rounded-full font-bold text-[11px] flex items-center justify-center gap-1 transition-all active:scale-95"
                                 onClick={handleCopyCsv}
                             >
                                 {copiedCsv ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} className="text-gray-500 dark:text-gray-400" />} {copiedCsv ? 'Copied' : 'Copy CSV'}
                             </button>
                         </div>
-                        {shareError && <p className="text-[10px] text-center text-red-500 font-semibold mt-1">{shareError}</p>}
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90 shrink-0"
+                            title="Close"
+                        >
+                            <X size={15} strokeWidth={2.5} />
+                        </button>
                     </div>
                 </div>
+
             </div>
         </div>
     )

@@ -54,6 +54,30 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     const transferTimerRef = useRef(null)
     const [restoreMsg, setRestoreMsg] = useState('')
     const restoreInputRef = useRef(null)
+    const [keyboardOffset, setKeyboardOffset] = useState(0)
+
+    useEffect(() => {
+        const handleViewportChange = () => {
+            if (!window.visualViewport) return
+            const layoutHeight = window.innerHeight
+            const visualHeight = window.visualViewport.height
+            const offset = Math.max(0, layoutHeight - visualHeight - window.visualViewport.offsetTop)
+            setKeyboardOffset(offset)
+        }
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportChange)
+            window.visualViewport.addEventListener('scroll', handleViewportChange)
+            handleViewportChange()
+        }
+
+        return () => {
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener('resize', handleViewportChange)
+                window.visualViewport.removeEventListener('scroll', handleViewportChange)
+            }
+        }
+    }, [])
 
     // Keep the screen awake while scanning/importing so the display doesn't
     // dim or sleep mid-transfer.
@@ -660,8 +684,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }
 
     return (
-        <div className="modal-backdrop p-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[95vh]" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
+        <div className="fixed top-0 left-0 w-full h-[100dvh] z-50 bg-gray-950/60 backdrop-blur-xs flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200 min-w-0 max-w-full" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-[85vh] sm:max-h-[800px] sm:max-w-md sm:rounded-3xl shadow-2xl flex flex-col sm:border sm:border-gray-200 dark:sm:border-gray-700 overflow-hidden min-w-0 max-w-full" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
 
                 {/* Header — matches app's blue-700 header */}
                 <div className="bg-blue-700 dark:bg-gray-900 px-4 pt-4 pb-3 shrink-0">
@@ -734,9 +758,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     onChange={handleRestoreFile}
                 />
 
-                {/* Body */}
-                <div className="flex flex-col gap-3 p-4 overflow-y-auto h-[440px]">
-
+                {/* Body — Scrollable content area */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col p-4 gap-3 bg-white dark:bg-gray-800 min-w-0 max-w-full">
                     {cameraMode === 'camera' ? (
                         <div className="flex flex-col gap-3 shrink-0">
                             {/* QR/Barcode Viewer */}
@@ -789,31 +812,11 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                     </div>
                                 </div>
                             )}
-
-                            {/* Buttons Grid */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                    onClick={() => setCameraMode('paste')}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
-                                    Use Code
-                                </button>
-                                {onRestore && (
-                                    <button
-                                        className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                        onClick={() => restoreInputRef.current?.click()}
-                                    >
-                                        <Upload size={14} />
-                                        Open File
-                                    </button>
-                                )}
-                            </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-3 h-full">
+                        <div className="flex flex-col gap-3 flex-1 min-h-[220px]">
                             <textarea
-                                className="w-full flex-1 min-h-0 rounded-xl border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 px-3 py-3 text-xs font-mono text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40 resize-none shadow-sm"
+                                className="w-full flex-1 min-h-[160px] rounded-xl border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 px-3 py-3 text-xs font-mono text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40 resize-none shadow-sm"
                                 placeholder={scanMode === 'import'
                                     ? 'Paste the Data Code here...'
                                     : 'Paste barcode or hospital number...'}
@@ -827,43 +830,98 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                 {status === 'found' && <Search size={14} className="inline mr-1.5" />}
                                 {statusMsg}
                             </div>
-                            <button
-                                className="w-full py-3 bg-blue-700 hover:bg-blue-800 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl font-bold text-sm shadow-sm shadow-blue-200 dark:shadow-blue-900/30 active:scale-[0.98] transition-all"
-                                disabled={!pasteData.trim()}
-                                onClick={() => {
-                                    console.log('[PASTE IMPORT DIAGNOSTIC] Button onClick fired, scanMode:', scanMode, 'pasteData trimmed:', pasteData.trim().slice(0, 30))
-                                    if (scanMode === 'import') {
-                                        handlePasteImport()
-                                    } else {
-                                        handlePasteQuick()
-                                    }
-                                }}
-                            >
-                                {scanMode === 'import' ? 'Receive Records' : 'Lookup / Add Patient'}
-                            </button>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
-                                <button
-                                    className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                    onClick={() => { setPasteData(''); setCameraMode('camera') }}
-                                >
-                                    <Camera size={14} /> Use Camera
-                                </button>
-                                {onRestore && (
-                                    <button
-                                        className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                                        onClick={() => restoreInputRef.current?.click()}
-                                    >
-                                        <Upload size={14} /> Import File
-                                    </button>
-                                )}
-                            </div>
                         </div>
                     )}
 
                     {restoreMsg && (
-                        <p className="text-[10px] text-center font-bold text-gray-500 dark:text-gray-400 -mt-1">{restoreMsg}</p>
+                        <p className="text-[10px] text-center font-bold text-gray-500 dark:text-gray-400 mt-1">{restoreMsg}</p>
                     )}
                 </div>
+
+                {/* Bottom Action Bar (Stays on top of keyboard) */}
+                <div
+                    style={{ transform: `translateY(-${keyboardOffset}px)` }}
+                    className="flex items-center justify-between px-3 sm:px-4 py-2 min-h-[52px] border-t border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-20 min-w-0 max-w-full transition-transform duration-75 ease-out pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-xs"
+                >
+                    {cameraMode === 'camera' ? (
+                        <>
+                            <button
+                                type="button"
+                                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
+                                onClick={() => setCameraMode('paste')}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
+                                Paste Code
+                            </button>
+                            <div className="flex items-center gap-2">
+                                {onRestore && (
+                                    <button
+                                        type="button"
+                                        className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
+                                        onClick={() => restoreInputRef.current?.click()}
+                                    >
+                                        <Upload size={14} />
+                                        Open File
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90"
+                                    title="Close"
+                                >
+                                    <X size={15} strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
+                                onClick={() => { setPasteData(''); setCameraMode('camera') }}
+                            >
+                                <Camera size={14} />
+                                Use Camera
+                            </button>
+                            <div className="flex items-center gap-2">
+                                {onRestore && (
+                                    <button
+                                        type="button"
+                                        className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
+                                        onClick={() => restoreInputRef.current?.click()}
+                                    >
+                                        <Upload size={14} />
+                                        File
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    disabled={!pasteData.trim()}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-40 disabled:hover:bg-blue-600 shadow-xs shadow-blue-500/25 transition-all active:scale-95 text-xs font-bold"
+                                    onClick={() => {
+                                        if (scanMode === 'import') {
+                                            handlePasteImport()
+                                        } else {
+                                            handlePasteQuick()
+                                        }
+                                    }}
+                                >
+                                    {scanMode === 'import' ? 'Receive' : 'Lookup'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90"
+                                    title="Close"
+                                >
+                                    <X size={15} strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+
             </div>
         </div>
     )
