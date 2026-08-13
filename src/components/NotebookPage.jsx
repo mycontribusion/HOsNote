@@ -204,7 +204,13 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
 
 
     const sortDocs = (list) => {
-        if (sortBy === 'default') return list
+        if (sortBy === 'default') {
+            return [...list].sort((a, b) => {
+                const aTime = a.updatedAt || a.createdAt
+                const bTime = b.updatedAt || b.createdAt
+                return new Date(bTime) - new Date(aTime)
+            })
+        }
         return [...list].sort((a, b) => {
             if (sortBy === 'date_asc') {
                 return new Date(a.createdAt) - new Date(b.createdAt)

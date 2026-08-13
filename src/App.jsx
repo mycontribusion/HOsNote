@@ -1171,139 +1171,142 @@ const pendingEditRef = useRef(null)
                 />
             )}
 
-            <main
-                className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-24"
-                onClick={() => {
-                    if (selectedPatientIds.size > 0) {
-                        setSelectedPatientIds(new Set())
-                    }
-                }}
-            >
-                {showMortalityForm ? (
-                    <AddPatientForm
-                        initialData={null}
-                        initialTeam={activeTab}
-                        isMortalityMode
-                        onAdd={addMortality}
-                        onCancel={cancelForm}
-                        patients={patients}
-                    />
-                ) : (showAddForm || editingPatient) ? (
-                    <AddPatientForm
-                        initialData={editingPatient}
-                        initialTeam={activeTab}
-                        onAdd={savePatient}
-                        onCancel={cancelForm}
-                        isMortalityMode={editingPatient?.reason === 'mortality'}
-                        patients={patients}
-                    />
-                ) : null}
+            {activePage === 'patients' && (
+                <main
+                    className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-24"
+                    onClick={() => {
+                        if (selectedPatientIds.size > 0) {
+                            setSelectedPatientIds(new Set())
+                        }
+                    }}
+                >
+                    {showMortalityForm ? (
+                        <AddPatientForm
+                            initialData={null}
+                            initialTeam={activeTab}
+                            isMortalityMode
+                            onAdd={addMortality}
+                            onCancel={cancelForm}
+                            patients={patients}
+                        />
+                    ) : (showAddForm || editingPatient) ? (
+                        <AddPatientForm
+                            initialData={editingPatient}
+                            initialTeam={activeTab}
+                            onAdd={savePatient}
+                            onCancel={cancelForm}
+                            isMortalityMode={editingPatient?.reason === 'mortality'}
+                            patients={patients}
+                        />
+                    ) : null}
 
-                {/* Tabs */}
-                {!showAddForm && !editingPatient && !showMortalityForm && (
-                    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4 mt-2">
-                        <button
-                            onClick={() => goToTab('my_team')}
-                            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'my_team' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        >
-                            My Team
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'my_team' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-                                {myTeamCount}
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => goToTab('other_team')}
-                            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'other_team' ? 'border-purple-600 text-purple-700 dark:text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        >
-                            On Call
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'other_team' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-                                {otherTeamCount}
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => goToTab('mortalities')}
-                            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'mortalities' ? 'border-red-600 text-red-700 dark:text-red-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        >
-                            Mortalities
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'mortalities' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-                                {mortalitiesCount}
-                            </span>
-                        </button>
-                    </div>
-                )}
-
-                {activeTab === 'mortalities' ? (
-                    mortalities.length === 0 ? (
-                        <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                            <div className="bg-gray-50 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                                    <path d="M12 2v20" /><path d="m17 7-5-5-5 5" /><path d="m17 17-5 5-5-5" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No mortality records</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-[240px] mx-auto text-sm">Archived mortality records will appear here.</p>
+                    {/* Tabs */}
+                    {!showAddForm && !editingPatient && !showMortalityForm && (
+                        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4 mt-2">
+                            <button
+                                onClick={() => goToTab('my_team')}
+                                className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'my_team' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                            >
+                                My Team
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'my_team' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
+                                    {myTeamCount}
+                                </span>
+                            </button>
+                            <button
+                                onClick={() => goToTab('other_team')}
+                                className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'other_team' ? 'border-purple-600 text-purple-700 dark:text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                            >
+                                On Call
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'other_team' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
+                                    {otherTeamCount}
+                                </span>
+                            </button>
+                            <button
+                                onClick={() => goToTab('mortalities')}
+                                className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'mortalities' ? 'border-red-600 text-red-700 dark:text-red-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                            >
+                                Mortalities
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'mortalities' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
+                                    {mortalitiesCount}
+                                </span>
+                            </button>
                         </div>
+                    )}
+
+                    {activeTab === 'mortalities' ? (
+                        mortalities.length === 0 ? (
+                            <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                                <div className="bg-gray-50 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                        <path d="M12 2v20" /><path d="m17 7-5-5-5 5" /><path d="m17 17-5 5-5-5" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">No mortality records</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-[240px] mx-auto text-sm">Archived mortality records will appear here.</p>
+                            </div>
+                        ) : (
+                            <PatientList
+                                patients={mortalities}
+                                onEdit={startEditing}
+                                onDelete={deleteMortalityRecord}
+                                onReview={null}
+                                onResetReviews={() => { }}
+                                selectedIds={selectedPatientIds}
+                                onToggleSelect={toggleSelectPatient}
+                                onToggleSelectAll={toggleSelectAll}
+                                isMortality
+                            />
+                        )
+                    ) : activePatients.length === 0 ? (
+                        <EmptyState onAddClick={() => navigate(`/team/${activeTab}/add`)} />
                     ) : (
                         <PatientList
-                            patients={mortalities}
+                            patients={activePatients}
                             onEdit={startEditing}
-                            onDelete={deleteMortalityRecord}
-                            onReview={null}
-                            onResetReviews={() => { }}
+                            onDelete={startRemovalProcess}
+                            onReview={toggleReview}
+                            onResetReviews={resetReviews}
+                            onDocument={(patient) => setComposingFor(patient)}
+                            getDocCount={getDocCount}
                             selectedIds={selectedPatientIds}
                             onToggleSelect={toggleSelectPatient}
                             onToggleSelectAll={toggleSelectAll}
-                            isMortality
+                            onMoveTeam={activeTab === 'other_team' ? (id) => movePatientTeam(id, 'my_team') : undefined}
+                            moveTeamLabel={activeTab === 'other_team' ? 'Move to My Team' : undefined}
+                            highlightField={searchHighlightField}
+                            highlightQuery={searchHighlightQuery}
                         />
-                    )
-                ) : activePatients.length === 0 ? (
-                    <EmptyState onAddClick={() => navigate(`/team/${activeTab}/add`)} />
-                ) : (
-                    <PatientList
-                        patients={activePatients}
-                        onEdit={startEditing}
-                        onDelete={startRemovalProcess}
-                        onReview={toggleReview}
-                        onResetReviews={resetReviews}
-                        onDocument={(patient) => setComposingFor(patient)}
-                        getDocCount={getDocCount}
-                        selectedIds={selectedPatientIds}
-                        onToggleSelect={toggleSelectPatient}
-                        onToggleSelectAll={toggleSelectAll}
-                        onMoveTeam={activeTab === 'other_team' ? (id) => movePatientTeam(id, 'my_team') : undefined}
-                        moveTeamLabel={activeTab === 'other_team' ? 'Move to My Team' : undefined}
-                        highlightField={searchHighlightField}
-                        highlightQuery={searchHighlightQuery}
-                    />
-                )}
+                    )}
 
-                {activeTab === 'my_team' && (
-                    <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
-                        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
-                            {dischargeCount} patient{dischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
-                        </p>
-                        <button
-                            onClick={() => setShowConfirmResetStats(true)}
-                            className="text-[10px] font-black text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 uppercase tracking-tighter"
-                        >
-                            Reset Stats
-                        </button>
-                    </div>
-                )}
-                {activeTab === 'other_team' && (
-                    <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
-                        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
-                            {otherDischargeCount} patient{otherDischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
-                        </p>
-                        <button
-                            onClick={() => setShowConfirmResetStats(true)}
-                            className="text-[10px] font-black text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 uppercase tracking-tighter"
-                        >
-                            Reset Stats
-                        </button>
-                    </div>
-                )}
-            </main>
+                    {activeTab === 'my_team' && (
+                        <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
+                            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
+                                {dischargeCount} patient{dischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
+                            </p>
+                            <button
+                                onClick={() => setShowConfirmResetStats(true)}
+                                className="text-[10px] font-black text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 uppercase tracking-tighter"
+                            >
+                                Reset Stats
+                            </button>
+                        </div>
+                    )}
+                    {activeTab === 'other_team' && (
+                        <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
+                            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
+                                {otherDischargeCount} patient{otherDischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
+                            </p>
+                            <button
+                                onClick={() => setShowConfirmResetStats(true)}
+                                className="text-[10px] font-black text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 uppercase tracking-tighter"
+                            >
+                                Reset Stats
+                            </button>
+                        </div>
+                    )}
+                </main>
+            )}
+
 
             {/* Bottom Action Bar — Tracker Page */}
             {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (
