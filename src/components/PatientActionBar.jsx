@@ -1,8 +1,11 @@
-import { QrCode, Share2, UserPlus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { QrCode, Share2, UserPlus, ChevronDown, ChevronUp } from 'lucide-react'
 
 /**
  * Floating horizontal bottom action bar for the clinical tracker main view.
- * Matches the width of the main patient card container (max-w-2xl) with 3 evenly-spaced action buttons.
+ * Default view: Full width action panel (Receive, Handover, Add Patient).
+ * Collapsible view: Can be collapsed into a single compact rounded-square FAB button on request.
+ * Auto-expands when patients are selected.
  */
 export default function PatientActionBar({
     isMortality = false,
@@ -12,7 +15,37 @@ export default function PatientActionBar({
     handoverBadge = null,
     handoverDisabled = false,
 }) {
+    const [isCollapsed, setIsCollapsed] = useState(false)
     const hasSelection = handoverBadge !== null && handoverBadge > 0
+
+    // Auto-expand if user selects patients while collapsed
+    useEffect(() => {
+        if (hasSelection) {
+            setIsCollapsed(false)
+        }
+    }, [hasSelection])
+
+    if (isCollapsed) {
+        return (
+            <div className="fixed bottom-4 right-4 z-40 animate-in fade-in zoom-in-75 duration-200 mb-[env(safe-area-inset-bottom,0px)]">
+                <button
+                    id="pat-action-expand"
+                    type="button"
+                    onClick={() => setIsCollapsed(false)}
+                    aria-label="Expand action bar"
+                    className="relative w-12 h-12 rounded-2xl bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/80 dark:border-gray-700/80 shadow-xl shadow-gray-900/10 dark:shadow-black/40 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-90 transition-all cursor-pointer"
+                    title="Expand action bar"
+                >
+                    <ChevronUp size={22} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
+                    {hasSelection && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-xs animate-pulse">
+                            {handoverBadge}
+                        </span>
+                    )}
+                </button>
+            </div>
+        )
+    }
 
     return (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl p-1.5 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/80 dark:border-gray-700/80 rounded-2xl shadow-xl shadow-gray-900/10 dark:shadow-black/40 flex items-center justify-between animate-in fade-in slide-in-from-bottom-3 duration-200 mb-[env(safe-area-inset-bottom,0px)]">
@@ -70,6 +103,17 @@ export default function PatientActionBar({
             >
                 <UserPlus size={20} className={isMortality ? "text-red-500 dark:text-red-400" : "text-blue-600 dark:text-blue-400"} strokeWidth={2.2} />
                 <span>{isMortality ? 'Add Record' : 'Add Patient'}</span>
+            </button>
+
+            {/* 4. Collapse Toggle Button */}
+            <button
+                type="button"
+                onClick={() => setIsCollapsed(true)}
+                aria-label="Collapse action bar"
+                className="px-2 py-2 rounded-xl text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all active:scale-90 cursor-pointer shrink-0 ml-1"
+                title="Collapse action bar"
+            >
+                <ChevronDown size={18} strokeWidth={2.5} />
             </button>
         </div>
     )
