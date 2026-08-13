@@ -411,11 +411,11 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                             </div>
                                         )}
                                         <div className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto text-right leading-tight">
-                                            {formatSmartDateParts(doc.createdAt).date && (
-                                                <div>{formatSmartDateParts(doc.createdAt).date}</div>
+                                            {formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).date && (
+                                                <div>{formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).date}</div>
                                             )}
-                                            {formatSmartDateParts(doc.createdAt).time && (
-                                                <div>{formatSmartDateParts(doc.createdAt).time}</div>
+                                            {formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).time && (
+                                                <div>{formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).time}</div>
                                             )}
                                         </div>
                                     </div>
