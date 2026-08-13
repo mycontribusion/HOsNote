@@ -171,6 +171,26 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const [history, setHistory] = useState({ stack: [], index: -1 })
     const isUndoRedo = useRef(false)
+    const [keyboardOffset, setKeyboardOffset] = useState(0)
+
+    useEffect(() => {
+        if (!window.visualViewport) return
+
+        const handleResize = () => {
+            const viewport = window.visualViewport
+            const offset = window.innerHeight - viewport.height - viewport.offsetTop
+            setKeyboardOffset(offset > 0 ? offset : 0)
+        }
+
+        window.visualViewport.addEventListener('resize', handleResize)
+        window.visualViewport.addEventListener('scroll', handleResize)
+        handleResize()
+
+        return () => {
+            window.visualViewport.removeEventListener('resize', handleResize)
+            window.visualViewport.removeEventListener('scroll', handleResize)
+        }
+    }, [])
 
     useEffect(() => {
         hasSavedRef.current = false
@@ -607,9 +627,127 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         <div className="fixed top-0 left-0 w-full h-[100dvh] z-50 bg-gray-50 dark:bg-gray-950 flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200 min-w-0 max-w-full">
             <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-[85vh] sm:max-h-[800px] sm:max-w-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:border sm:border-gray-200 dark:sm:border-gray-700 overflow-hidden min-w-0 max-w-full">
                 <form id="add-patient-form" onSubmit={handleSubmit} className="flex flex-col h-full min-w-0 max-w-full overflow-hidden">
+                    {/* Scrollable Form Body (Unified scrolling for Biodata + Notes) */}
+                    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar overflow-x-hidden flex flex-col bg-white dark:bg-gray-800 min-w-0 max-w-full">
+                        
+                        {/* Error */}
+                        {error && (
+                            <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm font-bold mx-3 sm:mx-4 mb-3 shrink-0 shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                                {error}
+                            </div>
+                        )}
 
-                    {/* Top Action Bar */}
-                    <div className="flex items-center justify-between px-3 sm:px-4 h-[52px] border-b border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-10 min-w-0 max-w-full">
+                        {/* Faux-textarea container */}
+                        <div className="text-left py-2 px-4 sm:px-6 font-sans leading-relaxed flex flex-col cursor-text min-h-[300px] min-w-0 max-w-full text-sm sm:text-base" onClick={() => noteRef.current?.focus()}>
+                            {isNoteMode ? (
+                                <>
+                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Note title (optional)" />
+                                    </div>
+                                    <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
+                                            <MicrophoneButton
+                                                onTranscript={(transcript) => {
+                                                    setFields(prev => {
+                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
+                                                        return { ...prev, note: next }
+                                                     })
+                                                }}
+                                                title="Dictate note"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
+                                            <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
+                                                {fields.note + ' \n'}
+                                            </div>
+                                            <textarea
+                                                ref={noteRef}
+                                                className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
+                                                value={fields.note}
+                                                onChange={e => updateField('note', e.target.value)}
+                                                onPaste={e => handleCleanPaste(e, 'note')}
+                                                autoComplete="off"
+                                                spellCheck={false}
+                                                placeholder="Clinical notes…"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" autoCapitalize="words" inputMode="text" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={hospSplit.base} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
+                                        {hospSplit.suffix && (
+                                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
+                                                ({hospSplit.suffix})
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onPaste={e => handleCleanPaste(e, 'ward')} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} placeholder="Ward" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={bedSplit.base} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
+                                        {bedSplit.suffix && (
+                                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
+                                                ({bedSplit.suffix})
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onPaste={e => handleCleanPaste(e, 'admissionDate')} onKeyDown={e => handleEnter(e, diagRef)} autoComplete="off" spellCheck={false} placeholder="Admission date" />
+                                    </div>
+                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Diagnosis" />
+                                    </div>
+                                    <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
+                                            <MicrophoneButton
+                                                onTranscript={(transcript) => {
+                                                    setFields(prev => {
+                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
+                                                        return { ...prev, note: next }
+                                                     })
+                                                }}
+                                                title="Dictate note"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
+                                            <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
+                                                {fields.note + ' \n'}
+                                            </div>
+                                            <textarea
+                                                ref={noteRef}
+                                                className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
+                                                value={fields.note}
+                                                onChange={e => updateField('note', e.target.value)}
+                                                onPaste={e => handleCleanPaste(e, 'note')}
+                                                autoComplete="off"
+                                                spellCheck={false}
+                                                placeholder="Clinical notes…"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Non-interactive buffer zone below the form to prevent text from hiding behind mobile keyboards */}
+                        <div className="h-20 sm:h-12 w-full shrink-0 pointer-events-none select-none" aria-hidden="true" />
+                        
+                    </div>
+
+                    {/* Bottom Action Bar (Stays on top of keyboard) */}
+                    <div 
+                        style={{ transform: `translateY(-${keyboardOffset}px)` }}
+                        className="flex items-center justify-between px-3 sm:px-4 py-2 min-h-[52px] border-t border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-20 min-w-0 max-w-full transition-transform duration-75 ease-out pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-xs"
+                    >
                         {/* Left Group: Form Header Title & Segmented Undo/Redo */}
                         <div className="flex items-center gap-2 sm:gap-3">
                             <span className="text-xs font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 hidden sm:inline-block">
@@ -682,122 +820,6 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 <X size={15} strokeWidth={2.5} />
                             </button>
                         </div>
-                    </div>
-
-                    {/* Scrollable Form Body (Unified scrolling for Biodata + Notes) */}
-                    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar overflow-x-hidden flex flex-col bg-white dark:bg-gray-800 min-w-0 max-w-full">
-                        
-                        {/* Error */}
-                        {error && (
-                            <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm font-bold mx-3 sm:mx-4 mb-3 shrink-0 shadow-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-                                {error}
-                            </div>
-                        )}
-
-                        {/* Faux-textarea container */}
-                        <div className="text-left py-2 px-4 sm:px-6 font-sans leading-relaxed flex flex-col cursor-text min-h-[300px] min-w-0 max-w-full text-sm sm:text-base" onClick={() => noteRef.current?.focus()}>
-                            {isNoteMode ? (
-                                <>
-                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Note title (optional)" />
-                                    </div>
-                                    <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
-                                            <MicrophoneButton
-                                                onTranscript={(transcript) => {
-                                                    setFields(prev => {
-                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
-                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
-                                                        return { ...prev, note: next }
-                                                    })
-                                                }}
-                                                title="Dictate note"
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
-                                            <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
-                                                {fields.note + ' \n'}
-                                            </div>
-                                            <textarea
-                                                ref={noteRef}
-                                                className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
-                                                value={fields.note}
-                                                onChange={e => updateField('note', e.target.value)}
-                                                onPaste={e => handleCleanPaste(e, 'note')}
-                                                autoComplete="off"
-                                                spellCheck={false}
-                                                placeholder="Clinical notes…"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" autoCapitalize="words" inputMode="text" />
-                                    </div>
-                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={hospSplit.base} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
-                                        {hospSplit.suffix && (
-                                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
-                                                ({hospSplit.suffix})
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onPaste={e => handleCleanPaste(e, 'ward')} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} placeholder="Ward" />
-                                    </div>
-                                    <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={bedSplit.base} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
-                                        {bedSplit.suffix && (
-                                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
-                                                ({bedSplit.suffix})
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onPaste={e => handleCleanPaste(e, 'admissionDate')} onKeyDown={e => handleEnter(e, diagRef)} autoComplete="off" spellCheck={false} placeholder="Admission date" />
-                                    </div>
-                                    <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Diagnosis" />
-                                    </div>
-                                    <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
-                                            <MicrophoneButton
-                                                onTranscript={(transcript) => {
-                                                    setFields(prev => {
-                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
-                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
-                                                        return { ...prev, note: next }
-                                                    })
-                                                }}
-                                                title="Dictate note"
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
-                                            <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
-                                                {fields.note + ' \n'}
-                                            </div>
-                                            <textarea
-                                                ref={noteRef}
-                                                className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
-                                                value={fields.note}
-                                                onChange={e => updateField('note', e.target.value)}
-                                                onPaste={e => handleCleanPaste(e, 'note')}
-                                                autoComplete="off"
-                                                spellCheck={false}
-                                                placeholder="Clinical notes…"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        {/* Non-interactive buffer zone below the form to prevent text from hiding behind mobile keyboards */}
-                        <div className="h-48 sm:h-36 w-full shrink-0 pointer-events-none select-none" aria-hidden="true" />
-                        
                     </div>
                 </form>
                 {duplicateInfo && (
