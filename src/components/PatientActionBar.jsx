@@ -143,7 +143,7 @@ export default function PatientActionBar({
                                 {/* Handover */}
                                 <ExpandedAction
                                     icon={<Share2 size={18} strokeWidth={2} />}
-                                    label="Handover"
+                                    label={isMortality ? 'Handover' : 'Handover Patients'}
                                     badge={handoverBadge}
                                     disabled={handoverDisabled}
                                     colorClass="bg-gradient-to-br from-purple-500 to-indigo-600 shadow-purple-400/40"
@@ -157,7 +157,7 @@ export default function PatientActionBar({
                                 {/* Receive */}
                                 <ExpandedAction
                                     icon={<QrCode size={18} strokeWidth={2} />}
-                                    label="Receive"
+                                    label={isMortality ? 'Receive' : 'Receive Patients'}
                                     colorClass="bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-400/40"
                                     onClick={() => {
                                         setMoreOpen(false)
