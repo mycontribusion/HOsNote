@@ -56,7 +56,7 @@ export default function PatientActionBar({
                 className="absolute -top-2.5 right-4 bg-white dark:bg-gray-800 border border-gray-200/80 dark:border-gray-700/80 shadow-xs text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 rounded-full transition-all active:scale-90 cursor-pointer z-10"
                 title="Collapse action bar"
             >
-                <ChevronDown size={13} strokeWidth={2.5} />
+                <ChevronDown size={20} strokeWidth={2.5} />
             </button>
 
             {/* 1. Receive / Import Button */}
