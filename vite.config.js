@@ -36,4 +36,24 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('html5-qrcode') || id.includes('qrcode.react')) {
+            return 'vendor-qr'
+          }
+          if (id.includes('lucide-react')) {
+            return 'vendor-icons'
+          }
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
+            return 'vendor-core'
+          }
+          if (id.includes('@capacitor/')) {
+            return 'vendor-capacitor'
+          }
+        },
+      },
+    },
+  },
 })

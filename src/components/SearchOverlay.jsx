@@ -5,11 +5,19 @@ import SuffixedValue from './SuffixedValue'
 
 export default function SearchOverlay({ patients, mortalities, docs, activePage, activeTab, onClose, onNavigateToPatient, onNavigateToNote }) {
     const [query, setQuery] = useState('')
+    const [debouncedQuery, setDebouncedQuery] = useState('')
     const inputRef = useRef(null)
 
     useEffect(() => {
         inputRef.current?.focus()
     }, [])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(query)
+        }, 150)
+        return () => clearTimeout(timer)
+    }, [query])
 
     // Determine result ordering based on current view
     const getResultOrder = () => {
@@ -29,8 +37,8 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
     const resultOrder = getResultOrder()
 
     const results = useMemo(() => {
-        if (!query.trim()) return { my_team: [], on_call: [], notes: [], mortalities: [] }
-        const q = query.trim().toLowerCase()
+        if (!debouncedQuery.trim()) return { my_team: [], on_call: [], notes: [], mortalities: [] }
+        const q = debouncedQuery.trim().toLowerCase()
 
         const matchedPatients = patients
             .map(p => {
@@ -77,7 +85,7 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
             notes: matchedNotes.slice(0, 20),
             mortalities: matchedMortalities.slice(0, 20)
         }
-    }, [query, patients, mortalities, docs])
+    }, [debouncedQuery, patients, mortalities, docs])
 
     const totalResults = results.my_team.length + results.on_call.length + results.notes.length + results.mortalities.length
 

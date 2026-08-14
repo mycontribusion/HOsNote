@@ -1,6 +1,7 @@
 import { Moon, Sun, Settings, Stethoscope, BookOpen, Search } from 'lucide-react'
+import { memo } from 'react'
 
-export default function Header({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange, onOpenSearch, theme = 'blue' }) {
+const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange, onOpenSearch, theme = 'blue' }) => {
     const isRed = theme === 'red'
     const headerBg = isRed ? 'bg-red-700 dark:bg-red-900' : 'bg-blue-700 dark:bg-gray-900'
     const shadowColor = isRed ? 'shadow-red-900/30' : 'shadow-blue-900/30'
@@ -73,3 +74,5 @@ export default function Header({ patientCount, docCount = 0, darkMode, toggleDar
         </header>
     )
 }
+
+export default memo(HeaderInner)

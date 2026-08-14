@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import PatientCard from './PatientCard'
 import PatientDetailModal from './PatientDetailModal'
 import { ArrowUpDown, ChevronDown, ChevronRight, RotateCcw, CheckSquare, Square } from 'lucide-react'
@@ -12,13 +12,20 @@ const SORT_OPTIONS = [
     { value: 'hospnum', label: 'Hosp No.' },
 ]
 
-export default function PatientList({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery }) {
+const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery }) => {
     const [sortBy, setSortBy] = useState('none')
     const [isReviewedOpen, setIsReviewedOpen] = useState(false)
     const [selectedDetailPatient, setSelectedDetailPatient] = useState(null)
 
-    const activePatients = patients.filter(p => !p.reviewed)
-    const reviewedPatients = patients.filter(p => p.reviewed)
+    const { activePatients, reviewedPatients } = useMemo(() => {
+        const active = []
+        const reviewed = []
+        for (let i = 0; i < patients.length; i++) {
+            if (patients[i].reviewed) reviewed.push(patients[i])
+            else active.push(patients[i])
+        }
+        return { activePatients: active, reviewedPatients: reviewed }
+    }, [patients])
 
     const sortPatients = (list) => {
         if (sortBy === 'none') return list
@@ -195,3 +202,21 @@ export default function PatientList({ patients, onDelete, onEdit, onReview, onRe
         </div>
     )
 }
+
+export default memo(PatientListInner, (prev, next) => {
+    if (prev.patients !== next.patients) return false
+    if (prev.selectedIds !== next.selectedIds) return false
+    if (prev.highlightField !== next.highlightField) return false
+    if (prev.highlightQuery !== next.highlightQuery) return false
+    if (prev.isMortality !== next.isMortality) return false
+    if (prev.getDocCount !== next.getDocCount) return false
+    if (prev.onDelete !== next.onDelete) return false
+    if (prev.onEdit !== next.onEdit) return false
+    if (prev.onReview !== next.onReview) return false
+    if (prev.onDocument !== next.onDocument) return false
+    if (prev.onToggleSelect !== next.onToggleSelect) return false
+    if (prev.onToggleSelectAll !== next.onToggleSelectAll) return false
+    if (prev.onMoveTeam !== next.onMoveTeam) return false
+    if (prev.moveTeamLabel !== next.moveTeamLabel) return false
+    return true
+})

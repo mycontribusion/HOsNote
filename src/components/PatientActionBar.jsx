@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { QrCode, Share2, UserPlus, ChevronDown, ChevronUp } from 'lucide-react'
 
 /**
@@ -6,14 +6,14 @@ import { QrCode, Share2, UserPlus, ChevronDown, ChevronUp } from 'lucide-react'
  * Displays 3 perfectly symmetrical action buttons (Receive, Handover, Add Patient)
  * with a subtle floating micro-collapse button that doesn't disrupt alignment.
  */
-export default function PatientActionBar({
+const PatientActionBarInner = ({
     isMortality = false,
     onAdd,
     onImport,
     onHandover,
     handoverBadge = null,
     handoverDisabled = false,
-}) {
+}) => {
     const [isCollapsed, setIsCollapsed] = useState(false)
     const hasSelection = handoverBadge !== null && handoverBadge > 0
 
@@ -117,3 +117,5 @@ export default function PatientActionBar({
         </div>
     )
 }
+
+export default memo(PatientActionBarInner)

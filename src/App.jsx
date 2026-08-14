@@ -1,19 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import Header from './components/Header'
 import AddPatientForm from './components/AddPatientForm'
 import PatientList from './components/PatientList'
-import ExportModal from './components/ExportModal'
-import ScannerComponent from './components/ScannerComponent'
 import ConfirmDialog from './components/ConfirmDialog'
 import EmptyState from './components/EmptyState'
-import ReviewDuplicatesModal from './components/ReviewDuplicatesModal'
 import RemovalChoiceDialog from './components/RemovalChoiceDialog'
-import FeedbackModal from './components/FeedbackModal'
-import SettingsModal from './components/SettingsModal'
-import NotebookPage from './components/NotebookPage'
-import DocComposer from './components/DocComposer'
-import SearchOverlay from './components/SearchOverlay'
 import PatientActionBar from './components/PatientActionBar'
 import { get, set } from 'idb-keyval'
 import { generateUniqueValue, updateSuffixesAfterRemoval } from './utils/uniqueSuffix'
@@ -21,6 +13,15 @@ import { formatSmartDate } from './utils/formatSmartDate'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+
+const ExportModal = lazy(() => import('./components/ExportModal'))
+const ScannerComponent = lazy(() => import('./components/ScannerComponent'))
+const ReviewDuplicatesModal = lazy(() => import('./components/ReviewDuplicatesModal'))
+const FeedbackModal = lazy(() => import('./components/FeedbackModal'))
+const SettingsModal = lazy(() => import('./components/SettingsModal'))
+const NotebookPage = lazy(() => import('./components/NotebookPage'))
+const DocComposer = lazy(() => import('./components/DocComposer'))
+const SearchOverlay = lazy(() => import('./components/SearchOverlay'))
 
 const STORAGE_KEY = '4myteam_patients'
 const MORTALITIES_KEY = '4myteam_mortalities'
@@ -105,7 +106,7 @@ export default function App() {
 // Navigate back to default page when closing a URL-triggered modal/form
 const navigateBackFromUrlRoute = useCallback(() => {
     const path = location.pathname
-    if (path === '/notebook/edit') {
+    if (path === '/notebook/edit' || path === '/notebook/add') {
         navigate('/notebook')
     } else if (path.endsWith('/add') || path.includes('/edit') ||
         path.includes('/handover') || path.includes('/recieve') || path.includes('/receive')) {
@@ -125,25 +126,25 @@ useEffect(() => {
     }
     setShowExport(false)
     setShowScanner(false)
-    if (path !== '/notebook/edit') {
+    if (path !== '/notebook/edit' && path !== '/notebook/add') {
         setNotebookEditDoc(null)
     }
 
-    if (path.endsWith('/add')) {
+    if (path.endsWith('/add') && !path.startsWith('/notebook/add')) {
         setShowAddForm(true)
     } else if (path.includes('/edit') && !path.startsWith('/notebook/edit')) {
         if (pendingEditRef.current) {
             setEditingPatient(pendingEditRef.current)
             pendingEditRef.current = null
         }
-    } else if (path === '/notebook/edit') {
-        // Notebook edit state is managed by NotebookPage component
+    } else if (path === '/notebook/edit' || path === '/notebook/add') {
+        // Notebook state is managed by NotebookPage component
     } else if (path.includes('/handover')) {
         setShowExport(true)
     } else if (path.includes('/recieve') || path.includes('/receive')) {
         setShowScanner(true)
     }
-}, [location.pathname, navigate, activeTab])
+}, [location.pathname])
 
 const [isLoaded, setIsLoaded] = useState(false)
 const [patients, setPatients] = useState([])
@@ -372,27 +373,36 @@ const pendingEditRef = useRef(null)
         setPendingClearAction(null)
     }, [pendingClearAction, clearMyTeam, clearOnCall, clearMortalities, clearNotebook])
 
-    // Persist to IndexedDB on every change
-    useEffect(() => {
-        if (!isLoaded) return;
-        set(STORAGE_KEY, patients).catch(console.error)
-    }, [patients, isLoaded])
+    // Debounced IndexedDB persistence to avoid blocking main thread
+    const saveTimers = useRef({})
+
+    const debouncedSave = useCallback((key, data) => {
+        if (saveTimers.current[key]) clearTimeout(saveTimers.current[key])
+        saveTimers.current[key] = setTimeout(() => {
+            set(key, data).catch(console.error)
+        }, 500)
+    }, [])
 
     useEffect(() => {
         if (!isLoaded) return;
-        set(MORTALITIES_KEY, mortalities).catch(console.error)
-    }, [mortalities, isLoaded])
+        debouncedSave(STORAGE_KEY, patients)
+    }, [patients, isLoaded, debouncedSave])
 
     useEffect(() => {
         if (!isLoaded) return;
-        set(DISCHARGES_KEY, discharges).catch(console.error)
-        set(DISCHARGES_RESET_KEY, dischargesResetDate).catch(console.error)
-    }, [discharges, dischargesResetDate, isLoaded])
+        debouncedSave(MORTALITIES_KEY, mortalities)
+    }, [mortalities, isLoaded, debouncedSave])
 
     useEffect(() => {
         if (!isLoaded) return;
-        set(DOCUMENTATION_KEY, docs).catch(console.error)
-    }, [docs, isLoaded])
+        debouncedSave(DISCHARGES_KEY, discharges)
+        debouncedSave(DISCHARGES_RESET_KEY, dischargesResetDate)
+    }, [discharges, dischargesResetDate, isLoaded, debouncedSave])
+
+    useEffect(() => {
+        if (!isLoaded) return;
+        debouncedSave(DOCUMENTATION_KEY, docs)
+    }, [docs, isLoaded, debouncedSave])
 
     // ── Documentation callbacks ───────────────────────────────────────────────
 
@@ -453,9 +463,18 @@ const pendingEditRef = useRef(null)
         setTimeout(() => setShowUndoToast(false), 5000)
     }, [patients, mortalities, discharges, docs])
 
-    const getDocCount = useCallback((patientId) => {
-        return docs.filter(d => d.patientId === patientId).length
+    const docCountMap = useMemo(() => {
+        const map = {}
+        for (let i = 0; i < docs.length; i++) {
+            const pId = docs[i].patientId
+            if (pId) map[pId] = (map[pId] || 0) + 1
+        }
+        return map
     }, [docs])
+
+    const getDocCount = useCallback((patientId) => {
+        return docCountMap[patientId] || 0
+    }, [docCountMap])
 
     // ── Restore from JSON backup ──────────────────────────────────────────────
 
@@ -1031,9 +1050,10 @@ const pendingEditRef = useRef(null)
         setPendingImport(null);
     }, [patients, mortalities, discharges, pendingImport]);
 
-    const activePatients = activeTab === 'mortalities'
-        ? mortalities
-        : patients.filter(p => (p.team || 'my_team') === activeTab)
+    const activePatients = useMemo(() => {
+        if (activeTab === 'mortalities') return mortalities
+        return patients.filter(p => (p.team || 'my_team') === activeTab)
+    }, [activeTab, patients, mortalities])
 
     const lookupPatient = useCallback((hospitalNumber) => {
         const found = activePatients.find(p => p.hospitalNumber === hospitalNumber)
@@ -1054,17 +1074,33 @@ const pendingEditRef = useRef(null)
         return null
     }, [activePatients])
 
-    const myTeamCount = patients.filter(p => (p.team || 'my_team') === 'my_team').length
-    const otherTeamCount = patients.filter(p => p.team === 'other_team').length
+    const counts = useMemo(() => {
+        let myTeam = 0, otherTeam = 0
+        for (let i = 0; i < patients.length; i++) {
+            if ((patients[i].team || 'my_team') === 'my_team') myTeam++
+            else if (patients[i].team === 'other_team') otherTeam++
+        }
+        let myDischarges = 0, otherDischarges = 0
+        for (let i = 0; i < discharges.length; i++) {
+            if ((discharges[i].team || 'my_team') === 'my_team') myDischarges++
+            else if (discharges[i].team === 'other_team') otherDischarges++
+        }
+        return { myTeam, otherTeam, myDischarges, otherDischarges }
+    }, [patients, discharges])
+
+    const myTeamCount = counts.myTeam
+    const otherTeamCount = counts.otherTeam
     const mortalitiesCount = mortalities.length
-    const dischargeCount = discharges.filter(d => d.team === 'my_team').length
-    const otherDischargeCount = discharges.filter(d => d.team === 'other_team').length
+    const dischargeCount = counts.myDischarges
+    const otherDischargeCount = counts.otherDischarges
 
     const listName = activeTab === 'my_team' ? 'My Team' : activeTab === 'other_team' ? 'On Call' : 'Mortalities'
 
-    const patientsToExport = selectedPatientIds.size > 0
-        ? activePatients.filter(p => selectedPatientIds.has(p.id))
-        : activePatients
+    const patientsToExport = useMemo(() => {
+        return selectedPatientIds.size > 0
+            ? activePatients.filter(p => selectedPatientIds.has(p.id))
+            : activePatients
+    }, [selectedPatientIds, activePatients])
 
     const navigateToPatient = useCallback((patientId, highlightField, highlightQuery, targetTeam) => {
         // Determine target tab based on patient team
@@ -1150,25 +1186,27 @@ const pendingEditRef = useRef(null)
 
             {/* Notebook Page */}
             {activePage === 'notebook' && (
-                <NotebookPage
-                    docs={docs}
-                    onUpdateDoc={updateDoc}
-                    onDeleteDoc={deleteDoc}
-                    addDoc={addDoc}
-                    addStandaloneDoc={addStandaloneDoc}
-                    initialEditDoc={notebookEditDoc}
-                    onCancelEdit={() => {
-                        setNotebookEditDoc(null)
-                        navigate('/notebook')
-                    }}
-                    navigate={navigate}
-                    initialSelectedDocId={initialSelectedDocId}
-                    searchHighlight={notebookSearchHighlight}
-                    onDocOpened={() => {
-                        setInitialSelectedDocId(null)
-                        setNotebookSearchHighlight('')
-                    }}
-                />
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+                    <NotebookPage
+                        docs={docs}
+                        onUpdateDoc={updateDoc}
+                        onDeleteDoc={deleteDoc}
+                        addDoc={addDoc}
+                        addStandaloneDoc={addStandaloneDoc}
+                        initialEditDoc={notebookEditDoc}
+                        onCancelEdit={() => {
+                            setNotebookEditDoc(null)
+                            navigate('/notebook')
+                        }}
+                        navigate={navigate}
+                        initialSelectedDocId={initialSelectedDocId}
+                        searchHighlight={notebookSearchHighlight}
+                        onDocOpened={() => {
+                            setInitialSelectedDocId(null)
+                            setNotebookSearchHighlight('')
+                        }}
+                    />
+                </Suspense>
             )}
 
             {activePage === 'patients' && (
@@ -1331,29 +1369,72 @@ const pendingEditRef = useRef(null)
             )}
 
             {/* Modals */}
-            {showExport && (
-                <ExportModal
-                    patients={patientsToExport}
-                    allPatients={activePatients}
-                    listName={listName}
-                    selectionCount={selectedPatientIds.size}
-                    onClose={() => { setShowExport(false); clearSelection(); navigateBackFromUrlRoute() }}
-                    mortalities={mortalities}
-                    discharges={discharges}
-                    dischargesResetDate={dischargesResetDate}
-                    docs={docs}
-                />
-            )}
-            {showScanner && (
-                <ScannerComponent
-                    listName={listName}
-                    onImport={importPatients}
-                    onLookup={lookupPatient}
-                    onRestore={restoreFromBackup}
-                    onClose={() => { setShowScanner(false); navigateBackFromUrlRoute() }}
-                    onImportComplete={() => setShowExport(false)}
-                />
-            )}
+            <Suspense fallback={null}>
+                {showExport && (
+                    <ExportModal
+                        patients={patientsToExport}
+                        allPatients={activePatients}
+                        listName={listName}
+                        selectionCount={selectedPatientIds.size}
+                        onClose={() => { setShowExport(false); clearSelection(); navigateBackFromUrlRoute() }}
+                        mortalities={mortalities}
+                        discharges={discharges}
+                        dischargesResetDate={dischargesResetDate}
+                        docs={docs}
+                    />
+                )}
+                {showScanner && (
+                    <ScannerComponent
+                        listName={listName}
+                        onImport={importPatients}
+                        onLookup={lookupPatient}
+                        onRestore={restoreFromBackup}
+                        onClose={() => { setShowScanner(false); navigateBackFromUrlRoute() }}
+                        onImportComplete={() => setShowExport(false)}
+                    />
+                )}
+                {pendingImport && (
+                    <ReviewDuplicatesModal
+                        pendingImport={pendingImport}
+                        onResolve={resolveImport}
+                        onCancel={() => setPendingImport(null)}
+                    />
+                )}
+                {showFeedback && (
+                    <FeedbackModal onClose={() => setShowFeedback(false)} />
+                )}
+                {showSettings && (
+                    <SettingsModal
+                        onClose={() => setShowSettings(false)}
+                        onOpenFeedback={() => setShowFeedback(true)}
+                        textSize={textSize}
+                        onDecreaseText={decreaseTextSize}
+                        onIncreaseText={increaseTextSize}
+                        onClearRequest={handleClearRequest}
+                        onSaveBackup={handleSaveBackup}
+                        onRestoreBackup={restoreFromBackup}
+                    />
+                )}
+                {showSearch && (
+                    <SearchOverlay
+                        patients={patients}
+                        mortalities={mortalities}
+                        docs={docs}
+                        activePage={activePage}
+                        activeTab={activeTab}
+                        onClose={() => setShowSearch(false)}
+                        onNavigateToPatient={navigateToPatient}
+                        onNavigateToNote={navigateToNote}
+                    />
+                )}
+                {composingFor && (
+                    <DocComposer
+                        patient={composingFor}
+                        onSave={({ text, color }) => addDoc(composingFor, text, color)}
+                        onClose={() => setComposingFor(null)}
+                    />
+                )}
+            </Suspense>
             {showConfirmResetStats && (
                 <ConfirmDialog
                     title="Reset Discharge Stats?"
@@ -1369,40 +1450,6 @@ const pendingEditRef = useRef(null)
                     onDischarge={dischargePatient}
                     onMortality={markAsMortality}
                     onCancel={() => setRemovalCandidateId(null)}
-                />
-            )}
-            {pendingImport && (
-                <ReviewDuplicatesModal
-                    pendingImport={pendingImport}
-                    onResolve={resolveImport}
-                    onCancel={() => setPendingImport(null)}
-                />
-            )}
-            {showFeedback && (
-                <FeedbackModal onClose={() => setShowFeedback(false)} />
-            )}
-            {showSettings && (
-                <SettingsModal
-                    onClose={() => setShowSettings(false)}
-                    onOpenFeedback={() => setShowFeedback(true)}
-                    textSize={textSize}
-                    onDecreaseText={decreaseTextSize}
-                    onIncreaseText={increaseTextSize}
-                    onClearRequest={handleClearRequest}
-                    onSaveBackup={handleSaveBackup}
-                    onRestoreBackup={restoreFromBackup}
-                />
-            )}
-            {showSearch && (
-                <SearchOverlay
-                    patients={patients}
-                    mortalities={mortalities}
-                    docs={docs}
-                    activePage={activePage}
-                    activeTab={activeTab}
-                    onClose={() => setShowSearch(false)}
-                    onNavigateToPatient={navigateToPatient}
-                    onNavigateToNote={navigateToNote}
                 />
             )}
 
@@ -1426,7 +1473,7 @@ const pendingEditRef = useRef(null)
                         Undo
                     </button>
                     <button onClick={() => setShowUndoToast(false)} className="text-gray-400 hover:text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /></svg>
                     </button>
                 </div>
             )}
@@ -1435,15 +1482,6 @@ const pendingEditRef = useRef(null)
                 patients={patientsToExport}
                 listName={listName}
             />
-
-            {/* DocComposer — opens when Document button is tapped on a patient card */}
-            {composingFor && (
-                <DocComposer
-                    patient={composingFor}
-                    onSave={({ text, color }) => addDoc(composingFor, text, color)}
-                    onClose={() => setComposingFor(null)}
-                />
-            )}
         </div>
     )
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, memo } from 'react'
 import { Edit2, Trash2, BookOpen, X, Plus, ArrowUpDown, User, StickyNote } from 'lucide-react'
 import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
@@ -178,7 +178,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
-export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) {
+const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) => {
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
     const [showAddNoteForm, setShowAddNoteForm] = useState(false)
@@ -206,14 +206,14 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
     const sortDocs = (list) => {
         if (sortBy === 'default') {
             return [...list].sort((a, b) => {
-                const aTime = a.updatedAt || a.createdAt
-                const bTime = b.updatedAt || b.createdAt
-                return new Date(bTime) - new Date(aTime)
+                const aTime = Date.parse(a.updatedAt || a.createdAt || 0)
+                const bTime = Date.parse(b.updatedAt || b.createdAt || 0)
+                return bTime - aTime
             })
         }
         return [...list].sort((a, b) => {
             if (sortBy === 'date_asc') {
-                return new Date(a.createdAt) - new Date(b.createdAt)
+                return Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0)
             }
 
             if (sortBy === 'name') {
@@ -277,11 +277,13 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
 
         addStandaloneDoc(trimmedNote, trimmedDiagnosis)
         setShowAddNoteForm(false)
+        navigate('/notebook')
         return true
     }
 
     const handleCancelAddNote = () => {
         setShowAddNoteForm(false)
+        navigate('/notebook')
     }
 
     return (
@@ -291,7 +293,10 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                 <SpeedDialFAB
                     mainTheme="blue"
                     ariaLabel="Add new note"
-                    onClick={() => setShowAddNoteForm(true)}
+                    onClick={() => {
+                        navigate('/notebook/add')
+                        setShowAddNoteForm(true)
+                    }}
                     shape="square"
                 />
             )}
@@ -376,7 +381,8 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                             const hasName = Boolean(nameStr)
                             const wardStr = (doc.patientWard || '').trim()
                             const hospStr = (doc.patientHosp || '').trim()
-                            const hasBio = hasName || Boolean(wardStr) || Boolean(hospStr)
+                            const dateIso = doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt
+                            const dateParts = formatSmartDateParts(dateIso)
 
                             return (
                                 <button
@@ -411,11 +417,11 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
                                             </div>
                                         )}
                                         <div className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto text-right leading-tight">
-                                            {formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).date && (
-                                                <div>{formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).date}</div>
+                                            {dateParts.date && (
+                                                <div>{dateParts.date}</div>
                                             )}
-                                            {formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).time && (
-                                                <div>{formatSmartDateParts(doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt).time}</div>
+                                            {dateParts.time && (
+                                                <div>{dateParts.time}</div>
                                             )}
                                         </div>
                                     </div>
@@ -481,3 +487,21 @@ export default function NotebookPage({ docs, onUpdateDoc, onDeleteDoc, showUndoT
         </div>
     )
 }
+
+export default memo(NotebookPageInner, (prev, next) => {
+    if (prev.docs !== next.docs) return false
+    if (prev.initialEditDoc !== next.initialEditDoc) return false
+    if (prev.initialSelectedDocId !== next.initialSelectedDocId) return false
+    if (prev.searchHighlight !== next.searchHighlight) return false
+    if (prev.showUndoToast !== next.showUndoToast) return false
+    if (prev.onUpdateDoc !== next.onUpdateDoc) return false
+    if (prev.onDeleteDoc !== next.onDeleteDoc) return false
+    if (prev.onUndo !== next.onUndo) return false
+    if (prev.setShowUndoToast !== next.setShowUndoToast) return false
+    if (prev.addDoc !== next.addDoc) return false
+    if (prev.addStandaloneDoc !== next.addStandaloneDoc) return false
+    if (prev.onCancelEdit !== next.onCancelEdit) return false
+    if (prev.navigate !== next.navigate) return false
+    if (prev.onDocOpened !== next.onDocOpened) return false
+    return true
+})

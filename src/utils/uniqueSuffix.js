@@ -1,3 +1,5 @@
+const SUFFIX_REGEX = /^(.*?)(?:\s*(?:\((\d+)\)|\^(\d+)|\^\((\d+)\)))+$/
+
 /**
  * Helper function to parse a value into its base string and numeric suffix.
  * Handles patterns like "12345", "12345(2)", "12345^2", "12345^(2)", "12345(2)(2)".
@@ -11,8 +13,7 @@ export function parseBaseAndSuffix(val) {
     if (!str) return null
 
     // Match base followed by one or more suffix patterns like (2), ^2, ^(2)
-    const suffixRegex = /^(.*?)(?:\s*(?:\((\d+)\)|\^(\d+)|\^\((\d+)\)))+$/
-    const match = str.match(suffixRegex)
+    const match = str.match(SUFFIX_REGEX)
     if (match) {
         const base = match[1].trim()
         const count = parseInt(match[2] || match[3] || match[4], 10)

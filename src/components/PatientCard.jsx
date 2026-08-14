@@ -1,5 +1,5 @@
 import { Trash2, Pencil, CheckCircle2, FileText, ChevronsLeft } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo, memo } from 'react'
 import { formatSmartDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
 
@@ -20,16 +20,15 @@ function HighlightText({ text, query }) {
     )
 }
 
-export default function PatientCard({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail }) {
+const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail }) => {
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
 
-    let durationText = '';
-    if (admissionDate && !isMortality) {
-        let diffMs = Date.now() - new Date(admissionDate).getTime();
-        if (diffMs < 0) diffMs = 0;
-        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        durationText = `• ${days} day${days !== 1 ? 's' : ''}`;
-    }
+    const durationText = useMemo(() => {
+        if (!admissionDate || isMortality) return ''
+        const diffMs = Math.max(0, Date.now() - new Date(admissionDate).getTime())
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+        return `• ${days} day${days !== 1 ? 's' : ''}`
+    }, [admissionDate, isMortality])
 
     const [offsetX, setOffsetX] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
@@ -120,21 +119,26 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
         if (onOpenDetail) onOpenDetail(patient);
     }
 
-    // Generate a color based on ward or name or id string for visual variety
-    const colorStr = ward || name || id || ''
-    const wardColors = isMortality ? [
-        'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/40',
-    ] : [
-        'bg-blue-100 text-blue-800 border-blue-200',
-        'bg-purple-100 text-purple-800 border-purple-200',
-        'bg-teal-100 text-teal-800 border-teal-200',
-        'bg-orange-100 text-orange-800 border-orange-200',
-        'bg-pink-100 text-pink-800 border-pink-200',
-        'bg-indigo-100 text-indigo-800 border-indigo-200',
-    ]
-    const hash = String(colorStr).split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0)
-    const colorIdx = Math.abs(hash) % wardColors.length
-    const badgeColor = wardColors[colorIdx]
+    const badgeColor = useMemo(() => {
+        const colorStr = ward || name || id || ''
+        if (isMortality) {
+            return 'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/40'
+        }
+        const wardColors = [
+            'bg-blue-100 text-blue-800 border-blue-200',
+            'bg-purple-100 text-purple-800 border-purple-200',
+            'bg-teal-100 text-teal-800 border-teal-200',
+            'bg-orange-100 text-orange-800 border-orange-200',
+            'bg-pink-100 text-pink-800 border-pink-200',
+            'bg-indigo-100 text-indigo-800 border-indigo-200',
+        ]
+        let hash = 0
+        for (let i = 0; i < colorStr.length; i++) {
+            hash = colorStr.charCodeAt(i) + ((hash << 5) - hash)
+        }
+        const colorIdx = Math.abs(hash) % wardColors.length
+        return wardColors[colorIdx]
+    }, [ward, name, id, isMortality])
 
     return (
         <div className="relative overflow-hidden rounded-2xl" id={`patient-${id}`} role="listitem">
@@ -361,3 +365,36 @@ export default function PatientCard({ patient, onEdit, onDelete, onReview, onDoc
         </div>
     )
 }
+
+export default memo(PatientCardInner, (prev, next) => {
+    if (prev.patient !== next.patient) {
+        const p = prev.patient, n = next.patient
+        if (p.id !== n.id) return false
+        if (p.name !== n.name) return false
+        if (p.hospitalNumber !== n.hospitalNumber) return false
+        if (p.ward !== n.ward) return false
+        if (p.bed !== n.bed) return false
+        if (p.diagnosis !== n.diagnosis) return false
+        if (p.note !== n.note) return false
+        if (p.reviewed !== n.reviewed) return false
+        if (p.critical !== n.critical) return false
+        if (p.removedAt !== n.removedAt) return false
+        if (p.lastUpdated !== n.lastUpdated) return false
+        if (p.admissionDate !== n.admissionDate) return false
+    }
+    if (prev.docCount !== next.docCount) return false
+    if (prev.isSelected !== next.isSelected) return false
+    if (prev.selectionMode !== next.selectionMode) return false
+    if (prev.isMortality !== next.isMortality) return false
+    if (prev.highlightField !== next.highlightField) return false
+    if (prev.highlightQuery !== next.highlightQuery) return false
+    if (prev.onEdit !== next.onEdit) return false
+    if (prev.onDelete !== next.onDelete) return false
+    if (prev.onReview !== next.onReview) return false
+    if (prev.onDocument !== next.onDocument) return false
+    if (prev.onToggleSelect !== next.onToggleSelect) return false
+    if (prev.onMoveTeam !== next.onMoveTeam) return false
+    if (prev.moveTeamLabel !== next.moveTeamLabel) return false
+    if (prev.onOpenDetail !== next.onOpenDetail) return false
+    return true
+})

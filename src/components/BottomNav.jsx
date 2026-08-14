@@ -1,4 +1,6 @@
-export default function BottomNav({ activePage, onPageChange, docCount = 0 }) {
+import { memo } from 'react'
+
+const BottomNavInner = ({ activePage, onPageChange, docCount = 0 }) => {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-700">
             <div className="max-w-2xl mx-auto flex">
@@ -54,3 +56,5 @@ export default function BottomNav({ activePage, onPageChange, docCount = 0 }) {
         </div>
     )
 }
+
+export default memo(BottomNavInner)
