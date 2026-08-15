@@ -56,13 +56,13 @@ export default function PatientDetailModal({
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`modal-box max-w-md w-[95%] p-0 overflow-hidden border-l-4 ${isMortality ? 'border-red-500' : 'border-blue-500'}`}
+                className={`modal-box max-w-md w-[95%] h-[70vh] max-h-[600px] flex flex-col p-0 overflow-hidden border-l-4 ${isMortality ? 'border-red-500' : 'border-blue-500'}`}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="patient-detail-title"
             >
                 {/* Header */}
-                <div className={`px-5 pt-4 pb-3 ${isMortality ? 'bg-red-50 dark:bg-red-900/10' : 'bg-blue-50 dark:bg-blue-900/10'}`}>
+                <div className={`px-5 pt-4 pb-3 flex-shrink-0 ${isMortality ? 'bg-red-50 dark:bg-red-900/10' : 'bg-blue-50 dark:bg-blue-900/10'}`}>
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1 overflow-hidden">
                             <div className="flex flex-col gap-1 overflow-hidden">
@@ -134,7 +134,7 @@ export default function PatientDetailModal({
                 </div>
 
                 {/* Body */}
-                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto custom-scrollbar min-w-0 max-w-full">
+                <div className="px-5 py-4 flex-1 overflow-y-auto custom-scrollbar min-w-0 max-w-full">
                     {note ? (
                         <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word]">
                             {note}
@@ -152,7 +152,7 @@ export default function PatientDetailModal({
                 </div>
 
                 {/* Footer */}
-                <div className="flex gap-2 px-5 pb-5 border-t border-gray-100 dark:border-gray-700 pt-3">
+                <div className="flex gap-2 px-5 pb-5 border-t border-gray-100 dark:border-gray-700 pt-3 flex-shrink-0">
                     <button
                         type="button"
                         onClick={onClose}

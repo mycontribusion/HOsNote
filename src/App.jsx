@@ -1162,6 +1162,20 @@ const pendingEditRef = useRef(null)
         }
     }, [activePage, goToPage, docs])
 
+    const handleNotebookStartEdit = useCallback((doc) => {
+        setNotebookEditDoc(doc)
+    }, [])
+
+    const handleNotebookCancelEdit = useCallback(() => {
+        setNotebookEditDoc(null)
+        navigate('/notebook')
+    }, [navigate])
+
+    const handleNotebookDocOpened = useCallback(() => {
+        setInitialSelectedDocId(null)
+        setNotebookSearchHighlight('')
+    }, [])
+
     if (!isLoaded) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
@@ -1194,17 +1208,12 @@ const pendingEditRef = useRef(null)
                         addDoc={addDoc}
                         addStandaloneDoc={addStandaloneDoc}
                         initialEditDoc={notebookEditDoc}
-                        onCancelEdit={() => {
-                            setNotebookEditDoc(null)
-                            navigate('/notebook')
-                        }}
+                        onStartEdit={handleNotebookStartEdit}
+                        onCancelEdit={handleNotebookCancelEdit}
                         navigate={navigate}
                         initialSelectedDocId={initialSelectedDocId}
                         searchHighlight={notebookSearchHighlight}
-                        onDocOpened={() => {
-                            setInitialSelectedDocId(null)
-                            setNotebookSearchHighlight('')
-                        }}
+                        onDocOpened={handleNotebookDocOpened}
                     />
                 </Suspense>
             )}

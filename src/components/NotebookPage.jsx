@@ -90,13 +90,13 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`modal-box max-w-md w-[95%] p-0 overflow-hidden border-l-4 ${border}`}
+                className={`modal-box max-w-md w-[95%] h-[70vh] max-h-[600px] flex flex-col p-0 overflow-hidden border-l-4 ${border}`}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="note-detail-title"
             >
                 {/* Header */}
-                <div className={`px-5 pt-4 pb-3 ${bg}`}>
+                <div className={`px-5 pt-4 pb-3 flex-shrink-0 ${bg}`}>
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1 overflow-hidden">
                             <div className="flex flex-col gap-1 overflow-hidden">
@@ -141,7 +141,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
                 </div>
 
                 {/* Body — full note text */}
-                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto custom-scrollbar min-w-0 max-w-full">
+                <div className="px-5 py-4 flex-1 overflow-y-auto custom-scrollbar min-w-0 max-w-full">
                     <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word]">
                         {highlightText ? <HighlightText text={doc.text} query={highlightText} /> : doc.text}
                     </p>
@@ -153,7 +153,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 px-5 pb-5 border-t border-gray-100 dark:border-gray-700 pt-3">
+                <div className="flex gap-2 px-5 pb-5 border-t border-gray-100 dark:border-gray-700 pt-3 flex-shrink-0">
                     <button
                         id="btn-delete-note"
                         className="btn-ghost flex items-center gap-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 focus:ring-red-200 flex-1"
@@ -178,12 +178,28 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
-const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) => {
+const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onStartEdit, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) => {
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
     const [showAddNoteForm, setShowAddNoteForm] = useState(false)
     const [sortBy, setSortBy] = useState('default')
     const [noteFilter, setNoteFilter] = useState('all')
+
+    const editInitialData = useMemo(() => {
+        if (!editingDoc) return null
+        return {
+            id: editingDoc.id,
+            name: editingDoc.patientName || '',
+            hospitalNumber: editingDoc.patientHosp || '',
+            ward: editingDoc.patientWard || '',
+            bed: editingDoc.patientBed || '',
+            admissionDate: editingDoc.admissionDate || '',
+            diagnosis: editingDoc.diagnosis || editingDoc.patientDiagnosis || '',
+            note: editingDoc.text || '',
+            critical: editingDoc.critical || false,
+            team: editingDoc.team || 'my_team',
+        }
+    }, [editingDoc])
 
     useEffect(() => {
         if (initialEditDoc && initialEditDoc.id !== editingDoc?.id) {
@@ -445,6 +461,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                     onClose={() => setSelectedDoc(null)}
                     onEdit={() => {
                         setEditingDoc(selectedDoc)
+                        onStartEdit?.(selectedDoc)
                         navigate(`/notebook/edit`)
                     }}
                     onDelete={() => handleDeleteFromDetail(selectedDoc)}
@@ -456,18 +473,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
             {editingDoc && (
                 <AddPatientForm
                     isNoteMode={!editingDoc.patientId}
-                    initialData={{
-                        id: editingDoc.id,
-                        name: editingDoc.patientName || '',
-                        hospitalNumber: editingDoc.patientHosp || '',
-                        ward: editingDoc.patientWard || '',
-                        bed: editingDoc.patientBed || '',
-                        admissionDate: editingDoc.admissionDate || '',
-                        diagnosis: editingDoc.diagnosis || editingDoc.patientDiagnosis || '',
-                        note: editingDoc.text || '',
-                        critical: editingDoc.critical || false,
-                        team: editingDoc.team || 'my_team',
-                    }}
+                    initialData={editInitialData}
                     onAdd={handleEditSave}
                     onCancel={() => {
                         setEditingDoc(null)
@@ -501,6 +507,7 @@ export default memo(NotebookPageInner, (prev, next) => {
     if (prev.addDoc !== next.addDoc) return false
     if (prev.addStandaloneDoc !== next.addStandaloneDoc) return false
     if (prev.onCancelEdit !== next.onCancelEdit) return false
+    if (prev.onStartEdit !== next.onStartEdit) return false
     if (prev.navigate !== next.navigate) return false
     if (prev.onDocOpened !== next.onDocOpened) return false
     return true
