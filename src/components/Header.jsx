@@ -1,7 +1,7 @@
 import { Moon, Sun, Settings, Stethoscope, BookOpen, Search } from 'lucide-react'
 import { memo } from 'react'
 
-const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange, onOpenSearch, theme = 'blue' }) => {
+const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange, onOpenSearch, onHome, theme = 'blue' }) => {
     const isRed = theme === 'red'
     const headerBg = isRed ? 'bg-red-700 dark:bg-red-900' : 'bg-blue-700 dark:bg-gray-900'
     const shadowColor = isRed ? 'shadow-red-900/30' : 'shadow-blue-900/30'
@@ -13,9 +13,15 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
                 {/* Top row: Title + Controls */}
                 <div className="flex items-center justify-between gap-3 py-2">
                     {/* Logo + Title */}
-                    <div className="min-w-0">
+                    <button
+                        type="button"
+                        onClick={onHome}
+                        className="min-w-0 text-left hover:opacity-80 active:opacity-60 transition-opacity"
+                        aria-label="Go to main page"
+                        title="Main Page"
+                    >
                         <h1 className="font-bold text-xl leading-tight tracking-tight">HOsNote</h1>
-                    </div>
+                    </button>
 
                     {/* Right side controls */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">

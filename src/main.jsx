@@ -23,6 +23,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                     <Route path="receive" element={<App />} />
                     <Route path="receive/:name" element={<App />} />
                 </Route>
+                <Route path="/mortalities" element={<App />} />
+                <Route path="/settings" element={<App />} />
+                <Route path="/search" element={<App />} />
                 <Route path="/notebook" element={<App />} />
                 <Route path="/notebook/add" element={<App />} />
                 <Route path="/notebook/edit" element={<App />} />

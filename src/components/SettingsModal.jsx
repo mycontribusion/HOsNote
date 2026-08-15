@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare } from 'lucide-react'
+import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull } from 'lucide-react'
 
 export default function SettingsModal({
     onClose,
@@ -10,6 +10,7 @@ export default function SettingsModal({
     onClearRequest,
     onSaveBackup,
     onRestoreBackup,
+    onViewMortalities,
 }) {
     const [backupDone, setBackupDone] = useState(false)
     const [restoreMsg, setRestoreMsg] = useState('')
@@ -173,6 +174,19 @@ export default function SettingsModal({
                             </p>
                         )}
                         <input ref={fileInputRef} type="file" accept=".json,application/json,.txt,text/plain" className="hidden" onChange={handleFileChange} />
+                    </Section>
+
+                    {/* View Mortalities */}
+                    <Section title="Records">
+                        <Row
+                            icon={<Skull size={15} className="text-white" />}
+                            iconBg="bg-red-500"
+                            label="View Mortalities"
+                            sublabel="Browse archived mortality records"
+                            right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
+                            onClick={onViewMortalities}
+                            noBorder
+                        />
                     </Section>
 
                     {/* Clear data */}

@@ -93,14 +93,23 @@ export default function App() {
     const activePage = location.pathname.startsWith('/notebook') ? 'notebook' : 'patients'
     const activeTab = params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
         ? params.tab
-        : 'my_team'
+        : location.pathname === '/mortalities'
+            ? 'mortalities'
+            : 'my_team'
 
     const goToPage = useCallback((page) => {
+        setMortalitiesOnly(false)
         if (page === 'notebook') navigate('/notebook')
         else navigate(`/team/${activeTab}`)
     }, [navigate, activeTab])
     const goToTab = useCallback((tab) => {
+        setMortalitiesOnly(false)
         navigate(`/team/${tab}`)
+    }, [navigate])
+
+    const onHome = useCallback(() => {
+        setMortalitiesOnly(false)
+        navigate('/team/my_team')
     }, [navigate])
 
 // Navigate back to default page when closing a URL-triggered modal/form
@@ -111,6 +120,8 @@ const navigateBackFromUrlRoute = useCallback(() => {
     } else if (path.endsWith('/add') || path.includes('/edit') ||
         path.includes('/handover') || path.includes('/recieve') || path.includes('/receive')) {
         navigate(`/team/${activeTab}`)
+    } else if (path === '/settings' || path === '/search') {
+        navigate('/team/my_team')
     }
 }, [location.pathname, navigate, activeTab])
 
@@ -126,6 +137,8 @@ useEffect(() => {
     }
     setShowExport(false)
     setShowScanner(false)
+    setShowSettings(false)
+    setShowSearch(false)
     if (path !== '/notebook/edit' && path !== '/notebook/add') {
         setNotebookEditDoc(null)
     }
@@ -143,6 +156,10 @@ useEffect(() => {
         setShowExport(true)
     } else if (path.includes('/recieve') || path.includes('/receive')) {
         setShowScanner(true)
+    } else if (path === '/settings') {
+        setShowSettings(true)
+    } else if (path === '/search') {
+        setShowSearch(true)
     }
 }, [location.pathname])
 
@@ -154,6 +171,7 @@ const [docs, setDocs] = useState([])
 const [notebookEditDoc, setNotebookEditDoc] = useState(null)
 const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
 const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
+const [mortalitiesOnly, setMortalitiesOnly] = useState(false)
 const [darkMode, setDarkMode] = useState(() => {
     try {
         const stored = localStorage.getItem(DARK_MODE_KEY)
@@ -1053,9 +1071,9 @@ const pendingEditRef = useRef(null)
     }, [patients, mortalities, discharges, pendingImport]);
 
     const activePatients = useMemo(() => {
-        if (activeTab === 'mortalities') return mortalities
+        if (activeTab === 'mortalities' || mortalitiesOnly) return mortalities
         return patients.filter(p => (p.team || 'my_team') === activeTab)
-    }, [activeTab, patients, mortalities])
+    }, [activeTab, patients, mortalities, mortalitiesOnly])
 
     const lookupPatient = useCallback((hospitalNumber) => {
         const found = activePatients.find(p => p.hospitalNumber === hospitalNumber)
@@ -1096,7 +1114,7 @@ const pendingEditRef = useRef(null)
     const dischargeCount = counts.myDischarges
     const otherDischargeCount = counts.otherDischarges
 
-    const listName = activeTab === 'my_team' ? 'My Team' : activeTab === 'other_team' ? 'On Call' : 'Mortalities'
+    const listName = mortalitiesOnly ? 'Mortalities' : activeTab === 'my_team' ? 'My Team' : activeTab === 'other_team' ? 'On Call' : 'Mortalities'
 
     const patientsToExport = useMemo(() => {
         return selectedPatientIds.size > 0
@@ -1193,11 +1211,12 @@ const pendingEditRef = useRef(null)
                 docCount={docs.length}
                 darkMode={darkMode}
                 toggleDarkMode={toggleDarkMode}
-                onOpenSettings={() => setShowSettings(true)}
+                onOpenSettings={() => navigate('/settings')}
                 activePage={activePage}
                 onPageChange={goToPage}
-                onOpenSearch={() => setShowSearch(true)}
-                theme={activePage === 'patients' && activeTab === 'mortalities' ? 'red' : 'blue'}
+                onOpenSearch={() => navigate('/search')}
+                onHome={onHome}
+                theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
             />
 
             {/* Notebook Page */}
@@ -1250,7 +1269,7 @@ const pendingEditRef = useRef(null)
                     ) : null}
 
                     {/* Tabs */}
-                    {!showAddForm && !editingPatient && !showMortalityForm && (
+                    {!showAddForm && !editingPatient && !showMortalityForm && !mortalitiesOnly && activeTab !== 'mortalities' && (
                         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4 mt-2">
                             <button
                                 onClick={() => goToTab('my_team')}
@@ -1270,42 +1289,47 @@ const pendingEditRef = useRef(null)
                                     {otherTeamCount}
                                 </span>
                             </button>
-                            <button
-                                onClick={() => goToTab('mortalities')}
-                                className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'mortalities' ? 'border-red-600 text-red-700 dark:text-red-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                            >
-                                Mortalities
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'mortalities' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-                                    {mortalitiesCount}
-                                </span>
-                            </button>
                         </div>
                     )}
 
-                    {activeTab === 'mortalities' ? (
-                        mortalities.length === 0 ? (
-                            <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                                <div className="bg-gray-50 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                                        <path d="M12 2v20" /><path d="m17 7-5-5-5 5" /><path d="m17 17-5 5-5-5" />
+                    {(activeTab === 'mortalities' || mortalitiesOnly) ? (
+                        <div className="mt-2">
+                            <div className="flex items-center gap-2 mb-4">
+                                <button
+                                    onClick={onHome}
+                                    className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                                    aria-label="Back to main page"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M19 12H5M12 19l-7-7 7-7" />
                                     </svg>
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">No mortality records</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-[240px] mx-auto text-sm">Archived mortality records will appear here.</p>
+                                    Back
+                                </button>
                             </div>
-                        ) : (
-                            <PatientList
-                                patients={mortalities}
-                                onEdit={startEditing}
-                                onDelete={deleteMortalityRecord}
-                                onReview={null}
-                                onResetReviews={() => { }}
-                                selectedIds={selectedPatientIds}
-                                onToggleSelect={toggleSelectPatient}
-                                onToggleSelectAll={toggleSelectAll}
-                                isMortality
-                            />
-                        )
+                            {mortalities.length === 0 ? (
+                                <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                                    <div className="bg-gray-50 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                            <path d="M12 2v20" /><path d="m17 7-5-5-5 5" /><path d="m17 17-5 5-5-5" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">No mortality records</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-[240px] mx-auto text-sm">Archived mortality records will appear here.</p>
+                                </div>
+                            ) : (
+                                <PatientList
+                                    patients={mortalities}
+                                    onEdit={startEditing}
+                                    onDelete={deleteMortalityRecord}
+                                    onReview={null}
+                                    onResetReviews={() => { }}
+                                    selectedIds={selectedPatientIds}
+                                    onToggleSelect={toggleSelectPatient}
+                                    onToggleSelectAll={toggleSelectAll}
+                                    isMortality
+                                />
+                            )}
+                        </div>
                     ) : activePatients.length === 0 ? (
                         <EmptyState onAddClick={() => navigate(`/team/${activeTab}/add`)} />
                     ) : (
@@ -1360,9 +1384,9 @@ const pendingEditRef = useRef(null)
             {/* Bottom Action Bar — Tracker Page */}
             {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (
                 <PatientActionBar
-                    isMortality={activeTab === 'mortalities'}
+                    isMortality={activeTab === 'mortalities' || mortalitiesOnly}
                     onAdd={() => {
-                        if (activeTab === 'mortalities') setShowMortalityForm(true)
+                        if (activeTab === 'mortalities' || mortalitiesOnly) setShowMortalityForm(true)
                         else setShowAddForm(true)
                         navigate(`/team/${activeTab}/add`)
                     }}
@@ -1416,7 +1440,7 @@ const pendingEditRef = useRef(null)
                 )}
                 {showSettings && (
                     <SettingsModal
-                        onClose={() => setShowSettings(false)}
+                        onClose={() => { setShowSettings(false); navigateBackFromUrlRoute(); }}
                         onOpenFeedback={() => setShowFeedback(true)}
                         textSize={textSize}
                         onDecreaseText={decreaseTextSize}
@@ -1424,6 +1448,7 @@ const pendingEditRef = useRef(null)
                         onClearRequest={handleClearRequest}
                         onSaveBackup={handleSaveBackup}
                         onRestoreBackup={restoreFromBackup}
+                        onViewMortalities={() => { setShowSettings(false); navigate('/mortalities'); }}
                     />
                 )}
                 {showSearch && (
@@ -1433,7 +1458,7 @@ const pendingEditRef = useRef(null)
                         docs={docs}
                         activePage={activePage}
                         activeTab={activeTab}
-                        onClose={() => setShowSearch(false)}
+                        onClose={() => { setShowSearch(false); navigateBackFromUrlRoute(); }}
                         onNavigateToPatient={navigateToPatient}
                         onNavigateToNote={navigateToNote}
                     />
