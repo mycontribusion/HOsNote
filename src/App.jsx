@@ -376,11 +376,11 @@ const pendingEditRef = useRef(null)
     // Debounced IndexedDB persistence to avoid blocking main thread
     const saveTimers = useRef({})
 
-    const debouncedSave = useCallback((key, data) => {
+    const debouncedSave = useCallback((key, data, delay = 500) => {
         if (saveTimers.current[key]) clearTimeout(saveTimers.current[key])
         saveTimers.current[key] = setTimeout(() => {
             set(key, data).catch(console.error)
-        }, 500)
+        }, delay)
     }, [])
 
     useEffect(() => {
@@ -401,7 +401,9 @@ const pendingEditRef = useRef(null)
 
     useEffect(() => {
         if (!isLoaded) return;
-        debouncedSave(DOCUMENTATION_KEY, docs)
+        // Use a longer debounce for docs — the array can be large and changes
+        // frequently during note editing. 1500ms reduces write amplification.
+        debouncedSave(DOCUMENTATION_KEY, docs, 1500)
     }, [docs, isLoaded, debouncedSave])
 
     // ── Documentation callbacks ───────────────────────────────────────────────

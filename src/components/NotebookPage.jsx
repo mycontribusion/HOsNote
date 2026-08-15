@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, memo } from 'react'
+import { useState, useMemo, useEffect, memo, useRef } from 'react'
 import { Edit2, Trash2, BookOpen, X, Plus, ArrowUpDown, User, StickyNote } from 'lucide-react'
 import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
@@ -250,6 +250,14 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
         })
     }
 
+    const [visibleCount, setVisibleCount] = useState(30)
+    const sentinelRef = useRef(null)
+
+    // Reset windowing limit when filter or sort changes
+    useEffect(() => {
+        setVisibleCount(30)
+    }, [sortBy, noteFilter])
+
     const filteredDocs = useMemo(() => {
         if (noteFilter === 'patient') return docs.filter(d => d.patientId != null)
         if (noteFilter === 'standalone') return docs.filter(d => d.patientId == null)
@@ -257,6 +265,23 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
     }, [docs, noteFilter])
 
     const sortedDocs = useMemo(() => sortDocs(filteredDocs), [filteredDocs, sortBy])
+    const visibleDocs = useMemo(() => sortedDocs.slice(0, visibleCount), [sortedDocs, visibleCount])
+
+    // Infinite scroll observer for loading next chunk
+    useEffect(() => {
+        if (visibleCount >= sortedDocs.length) return
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                setVisibleCount(prev => Math.min(prev + 30, sortedDocs.length))
+            }
+        }, { rootMargin: '200px' })
+
+        const currentSentinel = sentinelRef.current
+        if (currentSentinel) observer.observe(currentSentinel)
+        return () => {
+            if (currentSentinel) observer.unobserve(currentSentinel)
+        }
+    }, [visibleCount, sortedDocs.length])
 
     const handleDeleteFromDetail = (doc) => {
         setSelectedDoc(null)
@@ -386,7 +411,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {sortedDocs.map(doc => {
+                        {visibleDocs.map(doc => {
                             const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
                             const bg = COLOR_BG[doc.color] || COLOR_BG.blue
                             const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
@@ -450,6 +475,11 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                                 </button>
                             )
                         })}
+                        {visibleCount < sortedDocs.length && (
+                            <div ref={sentinelRef} className="py-4 text-center text-xs text-gray-400 dark:text-gray-500 font-medium">
+                                Showing {visibleCount} of {sortedDocs.length} notes...
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

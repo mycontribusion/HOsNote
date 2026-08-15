@@ -36,6 +36,21 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
 
     const resultOrder = getResultOrder()
 
+    // Pre-compute normalized search indices for notebook docs
+    const indexedDocs = useMemo(() => {
+        return docs.map(d => ({
+            ...d,
+            _searchIndex: [
+                d.patientName,
+                d.patientHosp,
+                d.patientWard,
+                d.patientDiagnosis,
+                d.diagnosis,
+                d.text
+            ].filter(Boolean).join(' ').toLowerCase()
+        }))
+    }, [docs])
+
     const results = useMemo(() => {
         if (!debouncedQuery.trim()) return { my_team: [], on_call: [], notes: [], mortalities: [] }
         const q = debouncedQuery.trim().toLowerCase()
@@ -66,14 +81,13 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
             })
             .filter(p => p.matchedField !== null)
 
-        const matchedNotes = docs
-            .filter(d =>
-                (d.patientName || '').toLowerCase().includes(q) ||
-                (d.patientHosp || '').toLowerCase().includes(q) ||
-                (d.patientWard || '').toLowerCase().includes(q) ||
-                (d.patientDiagnosis || d.diagnosis || '').toLowerCase().includes(q) ||
-                (d.text || '').toLowerCase().includes(q)
-            )
+        const matchedNotes = []
+        for (let i = 0; i < indexedDocs.length; i++) {
+            if (indexedDocs[i]._searchIndex.includes(q)) {
+                matchedNotes.push(indexedDocs[i])
+                if (matchedNotes.length >= 20) break
+            }
+        }
 
         // Group patients by team
         const myTeamPatients = matchedPatients.filter(p => p.team === 'my_team').slice(0, 10)
@@ -82,10 +96,10 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
         return {
             my_team: myTeamPatients,
             on_call: onCallPatients,
-            notes: matchedNotes.slice(0, 20),
+            notes: matchedNotes,
             mortalities: matchedMortalities.slice(0, 20)
         }
-    }, [debouncedQuery, patients, mortalities, docs])
+    }, [debouncedQuery, patients, mortalities, indexedDocs])
 
     const totalResults = results.my_team.length + results.on_call.length + results.notes.length + results.mortalities.length
 
