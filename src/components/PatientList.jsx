@@ -4,11 +4,11 @@ import PatientDetailModal from './PatientDetailModal'
 import { ArrowUpDown, ChevronDown, ChevronRight, RotateCcw, CheckSquare, Square } from 'lucide-react'
 
 const SORT_OPTIONS = [
-    { value: 'none', label: 'Default' },
-    { value: 'status', label: 'Priority Status' },
-    { value: 'ward', label: 'Ward' },
-    { value: 'bed', label: 'Bed' },
-    { value: 'name', label: 'Name' },
+    { value: 'none',    label: 'Default' },
+    { value: 'status',  label: 'Priority' },
+    { value: 'ward',    label: 'Ward' },
+    { value: 'bed',     label: 'Bed' },
+    { value: 'name',    label: 'Name' },
     { value: 'hospnum', label: 'Hosp No.' },
 ]
 
@@ -34,70 +34,71 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                 if (a.critical !== b.critical) return a.critical ? -1 : 1
                 return 0
             }
-
             if (sortBy === 'ward') {
                 const wardCmp = (a.ward || '').localeCompare(b.ward || '', undefined, { numeric: true, sensitivity: 'base' })
                 if (wardCmp !== 0) return wardCmp
                 return (a.bed || '').localeCompare(b.bed || '', undefined, { numeric: true, sensitivity: 'base' })
             }
-
             if (sortBy === 'bed') {
                 const bedCmp = (a.bed || '').localeCompare(b.bed || '', undefined, { numeric: true, sensitivity: 'base' })
                 if (bedCmp !== 0) return bedCmp
                 return (a.ward || '').localeCompare(b.ward || '', undefined, { numeric: true, sensitivity: 'base' })
             }
-
             let av = '', bv = ''
-            if (sortBy === 'name') { av = a.name || ''; bv = b.name || '' }
+            if (sortBy === 'name')    { av = a.name || '';           bv = b.name || '' }
             if (sortBy === 'hospnum') { av = a.hospitalNumber || ''; bv = b.hospitalNumber || '' }
             return av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' })
         })
     }
 
-    const sortedActive = useMemo(() => sortPatients(activePatients), [activePatients, sortBy])
+    const sortedActive   = useMemo(() => sortPatients(activePatients),   [activePatients,   sortBy])
     const sortedReviewed = useMemo(() => sortPatients(reviewedPatients), [reviewedPatients, sortBy])
 
-    const allIds = patients.map(p => p.id)
+    const allIds      = patients.map(p => p.id)
     const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
     const someSelected = selectedIds.size > 0
 
     return (
         <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                {/* Title & Badge */}
-                <div className="flex items-center gap-3">
-                    <h2 className="font-semibold text-gray-500 dark:text-gray-400 text-sm uppercase tracking-wider">
-                        {isMortality ? 'Mortality Records' : 'Patient List'}
+            {/* ── List controls bar ─────────────────────────────────────── */}
+            <div className="flex items-center justify-between gap-3 mb-4">
+                {/* Title + count badge */}
+                <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest">
+                        {isMortality ? 'Mortality' : 'Patients'}
                     </h2>
-                    <span className={`${isMortality ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'} text-xs font-bold px-2.5 py-1 rounded-full`}>
+                    <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full min-w-[22px] text-center ${isMortality
+                        ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
+                        : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                    }`}>
                         {activePatients.length}
                     </span>
                 </div>
 
-                {/* Controls (Select All & Sort) */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                {/* Controls: Select All + Sort */}
+                <div className="flex items-center gap-2">
                     {/* Select All toggle */}
                     <button
                         onClick={() => onToggleSelectAll(allIds)}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60"
                         title={allSelected ? 'Deselect all' : 'Select all for handover'}
                     >
                         {allSelected
-                            ? <CheckSquare size={16} className="text-blue-600 dark:text-blue-400" />
+                            ? <CheckSquare size={14} className="text-blue-600 dark:text-blue-400" />
                             : someSelected
-                                ? <CheckSquare size={16} className="text-blue-400 dark:text-blue-500 opacity-60" />
-                                : <Square size={16} />
+                                ? <CheckSquare size={14} className="text-blue-400 opacity-70" />
+                                : <Square size={14} />
                         }
                         {someSelected ? `${selectedIds.size} selected` : 'Select'}
                     </button>
 
-                    {/* Sort controls */}
-                    <div className="flex items-center gap-1.5">
-                        <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
+                    {/* Sort dropdown */}
+                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/60 rounded-lg px-2 py-1 border border-gray-200/60 dark:border-gray-600/40">
+                        <ArrowUpDown size={11} className="text-gray-400 flex-shrink-0" />
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
-                            className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
+                            className="text-[11px] text-gray-600 dark:text-gray-300 font-bold bg-transparent border-0 cursor-pointer focus:outline-none"
                             aria-label="Sort patients by"
                         >
                             {SORT_OPTIONS.map((opt) => (
@@ -108,10 +109,11 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                 </div>
             </div>
 
+            {/* ── Active patients ───────────────────────────────────────── */}
             <div
                 role="list"
-                className="flex flex-col gap-3 mb-6"
-                aria-label={isMortality ? "Mortality list" : "Patient list"}
+                className="flex flex-col gap-2.5 mb-6"
+                aria-label={isMortality ? 'Mortality list' : 'Patient list'}
             >
                 {sortedActive.map((patient) => (
                     <PatientCard
@@ -134,33 +136,41 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                     />
                 ))}
                 {sortedActive.length === 0 && reviewedPatients.length > 0 && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-                        All patients reviewed! Great job! 🎉
+                    <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                        <span className="text-3xl">🎉</span>
+                        <p className="text-sm font-semibold">All patients reviewed!</p>
                     </div>
                 )}
             </div>
 
+            {/* ── Reviewed section ──────────────────────────────────────── */}
             {reviewedPatients.length > 0 && (
-                <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="mt-2 border-t border-gray-200 dark:border-gray-700/60 pt-5">
+                    <div className="flex items-center justify-between mb-3">
                         <button
-                            className="flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white font-semibold"
+                            className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-bold text-sm transition-colors"
                             onClick={() => setIsReviewedOpen(!isReviewedOpen)}
                         >
-                            {isReviewedOpen ? <ChevronDown size={20} className="text-gray-400" /> : <ChevronRight size={20} className="text-gray-400" />}
-                            Reviewed Patients ({reviewedPatients.length})
+                            {isReviewedOpen
+                                ? <ChevronDown size={16} className="text-gray-400" />
+                                : <ChevronRight size={16} className="text-gray-400" />
+                            }
+                            Reviewed
+                            <span className="text-xs font-extrabold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                                {reviewedPatients.length}
+                            </span>
                         </button>
                         <button
-                            className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-3 py-1.5 rounded-lg transition-colors border-none cursor-pointer"
+                            className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2.5 py-1.5 rounded-lg transition-colors"
                             onClick={onResetReviews}
                         >
-                            <RotateCcw size={15} />
-                            Reset All
+                            <RotateCcw size={12} />
+                            Reset
                         </button>
                     </div>
 
                     {isReviewedOpen && (
-                        <div role="list" className="flex flex-col gap-3 opacity-80" aria-label="Reviewed patient list">
+                        <div role="list" className="flex flex-col gap-2.5 opacity-70" aria-label="Reviewed patient list">
                             {sortedReviewed.map((patient) => (
                                 <PatientCard
                                     key={patient.id}

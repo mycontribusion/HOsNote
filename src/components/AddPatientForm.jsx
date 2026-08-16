@@ -748,48 +748,44 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         style={{ transform: `translateY(-${keyboardOffset}px)` }}
                         className="flex items-center justify-between px-3 sm:px-4 py-2 min-h-[52px] border-t border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-20 min-w-0 max-w-full transition-transform duration-75 ease-out pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-xs"
                     >
-                        {/* Left Group: Form Header Title & Segmented Undo/Redo */}
+                        {/* Left Group: Undo/Redo */}
                         <div className="flex items-center gap-2 sm:gap-3">
-                            <span className="text-xs font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 hidden sm:inline-block">
-                                {isNoteMode ? (initialData ? 'Edit Note' : 'New Note') : isMortalityMode ? 'Mortality Record' : initialData ? 'Edit Patient' : 'New Patient'}
-                            </span>
-
                             {/* Segmented Undo / Redo */}
                             <div className="flex items-center p-0.5 rounded-xl bg-gray-100/90 dark:bg-gray-700/60 border border-gray-200/60 dark:border-gray-600/60">
                                 <button
                                     type="button"
                                     onClick={handleUndo}
                                     disabled={history.index <= 0}
-                                    className="p-1 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+                                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
                                     aria-label="Undo"
                                     title="Undo"
                                 >
-                                    <Undo2 size={14} strokeWidth={2.5} />
+                                    <Undo2 size={13} strokeWidth={2.5} />
                                 </button>
                                 <div className="w-[1px] h-3 bg-gray-200 dark:bg-gray-600 mx-0.5" />
                                 <button
                                     type="button"
                                     onClick={handleRedo}
                                     disabled={history.index >= history.stack.length - 1}
-                                    className="p-1 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+                                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
                                     aria-label="Redo"
                                     title="Redo"
                                 >
-                                    <Redo2 size={14} strokeWidth={2.5} />
+                                    <Redo2 size={13} strokeWidth={2.5} />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Right Group: Primary Save + Dismiss */}
+                        {/* Right Group: Critical toggle + Save + Cancel */}
                         <div className="flex items-center gap-1.5 sm:gap-2">
                             {!isNoteMode && !isMortalityMode && (
                                 <button
                                     type="button"
                                     aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
                                     onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
-                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
                                         critical
-                                            ? 'bg-red-500 dark:bg-red-600 text-white shadow-xs shadow-red-500/30'
+                                            ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm shadow-red-500/30'
                                             : 'bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400'
                                     }`}
                                 >
@@ -800,13 +796,19 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
                             {/* Add / Save Button */}
                             <button
-                                id={isNoteMode ? "btn-add-note" : "btn-add-patient"}
+                                id={isNoteMode ? 'btn-add-note' : 'btn-add-patient'}
                                 type="submit"
-                                aria-label={initialData ? "Save" : "Add"}
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 shadow-xs shadow-blue-500/25 transition-all active:scale-95"
+                                aria-label={initialData ? 'Save' : 'Add'}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white font-bold text-xs transition-all active:scale-95 shadow-sm ${
+                                    isMortalityMode
+                                        ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 shadow-red-500/25'
+                                        : isNoteMode
+                                            ? 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 shadow-teal-500/25'
+                                            : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 shadow-blue-500/25'
+                                }`}
                             >
-                                {initialData ? <Save size={14} strokeWidth={2.5} /> : <Plus size={14} strokeWidth={2.5} />}
-                                <span className="text-xs font-bold">{initialData ? 'Save' : 'Add'}</span>
+                                {initialData ? <Save size={13} strokeWidth={2.5} /> : <Plus size={13} strokeWidth={2.5} />}
+                                {initialData ? 'Save' : 'Add'}
                             </button>
 
                             {/* Cancel / Dismiss */}
@@ -814,10 +816,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 type="button"
                                 onClick={handleCancel}
                                 aria-label="Cancel"
-                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90 ml-0.5"
+                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90"
                                 title="Close"
                             >
-                                <X size={15} strokeWidth={2.5} />
+                                <X size={14} strokeWidth={2.5} />
                             </button>
                         </div>
                     </div>

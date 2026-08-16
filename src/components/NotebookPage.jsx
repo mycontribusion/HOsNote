@@ -178,6 +178,26 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
+function NoteTextPreview({ text }) {
+    const ref = useRef(null)
+    const [overflows, setOverflows] = useState(false)
+
+    useEffect(() => {
+        const el = ref.current
+        if (!el) return
+        const check = () => setOverflows(el.scrollHeight > el.clientHeight)
+        check()
+        window.addEventListener('resize', check)
+        return () => window.removeEventListener('resize', check)
+    }, [text])
+
+    return (
+        <p ref={ref} className={`text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-y-auto custom-scrollbar pointer-events-none select-none pr-1${overflows ? ' clamp-fade-out' : ''}`}>
+            {text}
+        </p>
+    )
+}
+
 const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onStartEdit, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) => {
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
@@ -468,9 +488,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                                     </div>
                                     {/* Text preview — visual scrollbar without touch scrolling */}
                                     <div className="px-4 py-2 min-w-0 max-w-full">
-                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-y-auto custom-scrollbar pointer-events-none select-none pr-1">
-                                            {doc.text}
-                                        </p>
+                                        <NoteTextPreview text={doc.text} />
                                     </div>
                                 </button>
                             )

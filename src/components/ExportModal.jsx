@@ -498,102 +498,150 @@ export default function ExportModal({ patients, allPatients, listName, selection
         <div className="modal-backdrop p-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
             <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[95vh]" role="dialog" aria-modal="true" aria-labelledby="export-title">
 
-                {/* Header — matches app's blue-700 header */}
-                <div className="bg-blue-700 dark:bg-gray-900 px-4 pt-4 pb-3 shrink-0">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-blue-700 to-blue-800 dark:from-gray-900 dark:to-gray-900 px-4 pt-4 pb-3 shrink-0">
                     <div className="flex items-start justify-between">
                         <div className="flex-1">
-                            <h2 id="export-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1">Handover Records</h2>
+                            <h2 id="export-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1">Handover</h2>
                             <div className="flex items-center gap-2">
-                                <p className="text-[11px] font-semibold text-blue-200">{listName} • {patients.length} Patient{patients.length !== 1 ? 's' : ''}</p>
+                                <p className="text-[11px] font-semibold text-blue-200/90">
+                                    {listName} · <span className="font-extrabold text-white">{patients.length}</span> patient{patients.length !== 1 ? 's' : ''}
+                                    {selectionCount > 0 && <span className="ml-1 text-blue-300">(selected)</span>}
+                                </p>
                                 {wakeSupported && wakeLocked && (
-                                    <Smartphone size={12} className="text-emerald-300 animate-pulse" />
+                                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-300">
+                                        <Smartphone size={10} className="animate-pulse" /> Screen on
+                                    </span>
                                 )}
                             </div>
                         </div>
                         <button
-                            className="p-1.5 bg-white/15 hover:bg-white/25 text-white rounded-full shrink-0 transition-colors"
+                            className="w-8 h-8 flex items-center justify-center bg-white/15 hover:bg-white/25 active:bg-white/30 text-white rounded-full shrink-0 transition-colors"
                             onClick={onClose}
+                            aria-label="Close"
                         >
-                            <X size={18} />
+                            <X size={16} />
                         </button>
                     </div>
 
-                    {/* QR Mode Tabs — inside header */}
-                    <div className="flex bg-blue-800/50 dark:bg-gray-800/50 p-1 rounded-lg mt-3">
+                    {/* QR Mode Tabs */}
+                    <div className="flex bg-blue-900/50 dark:bg-gray-800/60 p-1 rounded-xl mt-3 gap-0.5">
                         <button
-                            className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${qrMode === 'compact' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                                qrMode === 'compact'
+                                    ? 'bg-white text-blue-700 shadow-sm'
+                                    : 'text-blue-200/80 hover:text-white hover:bg-white/10'
+                            }`}
                             onClick={() => setQrMode('compact')}
                         >
-                            <QrCode size={14} /> Patients' Lists
+                            <QrCode size={13} /> List QR
                         </button>
                         <button
-                            className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${qrMode === 'full' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                                qrMode === 'full'
+                                    ? 'bg-white text-blue-700 shadow-sm'
+                                    : 'text-blue-200/80 hover:text-white hover:bg-white/10'
+                            }`}
                             onClick={() => setQrMode('full')}
                         >
-                            <QrCode size={14} /> Patients' Details
+                            <QrCode size={13} /> Full Transfer
                         </button>
                     </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex flex-col gap-3 p-4 overflow-y-auto">
+                <div className="flex flex-col gap-4 p-4 overflow-y-auto custom-scrollbar">
 
                     {/* QR Display Area */}
-                    <div className={`flex flex-col items-center justify-center rounded-xl p-3 shrink-0 ${qrMode === 'full' ? 'bg-blue-50 dark:bg-blue-950/30' : 'bg-gray-50 dark:bg-gray-800/40'}`}>
+                    <div className={`flex flex-col items-center justify-center rounded-2xl p-3.5 shrink-0 ${
+                        qrMode === 'full'
+                            ? 'bg-blue-50/80 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30'
+                            : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/40'
+                    }`}>
                         {qrMode === 'compact' ? (
-                            <div className="w-full max-w-[320px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                            <div className="w-full max-w-[300px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200/80 dark:border-gray-700 flex items-center justify-center">
                                 {qrData.length > 2300 ? (
-                                    <p className="text-red-600 text-sm text-center font-semibold">⚠️ List too large for QR.<br />Use Share Code.</p>
+                                    <div className="text-center px-4">
+                                        <p className="text-2xl mb-2">⚠️</p>
+                                        <p className="text-red-600 dark:text-red-400 text-sm font-bold">List too large for QR.</p>
+                                        <p className="text-gray-500 text-xs mt-1">Use Share File instead.</p>
+                                    </div>
                                 ) : (
                                     <QRCodeSVG value={qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#111827" bgColor="#ffffff" />
                                 )}
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center w-full max-w-[320px]">
+                            <div className="flex flex-col items-center w-full max-w-[300px]">
                                 <div className="w-full flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded">Part {frameIdx + 1} of {frames.length}</span>
+                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">
+                                        {frameIdx + 1} / {frames.length}
+                                    </span>
                                     {frames.length > 1 && (
-                                        <button className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 transition-all ${autoPlay ? 'bg-blue-700 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600'}`} onClick={() => setAutoPlay(!autoPlay)}>
+                                        <button
+                                            className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 transition-all ${
+                                                autoPlay
+                                                    ? 'bg-blue-700 text-white shadow-sm'
+                                                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600'
+                                            }`}
+                                            onClick={() => setAutoPlay(!autoPlay)}
+                                        >
                                             {autoPlay ? <Pause size={10} /> : <Play size={10} />}
                                             {autoPlay ? 'Auto' : 'Manual'}
                                         </button>
                                     )}
                                 </div>
 
-                                <div className="w-full aspect-square bg-white p-3 rounded-xl shadow-sm border border-blue-200 dark:border-blue-700 relative mb-1">
+                                <div className="w-full aspect-square bg-white p-3 rounded-xl shadow-sm border border-blue-200 dark:border-blue-700 relative mb-1.5">
                                     <QRCodeSVG value={frames[frameIdx] || qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#1e3a8a" bgColor="#ffffff" />
                                 </div>
 
-                                {/* "Hold still" indicator lives BELOW the QR — never occludes or blurs it */}
                                 {autoPlay && (
-                                    <div className="flex items-center justify-center gap-1.5 py-1.5 mb-1">
+                                    <div className="flex items-center justify-center gap-1.5 py-1.5">
                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                                        <span className="text-xs font-bold text-blue-700 dark:text-blue-400">Hold still — scanning in progress</span>
+                                        <span className="text-[11px] font-bold text-blue-700 dark:text-blue-400">Hold still — scanning in progress</span>
                                     </div>
                                 )}
 
                                 {frames.length > 1 && !autoPlay && (
                                     <div className="flex w-full gap-2">
-                                        <button className="flex-1 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95" onClick={() => setFrameIdx((i) => (i - 1 + frames.length) % frames.length)}><ChevronLeft size={14} /> Prev</button>
-                                        <button className="flex-1 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95" onClick={() => setFrameIdx((i) => (i + 1) % frames.length)}>Next <ChevronRight size={14} /></button>
+                                        <button
+                                            className="flex-1 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                                            onClick={() => setFrameIdx((i) => (i - 1 + frames.length) % frames.length)}
+                                        >
+                                            <ChevronLeft size={14} /> Prev
+                                        </button>
+                                        <button
+                                            className="flex-1 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                                            onClick={() => setFrameIdx((i) => (i + 1) % frames.length)}
+                                        >
+                                            Next <ChevronRight size={14} />
+                                        </button>
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    {/* Actions */}
+                    {/* Primary Actions */}
                     <div className="flex flex-col gap-2 shrink-0">
                         <div className="grid grid-cols-2 gap-2">
                             <button
-                                className={`py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] ${sharedCode ? 'bg-emerald-500 text-white' : 'bg-blue-700 hover:bg-blue-800 text-white shadow-blue-200 dark:shadow-blue-900/30'}`}
+                                className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.97] ${
+                                    sharedCode
+                                        ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25'
+                                        : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white shadow-md shadow-blue-700/25'
+                                }`}
                                 onClick={handleShareCode}
                             >
                                 {sharedCode ? <CheckCircle size={14} /> : <Share2 size={14} />}
                                 {sharedCode ? 'Shared!' : 'Share File'}
                             </button>
                             <button
-                                className={`py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] border ${copiedCode ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
+                                className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.97] border-2 ${
+                                    copiedCode
+                                        ? 'bg-emerald-500 text-white border-emerald-500'
+                                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-300'
+                                }`}
                                 onClick={handleCopyCode}
                             >
                                 {copiedCode ? <CheckCircle size={14} /> : <Copy size={14} />}
@@ -601,21 +649,36 @@ export default function ExportModal({ patients, allPatients, listName, selection
                             </button>
                         </div>
 
+                        {/* Secondary actions */}
                         <div className="grid grid-cols-2 gap-2">
                             <button
-                                className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
+                                className="py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-300 rounded-xl font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.97]"
                                 onClick={handlePrint}
                             >
-                                <FileText size={13} className="text-blue-600 dark:text-blue-400" /> Save PDF
+                                <FileText size={13} className="text-blue-600 dark:text-blue-400" />
+                                Save PDF
                             </button>
                             <button
-                                className="py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all"
+                                className={`py-2 border rounded-xl font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] ${
+                                    copiedCsv
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 text-emerald-700 dark:text-emerald-400'
+                                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-300'
+                                }`}
                                 onClick={handleCopyCsv}
                             >
-                                {copiedCsv ? <CheckCircle size={13} className="text-emerald-500" /> : <Copy size={13} className="text-gray-500 dark:text-gray-400" />} {copiedCsv ? 'Copied' : 'Copy CSV'}
+                                {copiedCsv
+                                    ? <><CheckCircle size={13} className="text-emerald-500" /> Copied!</>
+                                    : <><Copy size={13} className="text-gray-400" /> Copy CSV</>
+                                }
                             </button>
                         </div>
-                        {shareError && <p className="text-[10px] text-center text-red-500 font-semibold mt-1">{shareError}</p>}
+
+                        {shareError && (
+                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl px-3 py-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                                <p className="text-[11px] text-red-600 dark:text-red-400 font-semibold">{shareError}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
