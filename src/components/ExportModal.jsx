@@ -89,8 +89,6 @@ export default function ExportModal({ patients, allPatients, listName, selection
     //    Only docs belonging to the exported patients are included.
     const transferPayload = useMemo(() => {
         const sid = transferSidRef.current
-        const patientIds = new Set(patients.map(p => p.id))
-        const selectedDocs = docs.filter(d => patientIds.has(d.patientId))
         const includedMortalities = selectionCount > 0 ? [] : (listName === 'Mortalities' ? mortalities : [])
         console.log('[TRANSFER DIAGNOSTIC] listName:', listName, 'selectionCount:', selectionCount, 'patients count:', patients.length, 'includedMortalities count:', includedMortalities.length)
 
@@ -126,20 +124,6 @@ export default function ExportModal({ patients, allPatients, listName, selection
             ]
         })
 
-        // Ultra-compact docs: {pid, n, w, h, t, c, ca, ua}
-        // Include patient identity fields so the import side can link docs
-        // even when the exported patient carried no `id`.
-        const transferDocs = selectedDocs.map((d) => ({
-            pid: d.patientId,
-            n: d.patientName,
-            w: d.patientWard,
-            h: d.patientHosp,
-            t: d.text,
-            c: d.color,
-            ca: d.createdAt,
-            ua: d.updatedAt,
-        }))
-
         return {
             __sid: sid,
             __v: 1,
@@ -147,9 +131,9 @@ export default function ExportModal({ patients, allPatients, listName, selection
             listName,
             patients: transferPatients,
             mortalities: transferMortalities,
-            docs: transferDocs,
+            docs: [], // Handover exports patients only (no standalone notebook entries sent)
         }
-    }, [patients, mortalities, docs, listName, selectionCount])
+    }, [patients, mortalities, listName, selectionCount])
 
     // 4. Share payload — respects selection.
     //    When no patients are selected, share all patients from the current view
@@ -157,12 +141,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const sharePayload = useMemo(() => {
         const ptsToShare = selectionCount > 0 ? patients : (allPatients || patients)
         console.log('[SHARE DIAGNOSTIC] listName:', listName, 'selectionCount:', selectionCount, 'ptsToShare count:', ptsToShare.length, 'mortalities count:', mortalities.length)
-        // Build a lookup map so each doc can be annotated with patient identity fields
-        // (n/w/h). Since the share payload uses positional arrays (no id), the
-        // importer cannot use id-based linking — it falls back to identity matching,
-        // which requires these fields to be present on the doc.
-        const patientById = Object.fromEntries(ptsToShare.map(p => [p.id, p]))
-        const allIds = new Set(ptsToShare.map(p => p.id))
+
         const allFullCompressed = ptsToShare.map((p) => {
             return [
                 p.ward || '',
@@ -177,28 +156,15 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 p.lastUpdated || ''
             ]
         })
-        const enrichedDocs = docs.filter(d => allIds.has(d.patientId)).map(d => {
-            const pat = patientById[d.patientId]
-            return {
-                patientId: d.patientId,
-                // Identity fields so the importer can link docs even without a patient id
-                n: pat?.name || '',
-                w: pat?.ward || '',
-                h: pat?.hospitalNumber || '',
-                text: d.text,
-                color: d.color,
-                createdAt: d.createdAt,
-                updatedAt: d.updatedAt,
-            }
-        })
+
         return {
             type: 'patients',
             listName,
             patients: allFullCompressed,
             mortalities: listName === 'Mortalities' ? mortalities.map(compressMortality) : [],
-            docs: enrichedDocs,
+            docs: [], // Handover exports patients only (no standalone notebook entries sent)
         }
-    }, [allPatients, patients, mortalities, docs, listName, selectionCount])
+    }, [allPatients, patients, mortalities, listName, selectionCount])
 
     const { frames, total: frameTotal, bytes } = useMemo(
         () => buildFrames(transferPayload),
