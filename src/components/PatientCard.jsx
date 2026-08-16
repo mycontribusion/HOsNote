@@ -42,7 +42,12 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
     const suppressClick = useRef(false)
     const longPressTimer = useRef(null)
 
-    // Detect if note preview text overflows its container and calculate proportional height calibration
+    // Bar uses sqrt(clientHeight/scrollHeight) — square-root scale spreads differences:
+    //   5-line note  → sqrt(4/5)  = 89% bar
+    //   10-line note → sqrt(4/10) = 63% bar
+    //   25-line note → sqrt(4/25) = 40% bar
+    //   50-line note → sqrt(4/50) = 28% bar
+    //   100+ lines   → floor at 20% (~12px on 60px badge — always visible)
     useEffect(() => {
         const el = noteRef.current
         if (!el) return
@@ -50,9 +55,10 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
             const hasOverflow = el.scrollHeight > el.clientHeight + 2
             setNoteOverflows(hasOverflow)
             if (hasOverflow) {
-                setThumbRatio(Math.min(1, Math.max(0.2, el.clientHeight / el.scrollHeight)))
+                const raw = el.clientHeight / el.scrollHeight
+                setThumbRatio(Math.min(1, Math.max(0.20, Math.sqrt(raw))))
             } else {
-                setThumbRatio(1)
+                setThumbRatio(0)
             }
         }
         check()
@@ -228,6 +234,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                         {/* Ward/Bed or Initial Badge with merged calibrated edge-reading indicator */}
                         <div className={`flex flex-col items-center justify-center rounded-2xl border-2 px-2.5 py-2 text-center w-[60px] min-h-[60px] shadow-sm ${badgeColor} relative overflow-hidden transition-all duration-200`}>
                             {/* Merged Dynamically Calibrated Edge-Reading Indicator Bar */}
+                            {/* Height represents how much note content is hidden beyond the 4-line preview */}
                             {noteOverflows && (
                                 <span
                                     className={`absolute left-0 top-0 w-[1.5px] rounded-r-full ${
@@ -237,7 +244,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                                 ? 'bg-amber-500 dark:bg-amber-400'
                                                 : 'bg-blue-600 dark:bg-teal-400'
                                     } transition-all duration-300 z-20`}
-                                    style={{ height: `${Math.max(20, Math.min(100, Math.round(thumbRatio * 100)))}%` }}
+                                    style={{ height: `${Math.round(thumbRatio * 100)}%` }}
                                     title="Extended content inside"
                                 />
                             )}

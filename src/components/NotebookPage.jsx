@@ -205,6 +205,9 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
     const dateIso = doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt
     const dateParts = formatSmartDateParts(dateIso)
 
+    // Bar uses sqrt(clientHeight/scrollHeight) — square-root scale:
+    //   5-line note  → 89% bar | 10-line → 63% | 25-line → 40% | 50-line → 28%
+    //   Floor 20% (~12px on card) keeps even very long notes visibly marked.
     useEffect(() => {
         const el = ref.current
         if (!el) return
@@ -212,9 +215,10 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
             const hasOverflow = el.scrollHeight > el.clientHeight + 2
             setOverflows(hasOverflow)
             if (hasOverflow) {
-                setThumbRatio(Math.min(1, Math.max(0.2, el.clientHeight / el.scrollHeight)))
+                const raw = el.clientHeight / el.scrollHeight
+                setThumbRatio(Math.min(1, Math.max(0.20, Math.sqrt(raw))))
             } else {
-                setThumbRatio(1)
+                setThumbRatio(0)
             }
         }
         check()
@@ -228,11 +232,12 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
             className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all relative`}
             onClick={onSelect}
         >
-            {/* Merged Dynamically Calibrated Edge-Reading Indicator Bar (Navy Blue, starts from top-0 of card going down) */}
+            {/* Merged Dynamically Calibrated Edge-Reading Indicator Bar (Navy Blue) */}
+            {/* Bar height = overflow fraction: short note barely over limit → short bar; very long note → tall bar */}
             {overflows && (
                 <span
                     className="absolute left-0 top-0 w-[1.5px] rounded-r-full bg-blue-950 dark:bg-blue-400 transition-all duration-300 z-20"
-                    style={{ height: `${Math.max(20, Math.min(100, Math.round(thumbRatio * 100)))}%` }}
+                    style={{ height: `${Math.round(thumbRatio * 100)}%` }}
                     title="Extended content inside"
                 />
             )}

@@ -101,7 +101,7 @@ export default function SettingsModal({
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className="w-full sm:max-w-sm bg-gray-50 dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
+                className="w-full sm:max-w-sm bg-gray-50 dark:bg-gray-900 rounded-3xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="settings-title"
