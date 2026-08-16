@@ -672,8 +672,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     }
 
     return (
-        <div className="modal-backdrop p-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[95vh]" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
+        <div className="modal-backdrop p-2 sm:p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[90vh] shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
 
                 {/* Header — matches app's blue-700 header */}
                 <div className="bg-blue-700 dark:bg-gray-900 px-4 pt-4 pb-3 shrink-0">
@@ -747,7 +747,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 />
 
                 {/* Body */}
-                <div className="flex flex-col gap-3 p-4 overflow-y-auto h-[440px]">
+                <div className="flex-1 min-h-0 flex flex-col gap-3 p-4 overflow-y-auto custom-scrollbar">
 
                     {cameraMode === 'camera' ? (
                         <div className="flex flex-col gap-3 shrink-0">

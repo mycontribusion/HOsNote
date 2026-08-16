@@ -462,8 +462,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
     }
 
     return (
-        <div className="modal-backdrop p-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[95vh]" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <div className="modal-backdrop p-2 sm:p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[90vh] shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="export-title">
 
                 {/* Header */}
                 <div className="bg-gradient-to-r from-blue-700 to-blue-800 dark:from-gray-900 dark:to-gray-900 px-4 pt-4 pb-3 shrink-0">
@@ -517,7 +517,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 </div>
 
                 {/* Body */}
-                <div className="flex flex-col gap-4 p-4 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 min-h-0 flex flex-col gap-4 p-4 overflow-y-auto custom-scrollbar">
 
                     {/* QR Display Area */}
                     <div className={`flex flex-col items-center justify-center rounded-2xl p-3.5 shrink-0 ${

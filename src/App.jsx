@@ -17,7 +17,6 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 const ExportModal = lazy(() => import('./components/ExportModal'))
 const ScannerComponent = lazy(() => import('./components/ScannerComponent'))
 const ReviewDuplicatesModal = lazy(() => import('./components/ReviewDuplicatesModal'))
-const FeedbackModal = lazy(() => import('./components/FeedbackModal'))
 const SettingsModal = lazy(() => import('./components/SettingsModal'))
 const NotebookPage = lazy(() => import('./components/NotebookPage'))
 const DocComposer = lazy(() => import('./components/DocComposer'))
@@ -1436,13 +1435,9 @@ const pendingEditRef = useRef(null)
                         onCancel={() => setPendingImport(null)}
                     />
                 )}
-                {showFeedback && (
-                    <FeedbackModal onClose={() => setShowFeedback(false)} />
-                )}
                 {showSettings && (
                     <SettingsModal
                         onClose={() => { setShowSettings(false); navigateBackFromUrlRoute(); }}
-                        onOpenFeedback={() => setShowFeedback(true)}
                         textSize={textSize}
                         onDecreaseText={decreaseTextSize}
                         onIncreaseText={increaseTextSize}

@@ -33,21 +33,21 @@ export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCanc
     };
 
     return (
-        <div className="modal-backdrop">
-            <div className="modal-box w-full max-w-lg p-0" role="dialog" aria-modal="true">
+        <div className="modal-backdrop p-2 sm:p-4" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+            <div className="modal-box w-full max-w-lg p-0 flex flex-col max-h-[88dvh] sm:max-h-[90vh] shadow-2xl" role="dialog" aria-modal="true">
                 {/* Header */}
-                <div className="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10 rounded-t-2xl">
-                    <h2 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800 z-10 rounded-t-2xl shrink-0">
+                    <h2 className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2">
                         <AlertTriangle size={20} className="text-orange-500" />
                         Review Duplicates
                     </h2>
-                    <button className="btn-icon text-gray-400 hover:text-gray-600" onClick={onCancel}>
+                    <button className="btn-icon text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" onClick={onCancel}>
                         <X size={20} />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-4 max-h-[60vh] overflow-y-auto">
+                <div className="p-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
                     <p className="text-sm text-gray-600 mb-4">
                         We found {pendingImport.conflicts.length} patient(s) that already exist in your list.
                         Please choose how to handle each one.
