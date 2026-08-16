@@ -371,7 +371,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
             docs,
         }
         const json = JSON.stringify(backup, null, 2)
-        const fileName = `HOsNote_Backup_${listName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -1)
+        const fileName = `HOsNote_Backup_${listName.replace(/\s+/g, '_')}_${timestamp}.json`;
 
         if (Capacitor.isNativePlatform()) {
             try {
@@ -399,7 +400,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.setAttribute('href', url)
-        link.setAttribute('download', `HOsNote_Backup_${listName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`)
+        link.setAttribute('download', fileName)
         link.style.visibility = 'hidden'
         document.body.appendChild(link)
         link.click()

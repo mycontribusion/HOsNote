@@ -544,7 +544,8 @@ const pendingEditRef = useRef(null)
             docs,
         }
         const json = JSON.stringify(backup, null, 2)
-        const fileName = `HOsNote_Backup_${new Date().toISOString().split('T')[0]}.json`
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -1)
+        const fileName = `HOsNote_Backup_${timestamp}.json`
 
         if (Capacitor.isNativePlatform()) {
             try {
@@ -1449,6 +1450,11 @@ const pendingEditRef = useRef(null)
                         onSaveBackup={handleSaveBackup}
                         onRestoreBackup={restoreFromBackup}
                         onViewMortalities={() => { setShowSettings(false); navigate('/mortalities'); }}
+                        hasMyTeamPatients={patients.some(p => p.team === 'my_team')}
+                        hasOnCallPatients={patients.some(p => p.team === 'other_team')}
+                        hasMortalities={mortalities.length > 0}
+                        hasDocs={docs.length > 0}
+                        hasAnyData={patients.length > 0 || mortalities.length > 0 || docs.length > 0 || discharges.length > 0}
                     />
                 )}
                 {showSearch && (

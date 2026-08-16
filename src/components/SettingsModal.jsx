@@ -11,6 +11,11 @@ export default function SettingsModal({
     onSaveBackup,
     onRestoreBackup,
     onViewMortalities,
+    hasMyTeamPatients,
+    hasOnCallPatients,
+    hasMortalities,
+    hasDocs,
+    hasAnyData,
 }) {
     const [backupDone, setBackupDone] = useState(false)
     const [restoreMsg, setRestoreMsg] = useState('')
@@ -67,13 +72,13 @@ export default function SettingsModal({
         </div>
     )
 
-    const Row = ({ icon, iconBg, label, sublabel, right, onClick, danger, noBorder }) => (
+    const Row = ({ icon, iconBg, label, sublabel, right, onClick, danger, noBorder, disabled: rowDisabled }) => (
         <button
             type="button"
             onClick={onClick}
-            disabled={!onClick}
+            disabled={!onClick || rowDisabled}
             className={`w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors
-                ${onClick ? (danger ? 'hover:bg-red-50/60 dark:hover:bg-red-900/10 active:bg-red-100/60' : 'hover:bg-gray-50 dark:hover:bg-gray-700/40 active:bg-gray-100 dark:active:bg-gray-700/60') : 'cursor-default'}
+                ${(!onClick || rowDisabled) ? 'opacity-40 cursor-not-allowed' : (danger ? 'hover:bg-red-50/60 dark:hover:bg-red-900/10 active:bg-red-100/60' : 'hover:bg-gray-50 dark:hover:bg-gray-700/40 active:bg-gray-100 dark:active:bg-gray-700/60')}
                 ${!noBorder ? 'border-b border-gray-100 dark:border-gray-700/40 last:border-0' : ''}
             `}
         >
@@ -158,6 +163,7 @@ export default function SettingsModal({
                             sublabel="Export full data snapshot as JSON"
                             right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
                             onClick={handleSaveBackupClick}
+                            disabled={!hasAnyData}
                         />
                         <Row
                             icon={<Upload size={15} className="text-white" />}
@@ -185,14 +191,20 @@ export default function SettingsModal({
                             sublabel="Browse archived mortality records"
                             right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
                             onClick={onViewMortalities}
+                            disabled={!hasMortalities}
                             noBorder
                         />
                     </Section>
 
                     {/* Clear data */}
                     <Section title="Clear Data">
-                        {clearOptions.map((opt, i) => (
-                            confirmClear === opt.action ? (
+                        {clearOptions.map((opt, i) => {
+                            const isDisabled = (opt.action === 'my_team' && !hasMyTeamPatients) ||
+                                (opt.action === 'on_call' && !hasOnCallPatients) ||
+                                (opt.action === 'mortalities' && !hasMortalities) ||
+                                (opt.action === 'notebook' && !hasDocs)
+
+                            return confirmClear === opt.action ? (
                                 <div key={opt.label} className={`flex items-center gap-2 px-4 py-3 ${i < clearOptions.length - 1 ? 'border-b border-gray-100 dark:border-gray-700/40' : ''}`}>
                                     <p className="flex-1 text-xs text-red-600 dark:text-red-400 font-semibold">Clear {opt.label}?</p>
                                     <button onClick={() => setConfirmClear(null)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
@@ -211,10 +223,11 @@ export default function SettingsModal({
                                     danger
                                     right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
                                     onClick={() => setConfirmClear(opt.action)}
+                                    disabled={isDisabled}
                                     noBorder={i === clearOptions.length - 1}
                                 />
                             )
-                        ))}
+                        })}
                     </Section>
 
                     {/* Contact */}
