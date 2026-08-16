@@ -328,11 +328,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                         note
                                     )}
                                 </div>
-                                {(note.length > 140 || (note.match(/\n/g) || []).length >= 3) && (
-                                    <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400/90 flex items-center gap-1">
-                                        <span>(more text inside...)</span>
-                                    </div>
-                                )}
+
                             </div>
                         )}
                     </div>
