@@ -237,6 +237,15 @@
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
 }
 
+/* Hide scrollbar for Chrome, Safari, Firefox and Edge */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* ─── Print Styles ───────────────────────────────────────────────────────── */
 @media print {
   @page {

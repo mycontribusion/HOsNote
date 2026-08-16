@@ -45,6 +45,14 @@ const COLOR_BADGE = {
     pink:   'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
     indigo: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
 }
+const COLOR_INDICATOR = {
+    blue:   'bg-blue-600 dark:bg-blue-400',
+    teal:   'bg-teal-600 dark:bg-teal-400',
+    purple: 'bg-purple-600 dark:bg-purple-400',
+    orange: 'bg-orange-600 dark:bg-orange-400',
+    pink:   'bg-pink-600 dark:bg-pink-400',
+    indigo: 'bg-indigo-600 dark:bg-indigo-400',
+}
 
 function formatDate(iso) {
     if (!iso) return ''
@@ -178,25 +186,97 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
-function NoteTextPreview({ text }) {
+const NoteCardItem = memo(({ doc, onSelect }) => {
+    const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
+    const bg = COLOR_BG[doc.color] || COLOR_BG.blue
+    const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
+    const indicatorColor = COLOR_INDICATOR[doc.color] || COLOR_INDICATOR.blue
+
     const ref = useRef(null)
     const [overflows, setOverflows] = useState(false)
+    const [thumbRatio, setThumbRatio] = useState(1)
+
+    const diagStr = (doc.diagnosis || doc.patientDiagnosis || '').trim()
+    const hasDiag = Boolean(diagStr)
+    const nameStr = (doc.patientName || '').trim()
+    const hasName = Boolean(nameStr)
+    const wardStr = (doc.patientWard || '').trim()
+    const hospStr = (doc.patientHosp || '').trim()
+    const dateIso = doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt
+    const dateParts = formatSmartDateParts(dateIso)
 
     useEffect(() => {
         const el = ref.current
         if (!el) return
-        const check = () => setOverflows(el.scrollHeight > el.clientHeight)
+        const check = () => {
+            const hasOverflow = el.scrollHeight > el.clientHeight + 2
+            setOverflows(hasOverflow)
+            if (hasOverflow) {
+                setThumbRatio(Math.min(1, Math.max(0.2, el.clientHeight / el.scrollHeight)))
+            } else {
+                setThumbRatio(1)
+            }
+        }
         check()
         window.addEventListener('resize', check)
         return () => window.removeEventListener('resize', check)
-    }, [text])
+    }, [doc.text])
 
     return (
-        <p ref={ref} className={`text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-y-auto custom-scrollbar pointer-events-none select-none pr-1${overflows ? ' clamp-fade-out' : ''}`}>
-            {text}
-        </p>
+        <button
+            id={`note-card-${doc.id}`}
+            className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all relative`}
+            onClick={onSelect}
+        >
+            {/* Merged Dynamically Calibrated Edge-Reading Indicator Bar (Navy Blue, starts from top-0 of card going down) */}
+            {overflows && (
+                <span
+                    className="absolute left-0 top-0 w-[1.5px] rounded-r-full bg-blue-950 dark:bg-blue-400 transition-all duration-300 z-20"
+                    style={{ height: `${Math.max(20, Math.min(100, Math.round(thumbRatio * 100)))}%` }}
+                    title="Extended content inside"
+                />
+            )}
+
+            {/* Card header — single line: Diagnosis if present, else Biodata + Date */}
+            <div className={`px-4 py-2.5 flex items-center gap-1.5 overflow-hidden ${bg}`}>
+                {hasDiag ? (
+                    <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex-1 min-w-0">
+                        <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                            {diagStr}
+                        </span>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-1.5 flex-1 min-w-0">
+                        {hasName ? (
+                            <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap shrink-0">
+                                {nameStr}
+                            </span>
+                        ) : hospStr ? (
+                            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
+                                {hospStr}
+                            </span>
+                        ) : wardStr ? (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
+                                {wardStr}
+                            </span>
+                        ) : null}
+                    </div>
+                )}
+                <div className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto text-right leading-tight">
+                    {dateParts.date && <div>{dateParts.date}</div>}
+                    {dateParts.time && <div>{dateParts.time}</div>}
+                </div>
+            </div>
+
+            {/* Text preview — static clamped text */}
+            <div className="px-4 py-2 min-w-0 max-w-full">
+                <p ref={ref} className={`text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-hidden pointer-events-none select-none pr-1${overflows ? ' clamp-fade-out' : ''}`}>
+                    {doc.text}
+                </p>
+            </div>
+        </button>
     )
-}
+})
 
 const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onStartEdit, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) => {
     const [selectedDoc, setSelectedDoc] = useState(null)
@@ -431,68 +511,13 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {visibleDocs.map(doc => {
-                            const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
-                            const bg = COLOR_BG[doc.color] || COLOR_BG.blue
-                            const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
-
-                            const diagStr = (doc.diagnosis || doc.patientDiagnosis || '').trim()
-                            const hasDiag = Boolean(diagStr)
-                            const nameStr = (doc.patientName || '').trim()
-                            const hasName = Boolean(nameStr)
-                            const wardStr = (doc.patientWard || '').trim()
-                            const hospStr = (doc.patientHosp || '').trim()
-                            const dateIso = doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt
-                            const dateParts = formatSmartDateParts(dateIso)
-
-                            return (
-                                <button
-                                    key={doc.id}
-                                    id={`note-card-${doc.id}`}
-                                    className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all`}
-                                    onClick={() => setSelectedDoc(doc)}
-                                >
-                                    {/* Card header — single line: Diagnosis if present, else Biodata + Date */}
-                                    <div className={`px-4 py-2.5 flex items-center gap-1.5 overflow-hidden ${bg}`}>
-                                        {hasDiag ? (
-                                            <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex-1 min-w-0">
-                                                <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                                                    {diagStr}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-1.5 flex-1 min-w-0">
-                                                {hasName ? (
-                                                    <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap shrink-0">
-                                                        {nameStr}
-                                                    </span>
-                                                ) : hospStr ? (
-                                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
-                                                        {hospStr}
-                                                    </span>
-                                                ) : wardStr ? (
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
-                                                        {wardStr}
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                        )}
-                                        <div className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 ml-auto text-right leading-tight">
-                                            {dateParts.date && (
-                                                <div>{dateParts.date}</div>
-                                            )}
-                                            {dateParts.time && (
-                                                <div>{dateParts.time}</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {/* Text preview — visual scrollbar without touch scrolling */}
-                                    <div className="px-4 py-2 min-w-0 max-w-full">
-                                        <NoteTextPreview text={doc.text} />
-                                    </div>
-                                </button>
-                            )
-                        })}
+                        {visibleDocs.map(doc => (
+                            <NoteCardItem
+                                key={doc.id}
+                                doc={doc}
+                                onSelect={() => setSelectedDoc(doc)}
+                            />
+                        ))}
                         {visibleCount < sortedDocs.length && (
                             <div ref={sentinelRef} className="py-4 text-center text-xs text-gray-400 dark:text-gray-500 font-medium">
                                 Showing {visibleCount} of {sortedDocs.length} notes...

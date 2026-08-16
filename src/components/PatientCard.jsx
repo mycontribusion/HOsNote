@@ -24,6 +24,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
     const noteRef = useRef(null)
     const [noteOverflows, setNoteOverflows] = useState(false)
+    const [thumbRatio, setThumbRatio] = useState(1)
 
     const durationText = useMemo(() => {
         if (!admissionDate || isMortality) return ''
@@ -37,19 +38,23 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
     const [pressRing, setPressRing] = useState(false)
     const startX = useRef(null)
     const startY = useRef(null)
-    const longPressTimer = useRef(null)
     const longPressTriggered = useRef(false)
-    // suppressClick survives pointerUp so the click event after a long-press is blocked
     const suppressClick = useRef(false)
+    const longPressTimer = useRef(null)
 
-    // Clear long-press timer on unmount
-    useEffect(() => () => clearTimeout(longPressTimer.current), [])
-
-    // Detect if note preview text overflows its clamped container
+    // Detect if note preview text overflows its container and calculate proportional height calibration
     useEffect(() => {
         const el = noteRef.current
         if (!el) return
-        const check = () => setNoteOverflows(el.scrollHeight > el.clientHeight)
+        const check = () => {
+            const hasOverflow = el.scrollHeight > el.clientHeight + 2
+            setNoteOverflows(hasOverflow)
+            if (hasOverflow) {
+                setThumbRatio(Math.min(1, Math.max(0.2, el.clientHeight / el.scrollHeight)))
+            } else {
+                setThumbRatio(1)
+            }
+        }
         check()
         window.addEventListener('resize', check)
         return () => window.removeEventListener('resize', check)
@@ -220,8 +225,22 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
 
                     {/* Left Column (Badge + Mobile Actions) */}
                     <div className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[60px]">
-                        {/* Ward/Bed or Initial Badge */}
-                        <div className={`flex flex-col items-center justify-center rounded-2xl border-2 px-2.5 py-2 text-center w-[60px] min-h-[60px] shadow-sm ${badgeColor}`}>
+                        {/* Ward/Bed or Initial Badge with merged calibrated edge-reading indicator */}
+                        <div className={`flex flex-col items-center justify-center rounded-2xl border-2 px-2.5 py-2 text-center w-[60px] min-h-[60px] shadow-sm ${badgeColor} relative overflow-hidden transition-all duration-200`}>
+                            {/* Merged Dynamically Calibrated Edge-Reading Indicator Bar */}
+                            {noteOverflows && (
+                                <span
+                                    className={`absolute left-0 top-0 w-[1.5px] rounded-r-full ${
+                                        isMortality
+                                            ? 'bg-red-500 dark:bg-red-400'
+                                            : critical
+                                                ? 'bg-amber-500 dark:bg-amber-400'
+                                                : 'bg-blue-600 dark:bg-teal-400'
+                                    } transition-all duration-300 z-20`}
+                                    style={{ height: `${Math.max(20, Math.min(100, Math.round(thumbRatio * 100)))}%` }}
+                                    title="Extended content inside"
+                                />
+                            )}
                             {ward || bed ? (
                                 <>
                                     {ward && <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-none mb-1 truncate max-w-full">{ward}</div>}
@@ -318,17 +337,20 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                 {formatSmartDate(lastUpdated)}
                             </div>
                         )}
-                        {/* Row 4: Note preview */}
+                        {/* Row 4: Static note preview */}
                         {note && (
                             <div className="mt-1 flex flex-col gap-0.5 min-w-0 max-w-full">
-                                <div ref={noteRef} className={`text-[12px] text-gray-500 dark:text-gray-400 max-h-[5.2rem] overflow-hidden pointer-events-none select-none break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full leading-relaxed${noteOverflows ? ' clamp-fade-out' : ''}`} style={{ whiteSpace: 'pre-wrap', WebkitLineClamp: 4, display: '-webkit-box', WebkitBoxOrient: 'vertical' }}>
+                                <div
+                                    ref={noteRef}
+                                    className={`text-[12px] text-gray-500 dark:text-gray-400 max-h-[5.2rem] overflow-hidden pointer-events-none select-none break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full leading-relaxed${noteOverflows ? ' clamp-fade-out' : ''}`}
+                                    style={{ whiteSpace: 'pre-wrap', WebkitLineClamp: 4, display: '-webkit-box', WebkitBoxOrient: 'vertical' }}
+                                >
                                     {highlightField === 'note' && highlightQuery ? (
                                         <HighlightText text={note} query={highlightQuery} />
                                     ) : (
                                         note
                                     )}
                                 </div>
-
                             </div>
                         )}
                     </div>
