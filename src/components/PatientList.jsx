@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react'
+import { useState, useMemo, useEffect, useRef, memo } from 'react'
 import PatientCard from './PatientCard'
 import PatientDetailModal from './PatientDetailModal'
 import { ArrowUpDown, ChevronDown, ChevronRight, RotateCcw, CheckSquare, Square } from 'lucide-react'
@@ -16,6 +16,10 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
     const [sortBy, setSortBy] = useState('none')
     const [isReviewedOpen, setIsReviewedOpen] = useState(false)
     const [selectedDetailPatient, setSelectedDetailPatient] = useState(null)
+    const [visibleCount, setVisibleCount] = useState(30)
+    const [visibleReviewedCount, setVisibleReviewedCount] = useState(30)
+    const sentinelRef = useRef(null)
+    const reviewedSentinelRef = useRef(null)
 
     const { activePatients, reviewedPatients } = useMemo(() => {
         const active = []
@@ -53,6 +57,47 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
 
     const sortedActive   = useMemo(() => sortPatients(activePatients),   [activePatients,   sortBy])
     const sortedReviewed = useMemo(() => sortPatients(reviewedPatients), [reviewedPatients, sortBy])
+
+    // Reset windowing limits when filter, sort, or expanded state changes
+    useEffect(() => {
+        setVisibleCount(30)
+        setVisibleReviewedCount(30)
+    }, [sortBy, patients, isReviewedOpen])
+
+    const visibleActive   = useMemo(() => sortedActive.slice(0, visibleCount), [sortedActive, visibleCount])
+    const visibleReviewed = useMemo(() => sortedReviewed.slice(0, visibleReviewedCount), [sortedReviewed, visibleReviewedCount])
+
+    // Infinite scroll observer for loading active patients next chunk
+    useEffect(() => {
+        if (visibleCount >= sortedActive.length) return
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                setVisibleCount(prev => Math.min(prev + 30, sortedActive.length))
+            }
+        }, { rootMargin: '200px' })
+
+        const currentSentinel = sentinelRef.current
+        if (currentSentinel) observer.observe(currentSentinel)
+        return () => {
+            if (currentSentinel) observer.unobserve(currentSentinel)
+        }
+    }, [visibleCount, sortedActive.length])
+
+    // Infinite scroll observer for loading reviewed patients next chunk
+    useEffect(() => {
+        if (!isReviewedOpen || visibleReviewedCount >= sortedReviewed.length) return
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                setVisibleReviewedCount(prev => Math.min(prev + 30, sortedReviewed.length))
+            }
+        }, { rootMargin: '200px' })
+
+        const currentSentinel = reviewedSentinelRef.current
+        if (currentSentinel) observer.observe(currentSentinel)
+        return () => {
+            if (currentSentinel) observer.unobserve(currentSentinel)
+        }
+    }, [isReviewedOpen, visibleReviewedCount, sortedReviewed.length])
 
     const allIds      = patients.map(p => p.id)
     const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
@@ -115,7 +160,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                 className="flex flex-col gap-2.5 mb-6"
                 aria-label={isMortality ? 'Mortality list' : 'Patient list'}
             >
-                {sortedActive.map((patient) => (
+                {visibleActive.map((patient) => (
                     <PatientCard
                         key={patient.id}
                         patient={patient}
@@ -135,6 +180,11 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                         onOpenDetail={setSelectedDetailPatient}
                     />
                 ))}
+                {visibleCount < sortedActive.length && (
+                    <div ref={sentinelRef} className="py-4 text-center text-xs text-gray-400 dark:text-gray-500 font-medium">
+                        Showing {visibleCount} of {sortedActive.length} {isMortality ? 'records' : 'patients'}...
+                    </div>
+                )}
                 {sortedActive.length === 0 && reviewedPatients.length > 0 && (
                     <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
                         <span className="text-3xl">🎉</span>
@@ -171,7 +221,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
 
                     {isReviewedOpen && (
                         <div role="list" className="flex flex-col gap-2.5" aria-label="Reviewed patient list">
-                            {sortedReviewed.map((patient) => (
+                            {visibleReviewed.map((patient) => (
                                 <PatientCard
                                     key={patient.id}
                                     patient={patient}
@@ -191,6 +241,11 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                                     onOpenDetail={setSelectedDetailPatient}
                                 />
                             ))}
+                            {visibleReviewedCount < sortedReviewed.length && (
+                                <div ref={reviewedSentinelRef} className="py-4 text-center text-xs text-gray-400 dark:text-gray-500 font-medium">
+                                    Showing {visibleReviewedCount} of {sortedReviewed.length} reviewed patients...
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
