@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect, memo, useRef } from 'react'
-import { Edit2, Trash2, BookOpen, X, Plus, ArrowUpDown, User, StickyNote } from 'lucide-react'
+import { useState, useMemo, useEffect, memo, useRef, useCallback } from 'react'
+import { Edit2, Trash2, BookOpen, X, ArrowUpDown, User, StickyNote, CheckCircle2, QrCode, Send, ChevronUp, ChevronDown } from 'lucide-react'
 import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
-import SpeedDialFAB from './SpeedDialFAB'
 
 function HighlightText({ text, query }) {
     if (!query || !text) return <>{text}</>
@@ -186,11 +185,10 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
-const NoteCardItem = memo(({ doc, onSelect }) => {
+const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionMode = false, onSelect }) => {
     const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
     const bg = COLOR_BG[doc.color] || COLOR_BG.blue
     const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
-    const indicatorColor = COLOR_INDICATOR[doc.color] || COLOR_INDICATOR.blue
 
     const ref = useRef(null)
     const [overflows, setOverflows] = useState(false)
@@ -200,6 +198,14 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
     const sbDragStartY = useRef(0)
     const sbDragStartScrollTop = useRef(0)
     const syncThumb = useRef(null)
+
+    // Long-press selection state
+    const [pressRing, setPressRing] = useState(false)
+    const startX = useRef(null)
+    const startY = useRef(null)
+    const longPressTriggered = useRef(false)
+    const suppressClick = useRef(false)
+    const longPressTimer = useRef(null)
 
     const diagStr = (doc.diagnosis || doc.patientDiagnosis || '').trim()
     const hasDiag = Boolean(diagStr)
@@ -258,12 +264,82 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
         e.currentTarget.releasePointerCapture(e.pointerId)
     }
 
+    const handlePointerDown = (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return
+        startX.current = e.clientX
+        startY.current = e.clientY
+        longPressTriggered.current = false
+
+        if (onToggleSelect) {
+            longPressTimer.current = setTimeout(() => {
+                longPressTriggered.current = true
+                suppressClick.current = true
+                setPressRing(true)
+                setTimeout(() => setPressRing(false), 400)
+                onToggleSelect(doc.id)
+            }, 500)
+        }
+    }
+
+    const handlePointerMove = (e) => {
+        if (startX.current === null) return
+        const dx = e.clientX - startX.current
+        const dy = e.clientY - (startY.current ?? e.clientY)
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            clearTimeout(longPressTimer.current)
+        }
+    }
+
+    const handlePointerUp = () => {
+        clearTimeout(longPressTimer.current)
+        startX.current = null
+        startY.current = null
+        longPressTriggered.current = false
+    }
+
+    const handleCardClick = (e) => {
+        if (suppressClick.current) {
+            suppressClick.current = false
+            e.stopPropagation()
+            return
+        }
+
+        if (selectionMode && onToggleSelect) {
+            e.stopPropagation()
+            onToggleSelect(doc.id)
+            return
+        }
+
+        onSelect?.()
+    }
+
     return (
-        <button
+        <div
             id={`note-card-${doc.id}`}
-            className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all relative group`}
-            onClick={onSelect}
+            className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all relative group cursor-pointer ${
+                isSelected
+                    ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-400 dark:border-blue-600 shadow-md ring-2 ring-blue-300 dark:ring-blue-800'
+                    : ''
+            }`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onClick={handleCardClick}
         >
+            {/* Long-press selection ring flash */}
+            {pressRing && (
+                <span className="absolute inset-0 rounded-2xl ring-4 ring-blue-400 dark:ring-blue-500 animate-ping pointer-events-none z-30" />
+            )}
+
+            {/* Selected: checkmark stamp in top-right */}
+            {isSelected && (
+                <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-blue-500 dark:bg-blue-400 flex items-center justify-center shadow-md z-20 animate-in zoom-in-50 duration-200">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                </div>
+            )}
 
             {/* Card header — single line: Diagnosis if present, else Biodata + Date */}
             <div className={`px-4 py-2.5 flex items-center gap-1.5 overflow-hidden ${bg}`}>
@@ -325,16 +401,123 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
                     </div>
                 )}
             </div>
-        </button>
+        </div>
     )
 })
 
-const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onStartEdit, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened }) => {
+const NotebookActionBar = memo(({
+    onImport,
+    onHandover,
+    onAddNote,
+    selectedCount = 0,
+}) => {
+    const [isCollapsed, setIsCollapsed] = useState(false)
+    const hasSelection = selectedCount > 0
+
+    useEffect(() => {
+        if (hasSelection) setIsCollapsed(false)
+    }, [hasSelection])
+
+    return (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl h-[54px] pointer-events-none mb-[env(safe-area-inset-bottom,0px)]">
+            <div className="relative w-full h-full">
+                {/* Collapse / expand button */}
+                <button
+                    type="button"
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    aria-label={isCollapsed ? "Expand action bar" : "Collapse action bar"}
+                    className="absolute -top-2.5 right-4 bg-white dark:bg-gray-800 border border-gray-200/80 dark:border-gray-700/80 shadow-md text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-1 rounded-full transition-all active:scale-90 cursor-pointer z-20 pointer-events-auto flex items-center justify-center"
+                    title={isCollapsed ? "Expand action bar" : "Collapse action bar"}
+                >
+                    {isCollapsed ? (
+                        <ChevronUp size={18} strokeWidth={2.5} />
+                    ) : (
+                        <ChevronDown size={18} strokeWidth={2.5} />
+                    )}
+                    {isCollapsed && hasSelection && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-xs animate-pulse">
+                            {selectedCount}
+                        </span>
+                    )}
+                </button>
+
+                {/* 3-Button Action Bar */}
+                {!isCollapsed && (
+                    <div className="w-full h-full p-1.5 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/80 dark:border-gray-700/80 rounded-2xl shadow-xl shadow-gray-900/10 dark:shadow-black/40 flex items-center justify-between pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200">
+                        {/* 1. Receive */}
+                        <button
+                            type="button"
+                            onClick={onImport}
+                            aria-label="Receive or import notes"
+                            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/70 transition-all active:scale-95 cursor-pointer"
+                        >
+                            <QrCode size={19} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.2} />
+                            <span>Receive</span>
+                        </button>
+
+                        {/* Divider */}
+                        <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700/80 shrink-0" />
+
+                        {/* 2. Send */}
+                        <button
+                            type="button"
+                            onClick={onHandover}
+                            aria-label={hasSelection ? `Send ${selectedCount} selected notes` : 'Send notes'}
+                            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                                hasSelection
+                                    ? 'bg-purple-600 dark:bg-purple-600 text-white shadow-xs shadow-purple-500/30 font-extrabold active:scale-95 cursor-pointer'
+                                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/70 active:scale-95 cursor-pointer'
+                            }`}
+                        >
+                            <div className="relative flex items-center justify-center">
+                                <Send size={19} className={hasSelection ? 'text-white' : 'text-purple-600 dark:text-purple-400'} strokeWidth={2.2} />
+                                {hasSelection && (
+                                    <span className="absolute -top-1.5 -right-3 bg-red-500 text-white text-[9px] font-black px-1 rounded-full min-w-[16px] h-[16px] flex items-center justify-center shadow-xs border border-white dark:border-gray-800">
+                                        {selectedCount}
+                                    </span>
+                                )}
+                            </div>
+                            <span>Send</span>
+                        </button>
+
+                        {/* Divider */}
+                        <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700/80 shrink-0" />
+
+                        {/* 3. Add Note */}
+                        <button
+                            type="button"
+                            onClick={onAddNote}
+                            aria-label="Add note to notebook"
+                            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/70 transition-all active:scale-95 cursor-pointer"
+                        >
+                            <BookOpen size={19} className="text-blue-600 dark:text-blue-400" strokeWidth={2.2} />
+                            <span>Add Note</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+})
+
+const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUndo, setShowUndoToast, addDoc, addStandaloneDoc, initialEditDoc, onStartEdit, onCancelEdit, navigate, initialSelectedDocId, searchHighlight, onDocOpened, onImport, onHandover }) => {
     const [selectedDoc, setSelectedDoc] = useState(null)
     const [editingDoc, setEditingDoc] = useState(null)
     const [showAddNoteForm, setShowAddNoteForm] = useState(false)
     const [sortBy, setSortBy] = useState('default')
     const [noteFilter, setNoteFilter] = useState('all')
+
+    // Selection state for notebook entries
+    const [selectedDocIds, setSelectedDocIds] = useState(new Set())
+
+    const toggleSelectDoc = useCallback((id) => {
+        setSelectedDocIds(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }, [])
 
     const editInitialData = useMemo(() => {
         if (!editingDoc) return null
@@ -418,6 +601,15 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
     const sortedDocs = useMemo(() => sortDocs(filteredDocs), [filteredDocs, sortBy])
     const visibleDocs = useMemo(() => sortedDocs.slice(0, visibleCount), [sortedDocs, visibleCount])
 
+    const toggleSelectAllDocs = useCallback(() => {
+        setSelectedDocIds(prev => {
+            if (filteredDocs.length > 0 && filteredDocs.every(d => prev.has(d.id))) {
+                return new Set()
+            }
+            return new Set(filteredDocs.map(d => d.id))
+        })
+    }, [filteredDocs])
+
     // Infinite scroll observer for loading next chunk
     useEffect(() => {
         if (visibleCount >= sortedDocs.length) return
@@ -480,25 +672,12 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
 
     return (
         <div className="flex flex-col flex-1">
-            {/* Speed Dial FAB — Notebook Page */}
-            {!showAddNoteForm && !editingDoc && (
-                <SpeedDialFAB
-                    mainTheme="blue"
-                    ariaLabel="Add new note"
-                    onClick={() => {
-                        navigate('/notebook/add')
-                        setShowAddNoteForm(true)
-                    }}
-                    shape="square"
-                />
-            )}
-
             {/* Card list */}
             <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-2 pb-36">
-                {/* Filter & Sort controls */}
+                {/* Filter & Sort & Select All controls */}
                 {docs.length > 0 && (
                     <div className="flex items-center justify-between gap-2 mb-3">
-                        {/* Note type filter */}
+                        {/* Left: Note type filter */}
                         <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
                             {NOTE_FILTER_OPTIONS.map((opt) => {
                                 const Icon = opt.icon
@@ -522,19 +701,45 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                             })}
                         </div>
 
-                        {/* Sort controls */}
-                        <div className="flex items-center gap-1.5">
-                            <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
-                                aria-label="Sort notes by"
+                        {/* Right: Select All & Sort controls */}
+                        <div className="flex items-center gap-2">
+                            {/* Select All button at top */}
+                            <button
+                                type="button"
+                                onClick={toggleSelectAllDocs}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all border ${
+                                    selectedDocIds.size > 0
+                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 shadow-xs'
+                                        : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 border-gray-200/60 dark:border-gray-600/60 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                }`}
+                                aria-label="Select all notes"
                             >
-                                {NOTE_SORT_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
+                                <CheckCircle2 size={13} strokeWidth={2.5} />
+                                <span>
+                                    {filteredDocs.length > 0 && filteredDocs.every(d => selectedDocIds.has(d.id))
+                                        ? 'Deselect All'
+                                        : 'Select All'}
+                                </span>
+                                {selectedDocIds.size > 0 && (
+                                    <span className="bg-blue-600 dark:bg-blue-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                                        {selectedDocIds.size}
+                                    </span>
+                                )}
+                            </button>
+
+                            <div className="flex items-center gap-1">
+                                <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value)}
+                                    className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
+                                    aria-label="Sort notes by"
+                                >
+                                    {NOTE_SORT_OPTIONS.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -566,6 +771,9 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                             <NoteCardItem
                                 key={doc.id}
                                 doc={doc}
+                                isSelected={selectedDocIds.has(doc.id)}
+                                onToggleSelect={toggleSelectDoc}
+                                selectionMode={selectedDocIds.size > 0}
                                 onSelect={() => setSelectedDoc(doc)}
                             />
                         ))}
@@ -577,6 +785,19 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                     </div>
                 )}
             </div>
+
+            {/* Bottom Action Bar — Notebook View (3 actions: Receive, Send, Add Note) */}
+            {!showAddNoteForm && !editingDoc && (
+                <NotebookActionBar
+                    onImport={onImport}
+                    onHandover={() => onHandover?.(Array.from(selectedDocIds))}
+                    onAddNote={() => {
+                        navigate('/notebook/add')
+                        setShowAddNoteForm(true)
+                    }}
+                    selectedCount={selectedDocIds.size}
+                />
+            )}
 
             {/* Detail modal */}
             {selectedDoc && !editingDoc && (
@@ -634,5 +855,7 @@ export default memo(NotebookPageInner, (prev, next) => {
     if (prev.onStartEdit !== next.onStartEdit) return false
     if (prev.navigate !== next.navigate) return false
     if (prev.onDocOpened !== next.onDocOpened) return false
+    if (prev.onImport !== next.onImport) return false
+    if (prev.onHandover !== next.onHandover) return false
     return true
 })

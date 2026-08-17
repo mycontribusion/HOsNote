@@ -50,8 +50,21 @@ export default function ExportModal({ patients, allPatients, listName, selection
     //  - criticalFlag: 1 if critical, else 0
     //  - mortalityFlag: 1 if mortality, else 0
     //  - compact scan only sends biodata, so note/removedAt are empty strings.
-    const qrCompressed = patients.map((p) => {
-        return [
+    // 1. QR Data: Ultra-compact positional array to keep QR density low.
+    // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, note, removedAt]
+    const isNotebookExport = listName === 'Notebook' || (docs && docs.length > 0 && patients.length === 0)
+    const qrCompressed = isNotebookExport
+        ? (docs || []).map(d => [
+            d.patientWard || '',
+            '',
+            d.patientName || '',
+            d.patientHosp || '',
+            0,
+            0,
+            d.text || '',
+            ''
+        ])
+        : patients.map((p) => [
             p.ward || '',
             p.bed || '',
             p.name || '',
@@ -60,40 +73,45 @@ export default function ExportModal({ patients, allPatients, listName, selection
             p.reason === 'mortality' ? 1 : 0,
             '', // no note for compact scan
             ''  // no removedAt for compact scan
-        ]
-    })
+        ])
     const qrData = JSON.stringify(qrCompressed)
 
     // 2. Full Data: Includes everything for Copy/Paste sharing
-    const fullCompressed = patients.map((p) => {
-        const obj = {}
-        if (p.id) obj.id = p.id
-        if (p.ward) obj.w = p.ward
-        if (p.bed) obj.b = p.bed
-        if (p.name) obj.n = p.name
-        if (p.hospitalNumber) obj.h = p.hospitalNumber
-        if (p.note) obj.t = p.note
-        if (p.critical) obj.c = true
-        if (p.reason === 'mortality') {
-            obj.reason = 'mortality'
-            obj.removedAt = p.removedAt
-        }
-        if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
-        if (p.admissionDate) obj.admissionDate = p.admissionDate
-        return obj
-    })
+    const fullCompressed = isNotebookExport
+        ? (docs || []).map(d => ({
+            t: d.text,
+            diagnosis: d.diagnosis || d.patientDiagnosis,
+            n: d.patientName,
+            w: d.patientWard,
+            h: d.patientHosp,
+            ca: d.createdAt,
+        }))
+        : patients.map((p) => {
+            const obj = {}
+            if (p.id) obj.id = p.id
+            if (p.ward) obj.w = p.ward
+            if (p.bed) obj.b = p.bed
+            if (p.name) obj.n = p.name
+            if (p.hospitalNumber) obj.h = p.hospitalNumber
+            if (p.note) obj.t = p.note
+            if (p.critical) obj.c = true
+            if (p.reason === 'mortality') {
+                obj.reason = 'mortality'
+                obj.removedAt = p.removedAt
+            }
+            if (p.lastUpdated) obj.lastUpdated = p.lastUpdated
+            if (p.admissionDate) obj.admissionDate = p.admissionDate
+            return obj
+        })
     const fullData = JSON.stringify(fullCompressed)
 
     // 3. Full Transfer payload (QR animation) — respects selection.
-    //    Uses ultra-compact positional arrays to minimize QR density.
-    //    Only docs belonging to the exported patients are included.
     const transferPayload = useMemo(() => {
         const sid = transferSidRef.current
-        const includedMortalities = selectionCount > 0 ? [] : (listName === 'Mortalities' ? mortalities : [])
-        console.log('[TRANSFER DIAGNOSTIC] listName:', listName, 'selectionCount:', selectionCount, 'patients count:', patients.length, 'includedMortalities count:', includedMortalities.length)
+        const isNotebook = listName === 'Notebook' || (docs && docs.length > 0 && patients.length === 0)
+        const includedMortalities = (isNotebook || selectionCount > 0) ? [] : (listName === 'Mortalities' ? mortalities : [])
 
-        // Ultra-compact patient array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
-        const transferPatients = patients.map((p) => {
+        const transferPatients = isNotebook ? [] : patients.map((p) => {
             return [
                 p.ward || '',
                 p.bed || '',
@@ -108,7 +126,6 @@ export default function ExportModal({ patients, allPatients, listName, selection
             ]
         })
 
-        // Ultra-compact mortality array: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
         const transferMortalities = includedMortalities.map((p) => {
             return [
                 p.ward || '',
@@ -124,25 +141,36 @@ export default function ExportModal({ patients, allPatients, listName, selection
             ]
         })
 
+        const transferDocs = (docs || []).map(d => [
+            d.id || '',
+            d.color || 'blue',
+            d.diagnosis || d.patientDiagnosis || '',
+            d.patientName || '',
+            d.patientWard || '',
+            d.patientHosp || '',
+            d.text || '',
+            d.createdAt || '',
+            d.updatedAt || '',
+            d.patientId || ''
+        ])
+
         return {
             __sid: sid,
             __v: 1,
-            type: 'patients',
-            listName,
+            type: isNotebook ? 'notebook' : 'patients',
+            listName: listName || 'Notebook',
             patients: transferPatients,
             mortalities: transferMortalities,
-            docs: [], // Handover exports patients only (no standalone notebook entries sent)
+            docs: transferDocs,
         }
-    }, [patients, mortalities, listName, selectionCount])
+    }, [patients, mortalities, docs, listName, selectionCount])
 
     // 4. Share payload — respects selection.
-    //    When no patients are selected, share all patients from the current view
-    //    (on call / my team). When some patients are selected, share only those.
     const sharePayload = useMemo(() => {
+        const isNotebook = listName === 'Notebook' || (docs && docs.length > 0 && patients.length === 0)
         const ptsToShare = selectionCount > 0 ? patients : (allPatients || patients)
-        console.log('[SHARE DIAGNOSTIC] listName:', listName, 'selectionCount:', selectionCount, 'ptsToShare count:', ptsToShare.length, 'mortalities count:', mortalities.length)
 
-        const allFullCompressed = ptsToShare.map((p) => {
+        const allFullCompressed = isNotebook ? [] : ptsToShare.map((p) => {
             return [
                 p.ward || '',
                 p.bed || '',
@@ -157,14 +185,27 @@ export default function ExportModal({ patients, allPatients, listName, selection
             ]
         })
 
+        const shareDocs = (docs || []).map(d => ({
+            id: d.id || '',
+            color: d.color || 'blue',
+            diagnosis: d.diagnosis || d.patientDiagnosis || '',
+            patientName: d.patientName || '',
+            patientWard: d.patientWard || '',
+            patientHosp: d.patientHosp || '',
+            text: d.text || '',
+            createdAt: d.createdAt || '',
+            updatedAt: d.updatedAt || '',
+            patientId: d.patientId || ''
+        }))
+
         return {
-            type: 'patients',
-            listName,
+            type: isNotebook ? 'notebook' : 'patients',
+            listName: listName || 'Notebook',
             patients: allFullCompressed,
-            mortalities: listName === 'Mortalities' ? mortalities.map(compressMortality) : [],
-            docs: [], // Handover exports patients only (no standalone notebook entries sent)
+            mortalities: isNotebook ? [] : (listName === 'Mortalities' ? mortalities.map(compressMortality) : []),
+            docs: shareDocs,
         }
-    }, [allPatients, patients, mortalities, listName, selectionCount])
+    }, [allPatients, patients, mortalities, docs, listName, selectionCount])
 
     const { frames, total: frameTotal, bytes } = useMemo(
         () => buildFrames(transferPayload),
@@ -188,33 +229,58 @@ export default function ExportModal({ patients, allPatients, listName, selection
     }, [autoPlay, frames.length])
 
     // Human-readable text
-    const textData = patients
-        .map((p) => {
+    const textData = isNotebookExport
+        ? (docs || []).map((d) => {
             const parts = []
-            if (p.reason === 'mortality') parts.push(`[DECEASED]`)
-            if (p.name) parts.push(`Name: ${p.name}`)
-            if (p.hospitalNumber) parts.push(`Hosp: ${p.hospitalNumber}`)
-            if (p.ward) parts.push(`Ward: ${p.ward}`)
-            if (p.bed) parts.push(`Bed: ${p.bed}`)
+            if (d.diagnosis || d.patientDiagnosis) parts.push(`Diagnosis: ${d.diagnosis || d.patientDiagnosis}`)
+            if (d.patientName) parts.push(`Patient: ${d.patientName}`)
+            if (d.patientWard) parts.push(`Ward: ${d.patientWard}`)
+            if (d.patientHosp) parts.push(`Hosp: ${d.patientHosp}`)
             let line = parts.join(' | ')
-            if (p.note) line += `\nNote: ${p.note}`
-            if (p.removedAt) line += `\nRecorded: ${new Date(p.removedAt).toLocaleString()}`
+            if (d.text) line += `\nNote: ${d.text}`
+            if (d.createdAt) line += `\nDate: ${new Date(d.createdAt).toLocaleString()}`
             return line
-        })
-        .join('\n\n')
+        }).join('\n\n')
+        : patients
+            .map((p) => {
+                const parts = []
+                if (p.reason === 'mortality') parts.push(`[DECEASED]`)
+                if (p.name) parts.push(`Name: ${p.name}`)
+                if (p.hospitalNumber) parts.push(`Hosp: ${p.hospitalNumber}`)
+                if (p.ward) parts.push(`Ward: ${p.ward}`)
+                if (p.bed) parts.push(`Bed: ${p.bed}`)
+                let line = parts.join(' | ')
+                if (p.note) line += `\nNote: ${p.note}`
+                if (p.removedAt) line += `\nRecorded: ${new Date(p.removedAt).toLocaleString()}`
+                return line
+            })
+            .join('\n\n')
 
     const handleCopyCsv = async () => {
-        const headers = ['Status', 'Ward', 'Bed', 'Name', 'HospitalNumber', 'Notes', 'Critical', 'RecordedAt']
-        const rows = patients.map(p => [
-            p.reason === 'mortality' ? 'DECEASED' : 'ACTIVE',
-            p.ward || '',
-            p.bed || '',
-            p.name || '',
-            p.hospitalNumber || '',
-            `"${(p.note || '').replace(/"/g, '""')}"`,
-            p.critical ? 'YES' : 'NO',
-            p.removedAt ? `"${new Date(p.removedAt).toISOString()}"` : ''
-        ])
+        let headers, rows
+        if (isNotebookExport) {
+            headers = ['Diagnosis', 'PatientName', 'Ward', 'HospitalNumber', 'Notes', 'CreatedAt']
+            rows = (docs || []).map(d => [
+                `"${(d.diagnosis || d.patientDiagnosis || '').replace(/"/g, '""')}"`,
+                `"${(d.patientName || '').replace(/"/g, '""')}"`,
+                `"${(d.patientWard || '').replace(/"/g, '""')}"`,
+                `"${(d.patientHosp || '').replace(/"/g, '""')}"`,
+                `"${(d.text || '').replace(/"/g, '""')}"`,
+                `"${d.createdAt ? new Date(d.createdAt).toISOString() : ''}"`
+            ])
+        } else {
+            headers = ['Status', 'Ward', 'Bed', 'Name', 'HospitalNumber', 'Notes', 'Critical', 'RecordedAt']
+            rows = patients.map(p => [
+                p.reason === 'mortality' ? 'DECEASED' : 'ACTIVE',
+                p.ward || '',
+                p.bed || '',
+                p.name || '',
+                p.hospitalNumber || '',
+                `"${(p.note || '').replace(/"/g, '""')}"`,
+                p.critical ? 'YES' : 'NO',
+                p.removedAt ? `"${new Date(p.removedAt).toISOString()}"` : ''
+            ])
+        }
         const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
         const ok = await copyToClipboard(csvContent)
         if (ok) {
@@ -469,10 +535,16 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 <div className="bg-gradient-to-r from-blue-700 to-blue-800 dark:from-gray-900 dark:to-gray-900 px-4 pt-4 pb-3 shrink-0">
                     <div className="flex items-start justify-between">
                         <div className="flex-1">
-                            <h2 id="export-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1">Handover</h2>
+                            <h2 id="export-title" className="text-xl font-extrabold tracking-tight text-white leading-none mb-1">
+                                {listName === 'Notebook' ? 'Notebook Handover' : 'Handover'}
+                            </h2>
                             <div className="flex items-center gap-2">
                                 <p className="text-[11px] font-semibold text-blue-200/90">
-                                    {listName} · <span className="font-extrabold text-white">{patients.length}</span> patient{patients.length !== 1 ? 's' : ''}
+                                    {listName === 'Notebook' ? (
+                                        <><span className="font-extrabold text-white">{docs ? docs.length : 0}</span> note{docs && docs.length !== 1 ? 's' : ''}</>
+                                    ) : (
+                                        <>{listName} · <span className="font-extrabold text-white">{patients.length}</span> patient{patients.length !== 1 ? 's' : ''}</>
+                                    )}
                                     {selectionCount > 0 && <span className="ml-1 text-blue-300">(selected)</span>}
                                 </p>
                                 {wakeSupported && wakeLocked && (

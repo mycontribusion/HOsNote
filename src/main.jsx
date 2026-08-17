@@ -29,6 +29,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/notebook" element={<App />} />
                 <Route path="/notebook/add" element={<App />} />
                 <Route path="/notebook/edit" element={<App />} />
+                <Route path="/notebook/handover" element={<App />} />
+                <Route path="/notebook/receive" element={<App />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </Router>

@@ -114,7 +114,8 @@ export default function App() {
 // Navigate back to default page when closing a URL-triggered modal/form
 const navigateBackFromUrlRoute = useCallback(() => {
     const path = location.pathname
-    if (path === '/notebook/edit' || path === '/notebook/add') {
+    if (path === '/notebook/edit' || path === '/notebook/add' ||
+        path === '/notebook/handover' || path === '/notebook/receive') {
         navigate('/notebook')
     } else if (path.endsWith('/add') || path.includes('/edit') ||
         path.includes('/handover') || path.includes('/recieve') || path.includes('/receive')) {
@@ -167,6 +168,7 @@ const [patients, setPatients] = useState([])
 const [mortalities, setMortalities] = useState([])
 const [discharges, setDischarges] = useState([])
 const [docs, setDocs] = useState([])
+const [notebookExportDocs, setNotebookExportDocs] = useState(null)
 const [notebookEditDoc, setNotebookEditDoc] = useState(null)
 const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
 const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
@@ -935,34 +937,47 @@ const pendingEditRef = useRef(null)
             }
 
             if (incomingDocs && incomingDocs.length > 0) {
-                const addedIds = new Set(newOnes.map(p => p.id));
                 setDocs(prev => {
                     const nextDocs = [...prev];
-                    incomingDocs.forEach(d => {
-                        // Support both compact keys (n/w/h/t/c/ca/ua) and legacy keys
-                        const docName = d.n || d.patientName || '';
-                        const docWard = d.w || d.patientWard || '';
-                        const docHosp = d.h || d.patientHosp || '';
-                        const docText = d.t || d.text || '';
-                        // Prefer id-based linking; fall back to identity match
-                        // (name/ward/hosp) for payloads that omit patient ids.
-                        const newPatientId = oldIdToNewIdMap[d.patientId]
-                            || identityToNewIdMap[identityKey(docName, docWard, docHosp)];
-                        if (newPatientId && addedIds.has(newPatientId)) {
-                            const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === docText.trim());
-                            if (!isDuplicate) {
-                                nextDocs.unshift({
-                                    id: generateId(),
-                                    patientId: newPatientId,
-                                    patientName: docName,
-                                    patientWard: docWard,
-                                    patientHosp: docHosp,
-                                    text: docText,
-                                    color: d.c || d.color || 'blue',
-                                    createdAt: d.ca || d.createdAt || new Date().toISOString(),
-                                    updatedAt: d.ua || d.updatedAt || new Date().toISOString(),
-                                });
-                            }
+                    incomingDocs.forEach(_d => {
+                        let d;
+                        if (Array.isArray(_d)) {
+                            const [id, color, diagnosis, patientName, patientWard, patientHosp, text, createdAt, updatedAt, patientId] = _d;
+                            d = { id, color, diagnosis, patientName, patientWard, patientHosp, text, createdAt, updatedAt, patientId };
+                        } else {
+                            d = _d;
+                        }
+                        const docName = (d.n || d.patientName || '').trim();
+                        const docWard = (d.w || d.patientWard || '').trim();
+                        const docHosp = (d.h || d.patientHosp || '').trim();
+                        const docText = (d.t || d.text || '').trim();
+                        const docDiag = (d.diagnosis || d.patientDiagnosis || '').trim();
+
+                        if (!docText) return;
+
+                        const newPatientId = d.patientId
+                            ? (oldIdToNewIdMap[d.patientId] || identityToNewIdMap[identityKey(docName, docWard, docHosp)] || null)
+                            : null;
+
+                        const isDuplicate = nextDocs.some(ex =>
+                            ex.text.trim() === docText &&
+                            (ex.diagnosis || '').trim() === docDiag &&
+                            (ex.patientName || '').trim() === docName
+                        );
+
+                        if (!isDuplicate) {
+                            nextDocs.unshift({
+                                id: generateId(),
+                                patientId: newPatientId,
+                                patientName: docName,
+                                patientWard: docWard,
+                                patientHosp: docHosp,
+                                diagnosis: docDiag,
+                                text: docText,
+                                color: d.c || d.color || 'blue',
+                                createdAt: d.ca || d.createdAt || new Date().toISOString(),
+                                updatedAt: d.ua || d.updatedAt || new Date().toISOString(),
+                            });
                         }
                     });
                     return nextDocs;
@@ -1235,6 +1250,20 @@ const pendingEditRef = useRef(null)
                         initialSelectedDocId={initialSelectedDocId}
                         searchHighlight={notebookSearchHighlight}
                         onDocOpened={handleNotebookDocOpened}
+                        onImport={() => {
+                            setShowScanner(true)
+                            navigate('/notebook/receive')
+                        }}
+                        onHandover={(selectedIds) => {
+                            if (selectedIds && selectedIds.length > 0) {
+                                const selectedDocs = docs.filter(d => selectedIds.includes(d.id))
+                                setNotebookExportDocs(selectedDocs)
+                            } else {
+                                setNotebookExportDocs(null)
+                            }
+                            setShowExport(true)
+                            navigate('/notebook/handover')
+                        }}
                     />
                 </Suspense>
             )}
@@ -1407,20 +1436,20 @@ const pendingEditRef = useRef(null)
             <Suspense fallback={null}>
                 {showExport && (
                     <ExportModal
-                        patients={patientsToExport}
-                        allPatients={activePatients}
-                        listName={listName}
-                        selectionCount={selectedPatientIds.size}
-                        onClose={() => { setShowExport(false); clearSelection(); navigateBackFromUrlRoute() }}
-                        mortalities={mortalities}
-                        discharges={discharges}
+                        patients={activePage === 'notebook' ? [] : patientsToExport}
+                        allPatients={activePage === 'notebook' ? [] : activePatients}
+                        listName={activePage === 'notebook' ? 'Notebook' : listName}
+                        selectionCount={activePage === 'notebook' ? (notebookExportDocs ? notebookExportDocs.length : 0) : selectedPatientIds.size}
+                        onClose={() => { setShowExport(false); setNotebookExportDocs(null); clearSelection(); navigateBackFromUrlRoute() }}
+                        mortalities={activePage === 'notebook' ? [] : mortalities}
+                        discharges={activePage === 'notebook' ? [] : discharges}
                         dischargesResetDate={dischargesResetDate}
-                        docs={docs}
+                        docs={activePage === 'notebook' ? (notebookExportDocs || docs) : docs}
                     />
                 )}
                 {showScanner && (
                     <ScannerComponent
-                        listName={listName}
+                        listName={activePage === 'notebook' ? 'Notebook' : listName}
                         onImport={importPatients}
                         onLookup={lookupPatient}
                         onRestore={restoreFromBackup}
