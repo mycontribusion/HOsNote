@@ -308,7 +308,7 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
                 </p>
                 {/* Custom right scrollbar (Micro-thin ghost bar) */}
                 {overflows && (
-                    <div className="flex-shrink-0 w-[2.5px] rounded-full bg-transparent relative self-stretch opacity-30 group-hover:opacity-80 hover:!opacity-100 transition-opacity duration-300">
+                    <div className="flex-shrink-0 w-[2.5px] rounded-full bg-transparent relative self-stretch opacity-20 group-hover:opacity-75 hover:!opacity-100 transition-opacity duration-300">
                         <div
                             className="absolute -left-1.5 -right-1.5 top-0 bottom-0 cursor-grab active:cursor-grabbing touch-none flex justify-center"
                             style={{
@@ -320,7 +320,7 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
                             onPointerUp={handleThumbPointerUp}
                             onPointerCancel={handleThumbPointerUp}
                         >
-                            <div className="w-[2.5px] h-full rounded-full bg-blue-950/60 dark:bg-blue-400/60 hover:bg-blue-600 dark:hover:bg-blue-300 transition-colors" />
+                            <div className="w-[2.5px] h-full rounded-full bg-gray-400/70 dark:bg-gray-500/70 hover:bg-blue-600 dark:hover:bg-blue-400 transition-colors" />
                         </div>
                     </div>
                 )}

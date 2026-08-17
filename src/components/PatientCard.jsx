@@ -364,7 +364,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                             <div className="mt-1 flex items-start gap-1.5 min-w-0 max-w-full">
                                 <div
                                     ref={noteRef}
-                                    className="flex-1 text-[12px] text-gray-500 dark:text-gray-400 max-h-[5.2rem] overflow-y-auto pointer-events-none select-none break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 leading-relaxed"
+                                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 max-h-[5.2rem] overflow-y-auto pointer-events-none select-none break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 leading-relaxed"
                                     style={{ whiteSpace: 'pre-wrap', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                                     onScroll={handleNoteScroll}
                                 >
@@ -376,7 +376,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                 </div>
                                 {/* Custom right scrollbar (Micro-thin ghost bar) */}
                                 {noteOverflows && (
-                                    <div className="flex-shrink-0 w-[2.5px] rounded-full bg-transparent relative self-stretch opacity-30 group-hover:opacity-80 hover:!opacity-100 transition-opacity duration-300">
+                                    <div className="flex-shrink-0 w-[2.5px] rounded-full bg-transparent relative self-stretch opacity-20 group-hover:opacity-75 hover:!opacity-100 transition-opacity duration-300">
                                         <div
                                             className="absolute -left-1.5 -right-1.5 top-0 bottom-0 cursor-grab active:cursor-grabbing touch-none flex justify-center"
                                             style={{
