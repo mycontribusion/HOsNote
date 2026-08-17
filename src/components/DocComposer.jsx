@@ -158,25 +158,30 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                 <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full">
                     {/* Top Action Bar */}
                     <div className="flex items-center justify-between px-3 py-3 sm:px-4 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0 shadow-sm z-10">
-                        {/* Left: Undo / Redo */}
-                        <div className="flex items-center gap-1.5">
+                        {/* Left: Responsive Undo / Redo */}
+                        <div className="flex items-center p-1 rounded-xl bg-gray-100/90 dark:bg-gray-700/60 border border-gray-200/60 dark:border-gray-600/60 min-w-[100px] sm:min-w-[180px]">
                             <button
                                 type="button"
                                 onClick={handleUndo}
                                 disabled={history.index <= 0}
-                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                className="flex-1 py-1.5 px-2.5 sm:px-3.5 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
                                 aria-label="Undo"
+                                title="Undo"
                             >
-                                <Undo2 size={20} strokeWidth={2.5} />
+                                <Undo2 size={16} strokeWidth={2.5} />
+                                <span className="hidden sm:inline">Undo</span>
                             </button>
+                            <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-600 mx-0.5" />
                             <button
                                 type="button"
                                 onClick={handleRedo}
                                 disabled={history.index >= history.stack.length - 1}
-                                className="p-2.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                className="flex-1 py-1.5 px-2.5 sm:px-3.5 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
                                 aria-label="Redo"
+                                title="Redo"
                             >
-                                <Redo2 size={20} strokeWidth={2.5} />
+                                <Redo2 size={16} strokeWidth={2.5} />
+                                <span className="hidden sm:inline">Redo</span>
                             </button>
                         </div>
 

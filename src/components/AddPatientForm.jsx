@@ -748,30 +748,32 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         style={{ transform: `translateY(-${keyboardOffset}px)` }}
                         className="flex items-center justify-between px-3 sm:px-4 py-2 min-h-[52px] border-t border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-20 min-w-0 max-w-full transition-transform duration-75 ease-out pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-xs"
                     >
-                        {/* Left Group: Undo/Redo */}
-                        <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Left Group: Undo/Redo (Expands based on device width) */}
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-[140px] sm:max-w-[220px]">
                             {/* Segmented Undo / Redo */}
-                            <div className="flex items-center p-0.5 rounded-xl bg-gray-100/90 dark:bg-gray-700/60 border border-gray-200/60 dark:border-gray-600/60">
+                            <div className="flex items-center w-full p-1 rounded-xl bg-gray-100/90 dark:bg-gray-700/60 border border-gray-200/60 dark:border-gray-600/60">
                                 <button
                                     type="button"
                                     onClick={handleUndo}
                                     disabled={history.index <= 0}
-                                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+                                    className="flex-1 py-1.5 px-2 sm:px-3 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
                                     aria-label="Undo"
                                     title="Undo"
                                 >
-                                    <Undo2 size={13} strokeWidth={2.5} />
+                                    <Undo2 size={15} strokeWidth={2.5} />
+                                    <span className="hidden sm:inline">Undo</span>
                                 </button>
-                                <div className="w-[1px] h-3 bg-gray-200 dark:bg-gray-600 mx-0.5" />
+                                <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-600 mx-0.5" />
                                 <button
                                     type="button"
                                     onClick={handleRedo}
                                     disabled={history.index >= history.stack.length - 1}
-                                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all active:scale-90"
+                                    className="flex-1 py-1.5 px-2 sm:px-3 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
                                     aria-label="Redo"
                                     title="Redo"
                                 >
-                                    <Redo2 size={13} strokeWidth={2.5} />
+                                    <Redo2 size={15} strokeWidth={2.5} />
+                                    <span className="hidden sm:inline">Redo</span>
                                 </button>
                             </div>
                         </div>
