@@ -674,7 +674,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
         <div className="flex flex-col flex-1">
             {/* Card list */}
             <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-2 pb-36">
-                {/* Filter & Sort & Select All controls */}
+                {/* Filter & Sort controls */}
                 {docs.length > 0 && (
                     <div className="flex items-center justify-between gap-2 mb-3">
                         {/* Left: Note type filter */}
@@ -701,46 +701,48 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                             })}
                         </div>
 
-                        {/* Right: Select All & Sort controls */}
-                        <div className="flex items-center gap-2">
-                            {/* Select All button at top */}
-                            <button
-                                type="button"
-                                onClick={toggleSelectAllDocs}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all border ${
-                                    selectedDocIds.size > 0
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 shadow-xs'
-                                        : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 border-gray-200/60 dark:border-gray-600/60 hover:bg-gray-200 dark:hover:bg-gray-600'
-                                }`}
-                                aria-label="Select all notes"
+                        {/* Right: Sort controls */}
+                        <div className="flex items-center gap-1">
+                            <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
+                                aria-label="Sort notes by"
                             >
-                                <CheckCircle2 size={13} strokeWidth={2.5} />
-                                <span>
-                                    {filteredDocs.length > 0 && filteredDocs.every(d => selectedDocIds.has(d.id))
-                                        ? 'Deselect All'
-                                        : 'Select All'}
-                                </span>
-                                {selectedDocIds.size > 0 && (
-                                    <span className="bg-blue-600 dark:bg-blue-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
-                                        {selectedDocIds.size}
-                                    </span>
-                                )}
-                            </button>
-
-                            <div className="flex items-center gap-1">
-                                <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
-                                <select
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                    className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
-                                    aria-label="Sort notes by"
-                                >
-                                    {NOTE_SORT_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                            </div>
+                                {NOTE_SORT_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
                         </div>
+                    </div>
+                )}
+
+                {/* Select All button — new line between controls and first card */}
+                {docs.length > 0 && (
+                    <div className="mb-3">
+                        <button
+                            type="button"
+                            onClick={toggleSelectAllDocs}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                selectedDocIds.size > 0
+                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 shadow-xs'
+                                    : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 border-gray-200/60 dark:border-gray-600/60 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                            aria-label="Select all notes"
+                        >
+                            <CheckCircle2 size={14} strokeWidth={2.5} />
+                            <span>
+                                {filteredDocs.length > 0 && filteredDocs.every(d => selectedDocIds.has(d.id))
+                                    ? 'Deselect All'
+                                    : 'Select All'}
+                            </span>
+                            {selectedDocIds.size > 0 && (
+                                <span className="bg-blue-600 dark:bg-blue-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                                    {selectedDocIds.size}
+                                </span>
+                            )}
+                        </button>
                     </div>
                 )}
 
