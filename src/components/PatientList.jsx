@@ -170,7 +170,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                     </div>
 
                     {isReviewedOpen && (
-                        <div role="list" className="flex flex-col gap-2.5 opacity-70" aria-label="Reviewed patient list">
+                        <div role="list" className="flex flex-col gap-2.5" aria-label="Reviewed patient list">
                             {sortedReviewed.map((patient) => (
                                 <PatientCard
                                     key={patient.id}

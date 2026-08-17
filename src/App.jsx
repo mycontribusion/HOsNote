@@ -1241,7 +1241,7 @@ const pendingEditRef = useRef(null)
 
             {activePage === 'patients' && (
                 <main
-                    className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-24"
+                    className="flex-1 w-full max-w-2xl mx-auto px-4 pt-2 pb-24"
                     onClick={() => {
                         if (selectedPatientIds.size > 0) {
                             setSelectedPatientIds(new Set())
@@ -1270,7 +1270,7 @@ const pendingEditRef = useRef(null)
 
                     {/* Tabs */}
                     {!showAddForm && !editingPatient && !showMortalityForm && !mortalitiesOnly && activeTab !== 'mortalities' && (
-                        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4 mt-2">
+                        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
                             <button
                                 onClick={() => goToTab('my_team')}
                                 className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'my_team' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}

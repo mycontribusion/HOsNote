@@ -194,7 +194,12 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
 
     const ref = useRef(null)
     const [overflows, setOverflows] = useState(false)
-    const [thumbRatio, setThumbRatio] = useState(1)
+    const [thumbHeight, setThumbHeight] = useState(1)
+    const [thumbTopFrac, setThumbTopFrac] = useState(0)
+    const isDraggingScrollbar = useRef(false)
+    const sbDragStartY = useRef(0)
+    const sbDragStartScrollTop = useRef(0)
+    const syncThumb = useRef(null)
 
     const diagStr = (doc.diagnosis || doc.patientDiagnosis || '').trim()
     const hasDiag = Boolean(diagStr)
@@ -205,9 +210,6 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
     const dateIso = doc.updatedAt && doc.updatedAt !== doc.createdAt ? doc.updatedAt : doc.createdAt
     const dateParts = formatSmartDateParts(dateIso)
 
-    // Bar uses sqrt(clientHeight/scrollHeight) — square-root scale:
-    //   5-line note  → 89% bar | 10-line → 63% | 25-line → 40% | 50-line → 28%
-    //   Floor 20% (~12px on card) keeps even very long notes visibly marked.
     useEffect(() => {
         const el = ref.current
         if (!el) return
@@ -215,32 +217,53 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
             const hasOverflow = el.scrollHeight > el.clientHeight + 2
             setOverflows(hasOverflow)
             if (hasOverflow) {
-                const raw = el.clientHeight / el.scrollHeight
-                setThumbRatio(Math.min(1, Math.max(0.20, Math.sqrt(raw))))
+                const h = Math.max(0.08, el.clientHeight / el.scrollHeight)
+                setThumbHeight(h)
+                const maxScroll = el.scrollHeight - el.clientHeight
+                setThumbTopFrac(maxScroll > 0 ? (el.scrollTop / maxScroll) * (1 - h) : 0)
             } else {
-                setThumbRatio(0)
+                setThumbHeight(1)
+                setThumbTopFrac(0)
             }
         }
+        syncThumb.current = check
         check()
         window.addEventListener('resize', check)
         return () => window.removeEventListener('resize', check)
     }, [doc.text])
 
+    const handleNoteScroll = () => syncThumb.current?.()
+
+    const handleThumbPointerDown = (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        isDraggingScrollbar.current = true
+        sbDragStartY.current = e.clientY
+        sbDragStartScrollTop.current = ref.current?.scrollTop ?? 0
+        e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    const handleThumbPointerMove = (e) => {
+        if (!isDraggingScrollbar.current) return
+        e.stopPropagation()
+        const el = ref.current
+        if (!el) return
+        const movableRange = el.clientHeight * (1 - thumbHeight)
+        if (movableRange <= 0) return
+        const dy = e.clientY - sbDragStartY.current
+        const maxScroll = el.scrollHeight - el.clientHeight
+        el.scrollTop = Math.max(0, Math.min(maxScroll, sbDragStartScrollTop.current + (dy / movableRange) * maxScroll))
+    }
+    const handleThumbPointerUp = (e) => {
+        isDraggingScrollbar.current = false
+        e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+
     return (
         <button
             id={`note-card-${doc.id}`}
-            className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all relative`}
+            className={`w-full text-left card p-0 overflow-hidden border-l-4 ${border} hover:-translate-y-0.5 active:scale-[0.99] transition-all relative group`}
             onClick={onSelect}
         >
-            {/* Merged Dynamically Calibrated Edge-Reading Indicator Bar (Navy Blue) */}
-            {/* Bar height = overflow fraction: short note barely over limit → short bar; very long note → tall bar */}
-            {overflows && (
-                <span
-                    className="absolute left-0 top-0 w-[1.5px] rounded-r-full bg-blue-950 dark:bg-blue-400 transition-all duration-300 z-20"
-                    style={{ height: `${Math.round(thumbRatio * 100)}%` }}
-                    title="Extended content inside"
-                />
-            )}
 
             {/* Card header — single line: Diagnosis if present, else Biodata + Date */}
             <div className={`px-4 py-2.5 flex items-center gap-1.5 overflow-hidden ${bg}`}>
@@ -273,11 +296,34 @@ const NoteCardItem = memo(({ doc, onSelect }) => {
                 </div>
             </div>
 
-            {/* Text preview — static clamped text */}
-            <div className="px-4 py-2 min-w-0 max-w-full">
-                <p ref={ref} className={`text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-hidden pointer-events-none select-none pr-1${overflows ? ' clamp-fade-out' : ''}`}>
+            {/* Text preview — scrollable with custom right scrollbar */}
+            <div className="px-4 py-2 min-w-0 max-w-full flex items-start gap-1.5">
+                <p
+                    ref={ref}
+                    className="flex-1 text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] max-h-[5.75rem] overflow-y-auto pointer-events-none select-none"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    onScroll={handleNoteScroll}
+                >
                     {doc.text}
                 </p>
+                {/* Custom right scrollbar (Micro-thin ghost bar) */}
+                {overflows && (
+                    <div className="flex-shrink-0 w-[2.5px] rounded-full bg-transparent relative self-stretch opacity-30 group-hover:opacity-80 hover:!opacity-100 transition-opacity duration-300">
+                        <div
+                            className="absolute -left-1.5 -right-1.5 top-0 bottom-0 cursor-grab active:cursor-grabbing touch-none flex justify-center"
+                            style={{
+                                height: `${thumbHeight * 100}%`,
+                                top: `${thumbTopFrac * 100}%`,
+                            }}
+                            onPointerDown={handleThumbPointerDown}
+                            onPointerMove={handleThumbPointerMove}
+                            onPointerUp={handleThumbPointerUp}
+                            onPointerCancel={handleThumbPointerUp}
+                        >
+                            <div className="w-[2.5px] h-full rounded-full bg-blue-950/60 dark:bg-blue-400/60 hover:bg-blue-600 dark:hover:bg-blue-300 transition-colors" />
+                        </div>
+                    </div>
+                )}
             </div>
         </button>
     )
@@ -448,7 +494,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
             )}
 
             {/* Card list */}
-            <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-36">
+            <div className="flex-1 w-full max-w-2xl mx-auto px-4 pt-2 pb-36">
                 {/* Filter & Sort controls */}
                 {docs.length > 0 && (
                     <div className="flex items-center justify-between gap-2 mb-3">

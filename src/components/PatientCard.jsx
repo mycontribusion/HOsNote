@@ -24,7 +24,11 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
     const noteRef = useRef(null)
     const [noteOverflows, setNoteOverflows] = useState(false)
-    const [thumbRatio, setThumbRatio] = useState(1)
+    const [thumbHeight, setThumbHeight] = useState(1)   // fraction of track
+    const [thumbTopFrac, setThumbTopFrac] = useState(0) // fraction of track
+    const isDraggingScrollbar = useRef(false)
+    const sbDragStartY = useRef(0)
+    const sbDragStartScrollTop = useRef(0)
 
     const durationText = useMemo(() => {
         if (!admissionDate || isMortality) return ''
@@ -42,12 +46,8 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
     const suppressClick = useRef(false)
     const longPressTimer = useRef(null)
 
-    // Bar uses sqrt(clientHeight/scrollHeight) — square-root scale spreads differences:
-    //   5-line note  → sqrt(4/5)  = 89% bar
-    //   10-line note → sqrt(4/10) = 63% bar
-    //   25-line note → sqrt(4/25) = 40% bar
-    //   50-line note → sqrt(4/50) = 28% bar
-    //   100+ lines   → floor at 20% (~12px on 60px badge — always visible)
+    const syncThumb = useRef(null)
+
     useEffect(() => {
         const el = noteRef.current
         if (!el) return
@@ -55,16 +55,46 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
             const hasOverflow = el.scrollHeight > el.clientHeight + 2
             setNoteOverflows(hasOverflow)
             if (hasOverflow) {
-                const raw = el.clientHeight / el.scrollHeight
-                setThumbRatio(Math.min(1, Math.max(0.20, Math.sqrt(raw))))
+                const h = Math.max(0.08, el.clientHeight / el.scrollHeight)
+                setThumbHeight(h)
+                const maxScroll = el.scrollHeight - el.clientHeight
+                setThumbTopFrac(maxScroll > 0 ? (el.scrollTop / maxScroll) * (1 - h) : 0)
             } else {
-                setThumbRatio(0)
+                setThumbHeight(1)
+                setThumbTopFrac(0)
             }
         }
+        syncThumb.current = check
         check()
         window.addEventListener('resize', check)
         return () => window.removeEventListener('resize', check)
     }, [note])
+
+    const handleNoteScroll = () => syncThumb.current?.()
+
+    const handleThumbPointerDown = (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        isDraggingScrollbar.current = true
+        sbDragStartY.current = e.clientY
+        sbDragStartScrollTop.current = noteRef.current?.scrollTop ?? 0
+        e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    const handleThumbPointerMove = (e) => {
+        if (!isDraggingScrollbar.current) return
+        e.stopPropagation()
+        const el = noteRef.current
+        if (!el) return
+        const movableRange = el.clientHeight * (1 - thumbHeight)
+        if (movableRange <= 0) return
+        const dy = e.clientY - sbDragStartY.current
+        const maxScroll = el.scrollHeight - el.clientHeight
+        el.scrollTop = Math.max(0, Math.min(maxScroll, sbDragStartScrollTop.current + (dy / movableRange) * maxScroll))
+    }
+    const handleThumbPointerUp = (e) => {
+        isDraggingScrollbar.current = false
+        e.currentTarget.releasePointerCapture(e.pointerId)
+    }
 
     const handlePointerDown = (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -184,10 +214,10 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
             {/* Fore Card */}
             <div
                 className={`card p-3.5 flex flex-col sm:flex-row gap-3.5 group relative z-10 touch-pan-y cursor-pointer
-                    ${isDragging ? 'transition-none' : 'transition-all duration-300'} 
+                    ${isDragging ? 'transition-none' : 'transition-all duration-300'}
                     ${isSelected
                         ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-700 shadow-lg shadow-blue-100/60 dark:shadow-blue-950/60'
-                        : reviewed ? 'opacity-60 bg-gray-50/80 dark:bg-gray-800/40 grayscale-[20%]'
+                        : reviewed ? 'bg-gray-50/80 dark:bg-gray-800/40'
                         : isMortality ? 'bg-white dark:bg-gray-800 border-red-100 dark:border-red-950/60'
                         : critical ? 'bg-gradient-to-r from-red-50/60 to-white dark:from-red-900/10 dark:to-gray-800 border-red-200 dark:border-red-800/60'
                         : 'bg-white dark:bg-gray-800'
@@ -231,23 +261,8 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
 
                     {/* Left Column (Badge + Mobile Actions) */}
                     <div className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[60px]">
-                        {/* Ward/Bed or Initial Badge with merged calibrated edge-reading indicator */}
+                        {/* Ward/Bed or Initial Badge */}
                         <div className={`flex flex-col items-center justify-center rounded-2xl border-2 px-2.5 py-2 text-center w-[60px] min-h-[60px] shadow-sm ${badgeColor} relative overflow-hidden transition-all duration-200`}>
-                            {/* Merged Dynamically Calibrated Edge-Reading Indicator Bar */}
-                            {/* Height represents how much note content is hidden beyond the 4-line preview */}
-                            {noteOverflows && (
-                                <span
-                                    className={`absolute left-0 top-0 w-[1.5px] rounded-r-full ${
-                                        isMortality
-                                            ? 'bg-red-500 dark:bg-red-400'
-                                            : critical
-                                                ? 'bg-amber-500 dark:bg-amber-400'
-                                                : 'bg-blue-600 dark:bg-teal-400'
-                                    } transition-all duration-300 z-20`}
-                                    style={{ height: `${Math.round(thumbRatio * 100)}%` }}
-                                    title="Extended content inside"
-                                />
-                            )}
                             {ward || bed ? (
                                 <>
                                     {ward && <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-none mb-1 truncate max-w-full">{ward}</div>}
@@ -344,13 +359,14 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                 {formatSmartDate(lastUpdated)}
                             </div>
                         )}
-                        {/* Row 4: Static note preview */}
+                        {/* Row 4: Scrollable note preview */}
                         {note && (
-                            <div className="mt-1 flex flex-col gap-0.5 min-w-0 max-w-full">
+                            <div className="mt-1 flex items-start gap-1.5 min-w-0 max-w-full">
                                 <div
                                     ref={noteRef}
-                                    className={`text-[12px] text-gray-500 dark:text-gray-400 max-h-[5.2rem] overflow-hidden pointer-events-none select-none break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full leading-relaxed${noteOverflows ? ' clamp-fade-out' : ''}`}
-                                    style={{ whiteSpace: 'pre-wrap', WebkitLineClamp: 4, display: '-webkit-box', WebkitBoxOrient: 'vertical' }}
+                                    className="flex-1 text-[12px] text-gray-500 dark:text-gray-400 max-h-[5.2rem] overflow-y-auto pointer-events-none select-none break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 leading-relaxed"
+                                    style={{ whiteSpace: 'pre-wrap', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                                    onScroll={handleNoteScroll}
                                 >
                                     {highlightField === 'note' && highlightQuery ? (
                                         <HighlightText text={note} query={highlightQuery} />
@@ -358,6 +374,24 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                         note
                                     )}
                                 </div>
+                                {/* Custom right scrollbar (Micro-thin ghost bar) */}
+                                {noteOverflows && (
+                                    <div className="flex-shrink-0 w-[2.5px] rounded-full bg-transparent relative self-stretch opacity-30 group-hover:opacity-80 hover:!opacity-100 transition-opacity duration-300">
+                                        <div
+                                            className="absolute -left-1.5 -right-1.5 top-0 bottom-0 cursor-grab active:cursor-grabbing touch-none flex justify-center"
+                                            style={{
+                                                height: `${thumbHeight * 100}%`,
+                                                top: `${thumbTopFrac * 100}%`,
+                                            }}
+                                            onPointerDown={handleThumbPointerDown}
+                                            onPointerMove={handleThumbPointerMove}
+                                            onPointerUp={handleThumbPointerUp}
+                                            onPointerCancel={handleThumbPointerUp}
+                                        >
+                                            <div className="w-[2.5px] h-full rounded-full bg-gray-400/70 dark:bg-gray-500/70 hover:bg-blue-600 dark:hover:bg-blue-400 transition-colors" />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
