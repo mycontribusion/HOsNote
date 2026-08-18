@@ -592,6 +592,12 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
         setVisibleCount(30)
     }, [sortBy, noteFilter])
 
+    const filterCounts = useMemo(() => ({
+        all: docs.length,
+        patient: docs.filter(d => d.patientId != null || Boolean(d.patientName?.trim() || d.patientWard?.trim() || d.patientHosp?.trim())).length,
+        standalone: docs.filter(d => d.patientId == null && !d.patientName?.trim() && !d.patientWard?.trim() && !d.patientHosp?.trim()).length,
+    }), [docs])
+
     const filteredDocs = useMemo(() => {
         if (noteFilter === 'patient') {
             return docs.filter(d => d.patientId != null || Boolean(d.patientName?.trim() || d.patientWard?.trim() || d.patientHosp?.trim()))
@@ -686,6 +692,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                             {NOTE_FILTER_OPTIONS.map((opt) => {
                                 const Icon = opt.icon
                                 const isActive = noteFilter === opt.value
+                                const count = filterCounts[opt.value] ?? 0
                                 return (
                                     <button
                                         key={opt.value}
@@ -700,6 +707,13 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                                     >
                                         {Icon && <Icon size={10} />}
                                         {opt.label}
+                                        <span className={`text-[9px] font-bold px-1 rounded-full ${
+                                            isActive
+                                                ? 'bg-gray-200 dark:bg-gray-500 text-gray-700 dark:text-gray-200'
+                                                : 'bg-gray-200/60 dark:bg-gray-600/60 text-gray-500 dark:text-gray-400'
+                                        }`}>
+                                            {count}
+                                        </span>
                                     </button>
                                 )
                             })}
