@@ -957,7 +957,7 @@ const pendingEditRef = useRef(null)
 
                         const newPatientId = d.patientId
                             ? (oldIdToNewIdMap[d.patientId] || identityToNewIdMap[identityKey(docName, docWard, docHosp)] || null)
-                            : null;
+                            : (identityToNewIdMap[identityKey(docName, docWard, docHosp)] || null);
 
                         const isDuplicate = nextDocs.some(ex =>
                             ex.text.trim() === docText &&

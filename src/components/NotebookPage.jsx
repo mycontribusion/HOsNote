@@ -593,8 +593,8 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
     }, [sortBy, noteFilter])
 
     const filteredDocs = useMemo(() => {
-        if (noteFilter === 'patient') return docs.filter(d => d.patientId != null)
-        if (noteFilter === 'standalone') return docs.filter(d => d.patientId == null)
+        if (noteFilter === 'patient') return docs.filter(d => d.patientId != null || (d.patientName || d.patientWard || d.patientHosp))
+        if (noteFilter === 'standalone') return docs.filter(d => d.patientId == null && !(d.patientName || d.patientWard || d.patientHosp))
         return docs
     }, [docs, noteFilter])
 
@@ -819,7 +819,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
             {/* Edit using AddPatientForm — use same UI style as how it was added */}
             {editingDoc && (
                 <AddPatientForm
-                    isNoteMode={!editingDoc.patientId}
+                    isNoteMode={!(editingDoc.patientId || editingDoc.patientName || editingDoc.patientWard || editingDoc.patientHosp)}
                     initialData={editInitialData}
                     onAdd={handleEditSave}
                     onCancel={() => {
