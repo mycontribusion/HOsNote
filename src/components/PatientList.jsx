@@ -12,7 +12,7 @@ const SORT_OPTIONS = [
     { value: 'hospnum', label: 'Hosp No.' },
 ]
 
-const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, reviewedExpandTrigger, onReviewedExpanded }) => {
+const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, reviewedExpandTrigger, onReviewedExpanded, initialSelectedPatientId, onPatientOpened }) => {
     const [sortBy, setSortBy] = useState('none')
     const [isReviewedOpen, setIsReviewedOpen] = useState(false)
     const [selectedDetailPatient, setSelectedDetailPatient] = useState(null)
@@ -20,6 +20,17 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
     const [visibleReviewedCount, setVisibleReviewedCount] = useState(30)
     const sentinelRef = useRef(null)
     const reviewedSentinelRef = useRef(null)
+
+    // Auto-open patient detail modal when navigating from search
+    useEffect(() => {
+        if (initialSelectedPatientId && patients.length > 0) {
+            const p = patients.find(item => item.id === initialSelectedPatientId)
+            if (p) {
+                setSelectedDetailPatient(p)
+                onPatientOpened?.()
+            }
+        }
+    }, [initialSelectedPatientId, patients, onPatientOpened])
 
     const { activePatients, reviewedPatients } = useMemo(() => {
         const active = []
@@ -303,6 +314,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                     isSelected={selectedIds.has(selectedDetailPatient.id)}
                     docCount={getDocCount ? getDocCount(selectedDetailPatient.id) : 0}
                     isMortality={isMortality}
+                    highlightQuery={highlightQuery}
                 />
             )}
         </div>
@@ -326,5 +338,7 @@ export default memo(PatientListInner, (prev, next) => {
     if (prev.moveTeamLabel !== next.moveTeamLabel) return false
     if (prev.reviewedExpandTrigger !== next.reviewedExpandTrigger) return false
     if (prev.onReviewedExpanded !== next.onReviewedExpanded) return false
+    if (prev.initialSelectedPatientId !== next.initialSelectedPatientId) return false
+    if (prev.onPatientOpened !== next.onPatientOpened) return false
     return true
 })

@@ -2,23 +2,7 @@ import { Trash2, Pencil, CheckCircle2, FileText, ChevronsLeft } from 'lucide-rea
 import { useState, useRef, useEffect, useMemo, memo } from 'react'
 import { formatSmartDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
-
-function HighlightText({ text, query }) {
-    if (!query || !text) return <>{text}</>
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
-    return (
-        <>
-            {parts.map((part, i) =>
-                part.toLowerCase() === query.toLowerCase() ? (
-                    <mark key={i} className="bg-yellow-200 dark:bg-yellow-600/40 text-gray-900 dark:text-gray-100 rounded-sm px-0.5">{part}</mark>
-                ) : (
-                    <span key={i}>{part}</span>
-                )
-            )}
-        </>
-    )
-}
+import HighlightText from './HighlightText'
 
 const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail }) => {
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient

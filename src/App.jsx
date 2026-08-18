@@ -173,6 +173,7 @@ const [notebookEditDoc, setNotebookEditDoc] = useState(null)
 const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
 const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
 const [mortalitiesOnly, setMortalitiesOnly] = useState(false)
+const [initialSelectedPatientId, setInitialSelectedPatientId] = useState(null)
 const [darkMode, setDarkMode] = useState(() => {
     try {
         const stored = localStorage.getItem(DARK_MODE_KEY)
@@ -1263,9 +1264,10 @@ const pendingEditRef = useRef(null)
             navigate(targetTab === 'mortalities' ? '/mortalities' : `/team/${targetTab}`)
         }
 
-        // Store highlight info for PatientCard
+        // Store highlight info & auto-open patient detail modal for search result
         setSearchHighlightField(highlightField)
         setSearchHighlightQuery(highlightQuery)
+        setInitialSelectedPatientId(patientId)
 
         // Find the patient and check if they are reviewed
         const allPatients = [...patients, ...mortalities]
@@ -1275,20 +1277,33 @@ const pendingEditRef = useRef(null)
             setReviewedExpandTrigger(prev => prev + 1)
         }
 
-        // Scroll to the patient
+        // Scroll to the patient and apply persistent ring highlight
         setTimeout(() => {
             const el = document.getElementById(`patient-${patientId}`)
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2')
-                setTimeout(() => el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2'), 3000)
+
+                // Remove existing rings
+                document.querySelectorAll('.search-ring-active').forEach(prev => {
+                    prev.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2', 'search-ring-active')
+                })
+                el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2', 'search-ring-active')
+
+                const removeRing = () => {
+                    if (document.querySelector('.modal-backdrop')) return
+                    el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2', 'search-ring-active')
+                    window.removeEventListener('scroll', removeRing, { capture: true, passive: true })
+                    window.removeEventListener('click', removeRing, { capture: true })
+                    window.removeEventListener('touchstart', removeRing, { capture: true, passive: true })
+                }
+
+                setTimeout(() => {
+                    window.addEventListener('scroll', removeRing, { capture: true, passive: true })
+                    window.addEventListener('click', removeRing, { capture: true })
+                    window.addEventListener('touchstart', removeRing, { capture: true, passive: true })
+                }, 400)
             }
         }, found && found.reviewed && targetTab !== 'mortalities' ? 400 : 300)
-        // Clear highlight after a few seconds
-        setTimeout(() => {
-            setSearchHighlightField(null)
-            setSearchHighlightQuery('')
-        }, 5000)
     }, [activePage, activeTab, navigate, patients, mortalities, setReviewedExpandTrigger])
 
     const navigateToNote = useCallback((noteId, highlightQuery) => {
@@ -1306,8 +1321,25 @@ const pendingEditRef = useRef(null)
                 const el = document.getElementById(`note-card-${noteId}`)
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                    el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2')
-                    setTimeout(() => el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2'), 3000)
+
+                    document.querySelectorAll('.search-ring-active').forEach(prev => {
+                        prev.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2', 'search-ring-active')
+                    })
+                    el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2', 'search-ring-active')
+
+                    const removeRing = () => {
+                        if (document.querySelector('.modal-backdrop')) return
+                        el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2', 'search-ring-active')
+                        window.removeEventListener('scroll', removeRing, { capture: true, passive: true })
+                        window.removeEventListener('click', removeRing, { capture: true })
+                        window.removeEventListener('touchstart', removeRing, { capture: true, passive: true })
+                    }
+
+                    setTimeout(() => {
+                        window.addEventListener('scroll', removeRing, { capture: true, passive: true })
+                        window.addEventListener('click', removeRing, { capture: true })
+                        window.addEventListener('touchstart', removeRing, { capture: true, passive: true })
+                    }, 400)
                 }
             }, 300)
         }
@@ -1476,6 +1508,8 @@ const pendingEditRef = useRef(null)
                                     isMortality
                                     reviewedExpandTrigger={reviewedExpandTrigger}
                                     onReviewedExpanded={() => setReviewedExpandTrigger(prev => prev + 1)}
+                                    initialSelectedPatientId={initialSelectedPatientId}
+                                    onPatientOpened={() => setInitialSelectedPatientId(null)}
                                 />
                             )}
                         </div>
@@ -1499,6 +1533,8 @@ const pendingEditRef = useRef(null)
                             highlightQuery={searchHighlightQuery}
                             reviewedExpandTrigger={reviewedExpandTrigger}
                             onReviewedExpanded={() => setReviewedExpandTrigger(prev => prev + 1)}
+                            initialSelectedPatientId={initialSelectedPatientId}
+                            onPatientOpened={() => setInitialSelectedPatientId(null)}
                         />
                     )}
 

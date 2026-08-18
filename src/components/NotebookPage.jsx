@@ -2,23 +2,7 @@ import { useState, useMemo, useEffect, memo, useRef, useCallback } from 'react'
 import { Edit2, Trash2, BookOpen, X, User, StickyNote, CheckCircle2, QrCode, Send, ChevronUp, ChevronDown } from 'lucide-react'
 import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
-
-function HighlightText({ text, query }) {
-    if (!query || !text) return <>{text}</>
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
-    return (
-        <>
-            {parts.map((part, i) =>
-                part.toLowerCase() === query.toLowerCase() ? (
-                    <mark key={i} className="bg-yellow-200 dark:bg-yellow-600/40 text-gray-900 dark:text-gray-100 rounded-sm px-0.5">{part}</mark>
-                ) : (
-                    <span key={i}>{part}</span>
-                )
-            )}
-        </>
-    )
-}
+import HighlightText from './HighlightText'
 
 const COLOR_BORDER = {
     blue:   'border-blue-500',
@@ -91,20 +75,26 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     const hospStr = (doc.patientHosp || '').trim()
     const hasBio = hasName || Boolean(wardStr) || Boolean(hospStr)
 
+    const modalRef = useRef(null)
     const bodyRef = useRef(null)
+
     useEffect(() => {
-        if (highlightText && bodyRef.current) {
+        if (highlightText && modalRef.current && bodyRef.current) {
             const timer = setTimeout(() => {
-                const markEl = bodyRef.current?.querySelector('mark')
-                if (markEl) {
-                    const markTop = markEl.offsetTop
-                    const containerTop = bodyRef.current.offsetTop
-                    bodyRef.current.scrollTop = Math.max(0, markTop - containerTop - 10)
+                const markEl = modalRef.current?.querySelector('mark')
+                if (markEl && bodyRef.current) {
+                    const markRect = markEl.getBoundingClientRect()
+                    const bodyRect = bodyRef.current.getBoundingClientRect()
+                    const relativeTop = markRect.top - bodyRect.top + bodyRef.current.scrollTop
+                    bodyRef.current.scrollTo({
+                        top: Math.max(0, relativeTop - 40),
+                        behavior: 'smooth'
+                    })
                 }
-            }, 100)
+            }, 150)
             return () => clearTimeout(timer)
         }
-    }, [highlightText])
+    }, [highlightText, doc])
 
     return (
         <div
@@ -112,6 +102,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
+                ref={modalRef}
                 className={`modal-box max-w-md w-[95%] h-[70vh] max-h-[600px] flex flex-col p-0 overflow-hidden border-l-4 ${border}`}
                 role="dialog"
                 aria-modal="true"

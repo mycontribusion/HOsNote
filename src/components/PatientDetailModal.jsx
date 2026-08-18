@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Pencil } from 'lucide-react'
 import { formatSmartDate, formatFullDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
+import HighlightText from './HighlightText'
 
 export default function PatientDetailModal({
     patient,
@@ -11,12 +12,33 @@ export default function PatientDetailModal({
     onToggleSelect,
     isSelected = false,
     docCount = 0,
-    isMortality = false
+    isMortality = false,
+    highlightQuery = ''
 }) {
     if (!patient) return null
 
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, critical, removedAt, lastUpdated, admissionDate } = patient
     const [copied, setCopied] = useState(false)
+    const modalRef = useRef(null)
+    const bodyRef = useRef(null)
+
+    useEffect(() => {
+        if (highlightQuery && modalRef.current && bodyRef.current) {
+            const timer = setTimeout(() => {
+                const markEl = modalRef.current?.querySelector('mark')
+                if (markEl && bodyRef.current) {
+                    const markRect = markEl.getBoundingClientRect()
+                    const bodyRect = bodyRef.current.getBoundingClientRect()
+                    const relativeTop = markRect.top - bodyRect.top + bodyRef.current.scrollTop
+                    bodyRef.current.scrollTo({
+                        top: Math.max(0, relativeTop - 40),
+                        behavior: 'smooth'
+                    })
+                }
+            }, 150)
+            return () => clearTimeout(timer)
+        }
+    }, [highlightQuery, patient])
 
     let durationText = ''
     if (admissionDate && !isMortality) {
@@ -35,9 +57,10 @@ export default function PatientDetailModal({
             note ? `Note:\n${note}` : ''
         ].filter(Boolean).join('\n')
 
-        navigator.clipboard.writeText(fullText)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
+        navigator.clipboard.writeText(fullText).then(() => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        })
     }
 
     const formatDate = (iso) => {
@@ -86,7 +109,7 @@ export default function PatientDetailModal({
                                 {hasDiag && (
                                     <div className="overflow-x-auto whitespace-nowrap custom-scrollbar pb-0.5">
                                         <h2 id="patient-detail-title" className="font-extrabold text-gray-900 dark:text-white text-base leading-tight inline-block whitespace-nowrap">
-                                            {diagnosis}
+                                            {highlightQuery ? <HighlightText text={diagnosis} query={highlightQuery} /> : diagnosis}
                                         </h2>
                                     </div>
                                 )}
@@ -94,22 +117,22 @@ export default function PatientDetailModal({
                                 <div className="flex flex-wrap items-center gap-1.5 py-0.5">
                                     {hasName && (
                                         <span className={`whitespace-nowrap ${hasDiag ? 'text-xs font-semibold text-gray-700 dark:text-gray-300' : 'font-extrabold text-base text-gray-900 dark:text-white'}`}>
-                                            {hasDiag ? name : name}
+                                            {highlightQuery ? <HighlightText text={name} query={highlightQuery} /> : name}
                                         </span>
                                     )}
                                     {wardStr && (
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-normal break-all ${pillColor}`}>
-                                            {wardStr}
+                                            {highlightQuery ? <HighlightText text={wardStr} query={highlightQuery} /> : wardStr}
                                         </span>
                                     )}
                                     {bed && (
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap ${pillColor}`}>
-                                            Bed {bed}
+                                            {highlightQuery ? <>Bed <HighlightText text={String(bed)} query={highlightQuery} /></> : `Bed ${bed}`}
                                         </span>
                                     )}
                                     {hospStr && (
                                         <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700/80 px-2 py-0.5 rounded-full whitespace-nowrap border border-gray-200/80 dark:border-gray-600/50">
-                                            <SuffixedValue value={hospitalNumber} />
+                                            {highlightQuery ? <HighlightText text={hospitalNumber} query={highlightQuery} /> : <SuffixedValue value={hospitalNumber} />}
                                         </span>
                                     )}
                                     {critical && !isMortality && (
@@ -150,10 +173,10 @@ export default function PatientDetailModal({
                 </div>
 
                 {/* Body */}
-                <div className="px-5 py-4 flex-1 overflow-y-auto custom-scrollbar min-w-0 max-w-full bg-white dark:bg-gray-800">
+                <div ref={bodyRef} className="px-5 py-4 flex-1 overflow-y-auto custom-scrollbar min-w-0 max-w-full bg-white dark:bg-gray-800">
                     {note ? (
                         <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word]">
-                            {note}
+                            {highlightQuery ? <HighlightText text={note} query={highlightQuery} /> : note}
                         </p>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-24 gap-2 text-center">
