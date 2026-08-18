@@ -24,7 +24,7 @@ function compressMortality(p) {
 }
 
 export default function ExportModal({ patients, allPatients, listName, selectionCount, onClose, mortalities = [], discharges = [], dischargesResetDate = '', docs = [] }) {
-    const [copiedCsv, setCopiedCsv] = useState(false)
+    const [savedCsv, setSavedCsv] = useState(false)
     const [sharedCode, setSharedCode] = useState(false)
     const [copiedCode, setCopiedCode] = useState(false)
     const [shareError, setShareError] = useState('')
@@ -257,41 +257,6 @@ export default function ExportModal({ patients, allPatients, listName, selection
             })
             .join('\n\n')
 
-    const handleCopyCsv = async () => {
-        let headers, rows
-        if (isNotebookExport) {
-            headers = ['Diagnosis', 'PatientName', 'Ward', 'HospitalNumber', 'Notes', 'CreatedAt']
-            rows = (docs || []).map(d => [
-                `"${(d.diagnosis || d.patientDiagnosis || '').replace(/"/g, '""')}"`,
-                `"${(d.patientName || '').replace(/"/g, '""')}"`,
-                `"${(d.patientWard || '').replace(/"/g, '""')}"`,
-                `"${(d.patientHosp || '').replace(/"/g, '""')}"`,
-                `"${(d.text || '').replace(/"/g, '""')}"`,
-                `"${d.createdAt ? new Date(d.createdAt).toISOString() : ''}"`
-            ])
-        } else {
-            headers = ['Status', 'Ward', 'Bed', 'Name', 'HospitalNumber', 'Notes', 'Critical', 'RecordedAt']
-            rows = patients.map(p => [
-                p.reason === 'mortality' ? 'DECEASED' : 'ACTIVE',
-                p.ward || '',
-                p.bed || '',
-                p.name || '',
-                p.hospitalNumber || '',
-                `"${(p.note || '').replace(/"/g, '""')}"`,
-                p.critical ? 'YES' : 'NO',
-                p.removedAt ? `"${new Date(p.removedAt).toISOString()}"` : ''
-            ])
-        }
-        const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-        const ok = await copyToClipboard(csvContent)
-        if (ok) {
-            setCopiedCsv(true)
-            setTimeout(() => setCopiedCsv(false), 2500)
-        } else {
-            alert(csvContent)
-        }
-    }
-
     const handleShareCode = async () => {
         setShareError('')
         try {
@@ -478,17 +443,30 @@ export default function ExportModal({ patients, allPatients, listName, selection
     }
 
     const downloadCSV = async () => {
-        const headers = ['Status', 'Ward', 'Bed', 'Name', 'HospitalNumber', 'Notes', 'Critical', 'RecordedAt']
-        const rows = patients.map(p => [
-            p.reason === 'mortality' ? 'DECEASED' : 'ACTIVE',
-            p.ward || '',
-            p.bed || '',
-            p.name || '',
-            p.hospitalNumber || '',
-            `"${(p.note || '').replace(/"/g, '""')}"`,
-            p.critical ? 'YES' : 'NO',
-            p.removedAt ? `"${new Date(p.removedAt).toISOString()}"` : ''
-        ])
+        let headers, rows
+        if (isNotebookExport) {
+            headers = ['Diagnosis', 'PatientName', 'Ward', 'HospitalNumber', 'Notes', 'CreatedAt']
+            rows = (docs || []).map(d => [
+                `"${(d.diagnosis || d.patientDiagnosis || '').replace(/"/g, '""')}"`,
+                `"${(d.patientName || '').replace(/"/g, '""')}"`,
+                `"${(d.patientWard || '').replace(/"/g, '""')}"`,
+                `"${(d.patientHosp || '').replace(/"/g, '""')}"`,
+                `"${(d.text || '').replace(/"/g, '""')}"`,
+                `"${d.createdAt ? new Date(d.createdAt).toISOString() : ''}"`
+            ])
+        } else {
+            headers = ['Status', 'Ward', 'Bed', 'Name', 'HospitalNumber', 'Notes', 'Critical', 'RecordedAt']
+            rows = patients.map(p => [
+                p.reason === 'mortality' ? 'DECEASED' : 'ACTIVE',
+                p.ward || '',
+                p.bed || '',
+                p.name || '',
+                p.hospitalNumber || '',
+                `"${(p.note || '').replace(/"/g, '""')}"`,
+                p.critical ? 'YES' : 'NO',
+                p.removedAt ? `"${new Date(p.removedAt).toISOString()}"` : ''
+            ])
+        }
         const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
         const fileName = `Handover_${listName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
 
@@ -504,8 +482,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
                     title: `HOsNote CSV`,
                     url: result.uri,
                 });
-                setCopiedCsv(true)
-                setTimeout(() => setCopiedCsv(false), 2000)
+                setSavedCsv(true)
+                setTimeout(() => setSavedCsv(false), 2000)
                 return;
             } catch (e) {
                 console.error("Native CSV share failed:", e);
@@ -517,11 +495,14 @@ export default function ExportModal({ patients, allPatients, listName, selection
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.setAttribute('href', url)
-        link.setAttribute('download', `Handover_${listName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`)
+        link.setAttribute('download', fileName)
         link.style.visibility = 'hidden'
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        setSavedCsv(true)
+        setTimeout(() => setSavedCsv(false), 2000)
     }
 
     const handlePrint = () => {
@@ -700,15 +681,15 @@ export default function ExportModal({ patients, allPatients, listName, selection
                             </button>
                             <button
                                 className={`py-2 border rounded-xl font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] ${
-                                    copiedCsv
+                                    savedCsv
                                         ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 text-emerald-700 dark:text-emerald-400'
                                         : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-300'
                                 }`}
-                                onClick={handleCopyCsv}
+                                onClick={downloadCSV}
                             >
-                                {copiedCsv
-                                    ? <><CheckCircle size={13} className="text-emerald-500" /> Copied!</>
-                                    : <><Copy size={13} className="text-gray-400" /> Copy CSV</>
+                                {savedCsv
+                                    ? <><CheckCircle size={13} className="text-emerald-500" /> Saved!</>
+                                    : <><Download size={13} className="text-gray-400" /> Save CSV</>
                                 }
                             </button>
                         </div>
