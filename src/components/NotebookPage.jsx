@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, memo, useRef, useCallback } from 'react'
-import { Edit2, Trash2, BookOpen, X, ArrowUpDown, User, StickyNote, CheckCircle2, QrCode, Send, ChevronUp, ChevronDown } from 'lucide-react'
+import { Edit2, Trash2, BookOpen, X, User, StickyNote, CheckCircle2, QrCode, Send, ChevronUp, ChevronDown } from 'lucide-react'
 import { formatSmartDate, formatSmartDateParts, formatFullDate } from '../utils/formatSmartDate'
 import AddPatientForm from './AddPatientForm'
 
@@ -720,12 +720,11 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                         </div>
 
                         {/* Right: Sort controls */}
-                        <div className="flex items-center gap-1">
-                            <ArrowUpDown size={13} className="text-gray-400 flex-shrink-0" />
+                        <div className="flex items-center">
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value)}
-                                className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 dark:ring-blue-700"
+                                className="text-[10px] text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-0 rounded-md px-1.5 py-0.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-300 dark:ring-blue-700"
                                 aria-label="Sort notes by"
                             >
                                 {NOTE_SORT_OPTIONS.map((opt) => (

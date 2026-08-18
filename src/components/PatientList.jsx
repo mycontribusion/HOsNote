@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react'
 import PatientCard from './PatientCard'
 import PatientDetailModal from './PatientDetailModal'
-import { ArrowUpDown, ChevronDown, ChevronRight, RotateCcw, CheckSquare, Square } from 'lucide-react'
+import { ChevronDown, ChevronRight, RotateCcw, CheckSquare, Square } from 'lucide-react'
 
 const SORT_OPTIONS = [
     { value: 'none',    label: 'Default' },
@@ -138,12 +138,11 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                     </button>
 
                     {/* Sort dropdown */}
-                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/60 rounded-lg px-2 py-1 border border-gray-200/60 dark:border-gray-600/40">
-                        <ArrowUpDown size={11} className="text-gray-400 flex-shrink-0" />
+                    <div className="flex items-center bg-gray-100 dark:bg-gray-700/60 rounded-md px-1.5 py-0.5 border border-gray-200/60 dark:border-gray-600/40">
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
-                            className="text-[11px] text-gray-600 dark:text-gray-300 font-bold bg-transparent border-0 cursor-pointer focus:outline-none"
+                            className="text-[10px] text-gray-600 dark:text-gray-300 font-bold bg-transparent border-0 cursor-pointer focus:outline-none"
                             aria-label="Sort patients by"
                         >
                             {SORT_OPTIONS.map((opt) => (
