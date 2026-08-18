@@ -79,14 +79,22 @@ export default function ExportModal({ patients, allPatients, listName, selection
 
     // 2. Full Data: Includes everything for Copy/Paste sharing
     const fullCompressed = isNotebookExport
-        ? (docs || []).map(d => ({
-            t: d.text,
-            diagnosis: d.diagnosis || d.patientDiagnosis,
-            n: d.patientName,
-            w: d.patientWard,
-            h: d.patientHosp,
-            ca: d.createdAt,
-        }))
+        ? {
+            type: 'notebook',
+            listName: listName || 'Notebook',
+            docs: (docs || []).map(d => ({
+                id: d.id || '',
+                c: d.color || 'blue',
+                diagnosis: d.diagnosis || d.patientDiagnosis || '',
+                n: d.patientName || '',
+                w: d.patientWard || '',
+                h: d.patientHosp || '',
+                t: d.text || '',
+                ca: d.createdAt || '',
+                ua: d.updatedAt || '',
+                patientId: d.patientId || ''
+            }))
+        }
         : patients.map((p) => {
             const obj = {}
             if (p.id) obj.id = p.id

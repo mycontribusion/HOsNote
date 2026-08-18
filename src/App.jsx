@@ -843,8 +843,7 @@ const pendingEditRef = useRef(null)
     }, [activeTab, patients, mortalities, discharges])
 
     // Merge imported patients, deduplicate
-    // Merge imported patients, deduplicate
-    const importPatients = useCallback((incoming, incomingDocs = []) => {
+    const importPatients = useCallback((incoming = [], incomingDocs = []) => {
         const conflicts = [];
         const newOnes = [];
         const isMortalityTab = activeTab === 'mortalities';
@@ -854,10 +853,28 @@ const pendingEditRef = useRef(null)
         // `id` (e.g. the "Share Code" payload omits ids). Keyed by a normalized
         // identity string so docs can still attach to the right imported patient.
         const identityToNewIdMap = {};
-        const identityKey = (name, ward, hosp) =>
-            `${(name || '').trim().toLowerCase()}|${(ward || '').trim().toUpperCase()}|${(hosp || '').trim().toLowerCase()}`;
+        const identityKey = (name, ward, hosp) => {
+            const n = (name || '').trim().toLowerCase();
+            const w = (ward || '').trim().toUpperCase();
+            const h = (hosp || '').trim().toLowerCase();
+            if (!n && !w && !h) return null;
+            return `${n}|${w}|${h}`;
+        };
 
-        incoming.forEach(_p => {
+        const actualIncoming = [];
+        const actualDocs = Array.isArray(incomingDocs) ? [...incomingDocs] : [];
+
+        if (Array.isArray(incoming)) {
+            incoming.forEach(item => {
+                if (item && typeof item === 'object' && !Array.isArray(item) && (item.t || item.text) && !item.b && !item.bed && item.reason === undefined && !item.hospitalNumber && !item.ward) {
+                    actualDocs.push(item);
+                } else {
+                    actualIncoming.push(item);
+                }
+            });
+        }
+
+        actualIncoming.forEach(_p => {
             // Support both the ultra-compact positional array format
             // [ward, bed, name, hospNo, criticalFlag, mortalityFlag, admissionDate, note, removedAt, lastUpdated]
             // and the legacy object format ({w,b,n,h,c,m,u,ad,...}).
@@ -907,7 +924,10 @@ const pendingEditRef = useRef(null)
             }
             // Always record an identity-based mapping so docs can be linked
             // even when the exported patient carried no `id`.
-            identityToNewIdMap[identityKey(p.name, p.ward, p.hospitalNumber)] = generatedId;
+            const pKey = identityKey(p.name, p.ward, p.hospitalNumber);
+            if (pKey) {
+                identityToNewIdMap[pKey] = generatedId;
+            }
 
             let existingMatch = null;
             const duplicateFields = [];
@@ -942,7 +962,7 @@ const pendingEditRef = useRef(null)
         });
 
         if (conflicts.length > 0) {
-            setPendingImport({ conflicts, newOnes, incomingDocs, oldIdToNewIdMap, identityToNewIdMap });
+            setPendingImport({ conflicts, newOnes, incomingDocs: actualDocs, oldIdToNewIdMap, identityToNewIdMap });
             setShowScanner(false);
             return false;
         } else {
@@ -955,10 +975,10 @@ const pendingEditRef = useRef(null)
                 setMortalities(prev => [...prev, ...incomingMortalities]);
             }
 
-            if (incomingDocs && incomingDocs.length > 0) {
+            if (actualDocs && actualDocs.length > 0) {
                 setDocs(prev => {
                     const nextDocs = [...prev];
-                    incomingDocs.forEach(_d => {
+                    actualDocs.forEach(_d => {
                         let d;
                         if (Array.isArray(_d)) {
                             const [id, color, diagnosis, patientName, patientWard, patientHosp, text, createdAt, updatedAt, patientId] = _d;
@@ -974,24 +994,39 @@ const pendingEditRef = useRef(null)
 
                         if (!docText) return;
 
-                        const newPatientId = d.patientId
-                            ? (oldIdToNewIdMap[d.patientId] || identityToNewIdMap[identityKey(docName, docWard, docHosp)] || null)
-                            : (identityToNewIdMap[identityKey(docName, docWard, docHosp)] || null);
+                        const docKey = identityKey(docName, docWard, docHosp);
+
+                        let newPatientId = null;
+                        if (d.patientId && oldIdToNewIdMap[d.patientId]) {
+                            newPatientId = oldIdToNewIdMap[d.patientId];
+                        } else if (docKey && identityToNewIdMap[docKey]) {
+                            newPatientId = identityToNewIdMap[docKey];
+                        } else if (docHosp) {
+                            const match = patients.find(ex => ex.hospitalNumber === docHosp) ||
+                                          mortalities.find(ex => ex.hospitalNumber === docHosp);
+                            if (match) newPatientId = match.id;
+                        } else if (docName && docWard) {
+                            const match = patients.find(ex => ex.name?.trim().toLowerCase() === docName.toLowerCase() && ex.ward?.trim().toUpperCase() === docWard.toUpperCase()) ||
+                                          mortalities.find(ex => ex.name?.trim().toLowerCase() === docName.toLowerCase() && ex.ward?.trim().toUpperCase() === docWard.toUpperCase());
+                            if (match) newPatientId = match.id;
+                        }
 
                         const isDuplicate = nextDocs.some(ex =>
                             ex.text.trim() === docText &&
                             (ex.diagnosis || '').trim() === docDiag &&
-                            (ex.patientName || '').trim() === docName
+                            (ex.patientName || '').trim() === docName &&
+                            (ex.patientHosp || '').trim() === docHosp
                         );
 
                         if (!isDuplicate) {
                             nextDocs.unshift({
-                                id: generateId(),
+                                id: d.id || generateId(),
                                 patientId: newPatientId,
                                 patientName: docName,
                                 patientWard: docWard,
                                 patientHosp: docHosp,
                                 diagnosis: docDiag,
+                                patientDiagnosis: docDiag,
                                 text: docText,
                                 color: d.c || d.color || 'blue',
                                 createdAt: d.ca || d.createdAt || new Date().toISOString(),
@@ -1018,8 +1053,13 @@ const pendingEditRef = useRef(null)
         const addedOrUpdatedIds = new Set(newOnes.map(p => p.id));
         const finalMap = { ...(pendingImport?.oldIdToNewIdMap || {}) };
         const identityMap = { ...(pendingImport?.identityToNewIdMap || {}) };
-        const identityKey = (name, ward, hosp) =>
-            `${(name || '').trim().toLowerCase()}|${(ward || '').trim().toUpperCase()}|${(hosp || '').trim().toLowerCase()}`;
+        const identityKey = (name, ward, hosp) => {
+            const n = (name || '').trim().toLowerCase();
+            const w = (ward || '').trim().toUpperCase();
+            const h = (hosp || '').trim().toLowerCase();
+            if (!n && !w && !h) return null;
+            return `${n}|${w}|${h}`;
+        };
 
         resolvedConflicts.forEach(res => {
             const p = res.imported;
@@ -1040,12 +1080,14 @@ const pendingEditRef = useRef(null)
                     }
                 });
                 addedOrUpdatedIds.add(cleanP.id);
-                identityMap[identityKey(cleanP.name, cleanP.ward, cleanP.hospitalNumber)] = cleanP.id;
+                const pKey = identityKey(cleanP.name, cleanP.ward, cleanP.hospitalNumber);
+                if (pKey) identityMap[pKey] = cleanP.id;
                 if (cleanP.reason === 'mortality') toAddMortality.push(cleanP);
                 else toAddActive.push(cleanP);
             } else if (res.action === 'update') {
                 addedOrUpdatedIds.add(res.existing.id);
-                identityMap[identityKey(p.name, p.ward, p.hospitalNumber)] = res.existing.id;
+                const pKey = identityKey(p.name, p.ward, p.hospitalNumber);
+                if (pKey) identityMap[pKey] = res.existing.id;
                 if (oldId) {
                     finalMap[oldId] = res.existing.id;
                 }
@@ -1072,29 +1114,60 @@ const pendingEditRef = useRef(null)
         if (incomingDocs && incomingDocs.length > 0) {
             setDocs(prev => {
                 const nextDocs = [...prev];
-                incomingDocs.forEach(d => {
-                    // Support both compact keys (n/w/h/t/c/ca/ua) and legacy keys
-                    const docName = d.n || d.patientName || '';
-                    const docWard = d.w || d.patientWard || '';
-                    const docHosp = d.h || d.patientHosp || '';
-                    const docText = d.t || d.text || '';
-                    const newPatientId = finalMap[d.patientId]
-                        || identityMap[identityKey(docName, docWard, docHosp)];
-                    if (newPatientId && addedOrUpdatedIds.has(newPatientId)) {
-                        const isDuplicate = nextDocs.some(ex => ex.patientId === newPatientId && ex.text.trim() === docText.trim());
-                        if (!isDuplicate) {
-                            nextDocs.unshift({
-                                id: generateId(),
-                                patientId: newPatientId,
-                                patientName: docName,
-                                patientWard: docWard,
-                                patientHosp: docHosp,
-                                text: docText,
-                                color: d.c || d.color || 'blue',
-                                createdAt: d.ca || d.createdAt || new Date().toISOString(),
-                                updatedAt: d.ua || d.updatedAt || new Date().toISOString(),
-                            });
-                        }
+                incomingDocs.forEach(_d => {
+                    let d;
+                    if (Array.isArray(_d)) {
+                        const [id, color, diagnosis, patientName, patientWard, patientHosp, text, createdAt, updatedAt, patientId] = _d;
+                        d = { id, color, diagnosis, patientName, patientWard, patientHosp, text, createdAt, updatedAt, patientId };
+                    } else {
+                        d = _d;
+                    }
+                    const docName = (d.n || d.patientName || '').trim();
+                    const docWard = (d.w || d.patientWard || '').trim();
+                    const docHosp = (d.h || d.patientHosp || '').trim();
+                    const docText = (d.t || d.text || '').trim();
+                    const docDiag = (d.diagnosis || d.patientDiagnosis || '').trim();
+
+                    if (!docText) return;
+
+                    const docKey = identityKey(docName, docWard, docHosp);
+
+                    let newPatientId = null;
+                    if (d.patientId && finalMap[d.patientId]) {
+                        newPatientId = finalMap[d.patientId];
+                    } else if (docKey && identityMap[docKey]) {
+                        newPatientId = identityMap[docKey];
+                    } else if (docHosp) {
+                        const match = nextPatients.find(ex => ex.hospitalNumber === docHosp) ||
+                                      nextMortalities.find(ex => ex.hospitalNumber === docHosp);
+                        if (match) newPatientId = match.id;
+                    } else if (docName && docWard) {
+                        const match = nextPatients.find(ex => ex.name?.trim().toLowerCase() === docName.toLowerCase() && ex.ward?.trim().toUpperCase() === docWard.toUpperCase()) ||
+                                      nextMortalities.find(ex => ex.name?.trim().toLowerCase() === docName.toLowerCase() && ex.ward?.trim().toUpperCase() === docWard.toUpperCase());
+                        if (match) newPatientId = match.id;
+                    }
+
+                    const isDuplicate = nextDocs.some(ex =>
+                        ex.text.trim() === docText &&
+                        (ex.diagnosis || '').trim() === docDiag &&
+                        (ex.patientName || '').trim() === docName &&
+                        (ex.patientHosp || '').trim() === docHosp
+                    );
+
+                    if (!isDuplicate) {
+                        nextDocs.unshift({
+                            id: d.id || generateId(),
+                            patientId: newPatientId,
+                            patientName: docName,
+                            patientWard: docWard,
+                            patientHosp: docHosp,
+                            diagnosis: docDiag,
+                            patientDiagnosis: docDiag,
+                            text: docText,
+                            color: d.c || d.color || 'blue',
+                            createdAt: d.ca || d.createdAt || new Date().toISOString(),
+                            updatedAt: d.ua || d.updatedAt || new Date().toISOString(),
+                        });
                     }
                 });
                 return nextDocs;

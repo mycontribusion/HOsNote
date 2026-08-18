@@ -299,7 +299,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             const parsed = JSON.parse(cleaned)
             if (Array.isArray(parsed)) {
                 parsedPayload = { incoming: parsed, docs: [] }
-            } else if (parsed && typeof parsed === 'object' && (parsed.patients || parsed.mortalities)) {
+            } else if (parsed && typeof parsed === 'object' && (parsed.patients || parsed.mortalities || parsed.docs)) {
                 parsedPayload = {
                     incoming: [...(parsed.patients || []), ...(parsed.mortalities || [])],
                     docs: parsed.docs || []
@@ -307,14 +307,15 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             }
         } catch { }
 
-        if (parsedPayload) {
+        if (parsedPayload && (parsedPayload.incoming.length > 0 || parsedPayload.docs.length > 0)) {
             isProcessingRef.current = true
             quickScanDoneRef.current = true
             transferDoneRef.current = true
             try { scannerRef.current?.pause(true) } catch (e) { }
 
+            const totalCount = parsedPayload.incoming.length + parsedPayload.docs.length;
             setStatus('success')
-            setStatusMsg(`Found ${parsedPayload.incoming.length} patient record${parsedPayload.incoming.length !== 1 ? 's' : ''}! Receiving…`)
+            setStatusMsg(`Found ${totalCount} record${totalCount !== 1 ? 's' : ''}! Receiving…`)
             setTimeout(() => {
                 if (mountedRef.current) {
                     const success = onImport(parsedPayload.incoming, parsedPayload.docs)
@@ -561,9 +562,10 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
                 const incomingDocs = parsed.docs || []
                 console.log('[PASTE IMPORT DIAGNOSTIC] Object payload, patients:', incoming.length, 'docs:', incomingDocs.length)
-                if (incoming.length > 0) {
+                if (incoming.length > 0 || incomingDocs.length > 0) {
+                    const totalCount = incoming.length + incomingDocs.length;
                     setStatus('success')
-                    setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
+                    setStatusMsg(`Loaded ${totalCount} record${totalCount !== 1 ? 's' : ''}! Importing…`)
                     setTimeout(() => {
                         if (mountedRef.current) {
                             const success = onImport(incoming, incomingDocs)

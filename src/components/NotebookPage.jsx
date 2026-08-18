@@ -593,8 +593,12 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
     }, [sortBy, noteFilter])
 
     const filteredDocs = useMemo(() => {
-        if (noteFilter === 'patient') return docs.filter(d => d.patientId != null || (d.patientName || d.patientWard || d.patientHosp))
-        if (noteFilter === 'standalone') return docs.filter(d => d.patientId == null && !(d.patientName || d.patientWard || d.patientHosp))
+        if (noteFilter === 'patient') {
+            return docs.filter(d => d.patientId != null || Boolean(d.patientName?.trim() || d.patientWard?.trim() || d.patientHosp?.trim()))
+        }
+        if (noteFilter === 'standalone') {
+            return docs.filter(d => d.patientId == null && !d.patientName?.trim() && !d.patientWard?.trim() && !d.patientHosp?.trim())
+        }
         return docs
     }, [docs, noteFilter])
 
