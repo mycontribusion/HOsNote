@@ -257,8 +257,27 @@ const pendingEditRef = useRef(null)
                     }
                 })
                 const allDocs = [...storedDocs, ...migrated]
-                if (migrated.length > 0) await set(DOCUMENTATION_KEY, allDocs)
-                setDocs(allDocs)
+                // One-time migration: link imported docs that have patient biodata
+                // but no patientId to the correct patient record
+                const identityKey = (name, ward, hosp) =>
+                    `${(name || '').trim().toLowerCase()}|${(ward || '').trim().toUpperCase()}|${(hosp || '').trim().toLowerCase()}`;
+                const patientIdentityMap = {};
+                pts.forEach(p => {
+                    patientIdentityMap[identityKey(p.name, p.ward, p.hospitalNumber)] = p.id;
+                });
+                const linkedDocs = allDocs.map(d => {
+                    if (d.patientId) return d;
+                    const key = identityKey(d.patientName, d.patientWard, d.patientHosp);
+                    const matchedId = patientIdentityMap[key];
+                    if (matchedId) {
+                        return { ...d, patientId: matchedId };
+                    }
+                    return d;
+                });
+                const hasLinked = linkedDocs.some((d, i) => d.patientId !== allDocs[i]?.patientId);
+                const finalDocs = hasLinked ? linkedDocs : allDocs;
+                if (hasLinked) await set(DOCUMENTATION_KEY, finalDocs)
+                setDocs(finalDocs)
 
             } catch (err) {
                 console.error("Failed to load data from IndexedDB", err)
