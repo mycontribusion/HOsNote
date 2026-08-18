@@ -257,27 +257,42 @@ const pendingEditRef = useRef(null)
                     }
                 })
                 const allDocs = [...storedDocs, ...migrated]
-                // One-time migration: link imported docs that have patient biodata
-                // but no patientId to the correct patient record
-                const identityKey = (name, ward, hosp) =>
-                    `${(name || '').trim().toLowerCase()}|${(ward || '').trim().toUpperCase()}|${(hosp || '').trim().toLowerCase()}`;
+                // One-time migration & repair: link imported docs with patient biodata, and clean up falsely assigned patientIds on standalone notes
+                const identityKey = (name, ward, hosp) => {
+                    const n = (name || '').trim().toLowerCase();
+                    const w = (ward || '').trim().toUpperCase();
+                    const h = (hosp || '').trim().toLowerCase();
+                    if (!n && !w && !h) return null;
+                    return `${n}|${w}|${h}`;
+                };
                 const patientIdentityMap = {};
-                pts.forEach(p => {
-                    patientIdentityMap[identityKey(p.name, p.ward, p.hospitalNumber)] = p.id;
+                [...pts, ...morts].forEach(p => {
+                    const k = identityKey(p.name, p.ward, p.hospitalNumber);
+                    if (k) patientIdentityMap[k] = p.id;
                 });
                 const linkedDocs = allDocs.map(d => {
-                    if (d.patientId) return d;
-                    const key = identityKey(d.patientName, d.patientWard, d.patientHosp);
-                    const matchedId = patientIdentityMap[key];
-                    if (matchedId) {
-                        return { ...d, patientId: matchedId };
+                    const hasBiodata = Boolean(d.patientName?.trim() || d.patientWard?.trim() || d.patientHosp?.trim());
+                    if (!hasBiodata) {
+                        // Standalone note: ensure patientId is null
+                        if (d.patientId !== null && d.patientId !== undefined) {
+                            return { ...d, patientId: null };
+                        }
+                        return d;
+                    }
+                    // Patient note: if missing patientId, attempt to link by identity
+                    if (!d.patientId) {
+                        const key = identityKey(d.patientName, d.patientWard, d.patientHosp);
+                        const matchedId = key ? patientIdentityMap[key] : null;
+                        if (matchedId) {
+                            return { ...d, patientId: matchedId };
+                        }
                     }
                     return d;
                 });
-                const hasLinked = linkedDocs.some((d, i) => d.patientId !== allDocs[i]?.patientId);
-                const finalDocs = hasLinked ? linkedDocs : allDocs;
-                if (hasLinked) await set(DOCUMENTATION_KEY, finalDocs)
-                setDocs(finalDocs)
+                const hasChanged = linkedDocs.some((d, i) => d.patientId !== allDocs[i]?.patientId);
+                const finalDocs = hasChanged ? linkedDocs : allDocs;
+                if (hasChanged) await set(DOCUMENTATION_KEY, finalDocs);
+                setDocs(finalDocs);
 
             } catch (err) {
                 console.error("Failed to load data from IndexedDB", err)
