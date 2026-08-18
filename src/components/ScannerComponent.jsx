@@ -752,7 +752,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     {cameraMode === 'camera' ? (
                         <div className="flex-1 min-h-0 flex flex-col gap-3">
                             {/* QR/Barcode Viewer */}
-                            <div className="w-full max-w-[300px] aspect-square mx-auto rounded-xl overflow-hidden bg-gray-900 relative shadow-inner">
+                            <div className="w-full max-w-[320px] aspect-square mx-auto rounded-xl overflow-hidden bg-gray-900 relative shadow-inner">
                                 <div id="qr-reader" className="w-full h-full object-cover [&>video]:object-cover [&>video]:h-full" />
                                 {status === 'scanning' && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

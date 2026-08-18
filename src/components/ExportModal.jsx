@@ -599,7 +599,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                             : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/40'
                     }`}>
                         {effectiveQrMode === 'compact' ? (
-                            <div className="w-full max-w-[280px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200/80 dark:border-gray-700 flex items-center justify-center">
+                            <div className="w-full max-w-[300px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200/80 dark:border-gray-700 flex items-center justify-center">
                                 {qrData.length > 2300 ? (
                                     <div className="text-center px-4">
                                         <p className="text-2xl mb-2">⚠️</p>
@@ -611,7 +611,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                                 )}
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center w-full max-w-[280px]">
+                            <div className="flex flex-col items-center w-full max-w-[300px]">
                                 <div className="w-full flex items-center justify-between mb-2">
                                     <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">
                                         {frameIdx + 1} / {frames.length}
