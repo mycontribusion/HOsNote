@@ -673,7 +673,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
     return (
         <div className="modal-backdrop p-2 sm:p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[90vh] shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
+            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col h-[88dvh] sm:h-[90vh] shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
 
                 {/* Header — matches app's blue-700 header */}
                 <div className="bg-blue-700 dark:bg-gray-900 px-4 pt-4 pb-3 shrink-0">
@@ -697,8 +697,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         </button>
                     </div>
 
-                    {/* Mode Selector — inside header */}
-                    <div className="flex bg-blue-800/50 dark:bg-gray-800/50 p-1 rounded-lg mt-3">
+                    {/* Mode Selector — inside header (scan mode buttons hidden in notebook view) */}
+                    <div className={`flex bg-blue-800/50 dark:bg-gray-800/50 p-1 rounded-lg mt-3 ${listName === 'Notebook' && cameraMode === 'camera' ? 'invisible' : ''}`}>
                         {cameraMode === 'camera' ? (
                             <>
                                 <button
@@ -747,12 +747,12 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 />
 
                 {/* Body */}
-                <div className="flex-1 min-h-0 flex flex-col gap-3 p-4 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 min-h-0 flex flex-col gap-3 p-4 overflow-hidden">
 
                     {cameraMode === 'camera' ? (
-                        <div className="flex flex-col gap-3 shrink-0">
+                        <div className="flex-1 min-h-0 flex flex-col gap-3">
                             {/* QR/Barcode Viewer */}
-                            <div className="w-full max-w-[320px] aspect-square mx-auto rounded-xl overflow-hidden bg-gray-900 relative shadow-inner">
+                            <div className="w-full max-w-[300px] aspect-square mx-auto rounded-xl overflow-hidden bg-gray-900 relative shadow-inner">
                                 <div id="qr-reader" className="w-full h-full object-cover [&>video]:object-cover [&>video]:h-full" />
                                 {status === 'scanning' && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -823,7 +823,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-3 h-full">
+                        <div className="flex flex-col gap-3 flex-1 min-h-0">
                             <textarea
                                 className="w-full flex-1 min-h-0 rounded-xl border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 px-3 py-3 text-xs font-mono text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40 resize-none shadow-sm"
                                 placeholder={scanMode === 'import'

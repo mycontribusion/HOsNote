@@ -29,6 +29,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const [copiedCode, setCopiedCode] = useState(false)
     const [shareError, setShareError] = useState('')
     const [qrMode, setQrMode] = useState('compact') // 'compact' | 'full'
+    const effectiveQrMode = listName === 'Notebook' ? 'full' : qrMode
 
     // Stable session id for the Full Transfer animation. It MUST stay constant
     // for the entire lifetime of this modal so every animated frame carries the
@@ -529,7 +530,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
 
     return (
         <div className="modal-backdrop p-2 sm:p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[90vh] shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="export-title">
+            <div className="modal-box max-w-sm w-full p-0 overflow-hidden flex flex-col h-[88dvh] sm:h-[90vh] shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="export-title">
 
                 {/* Header */}
                 <div className="bg-gradient-to-r from-blue-700 to-blue-800 dark:from-gray-900 dark:to-gray-900 px-4 pt-4 pb-3 shrink-0">
@@ -563,8 +564,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
                         </button>
                     </div>
 
-                    {/* QR Mode Tabs */}
-                    <div className="flex bg-blue-900/50 dark:bg-gray-800/60 p-1 rounded-xl mt-3 gap-0.5">
+                    {/* QR Mode Tabs — hidden in notebook view (always Full Transfer) */}
+                    <div className={`flex bg-blue-900/50 dark:bg-gray-800/60 p-1 rounded-xl mt-3 gap-0.5 ${listName === 'Notebook' ? 'invisible' : ''}`}>
                         <button
                             className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                                 qrMode === 'compact'
@@ -589,16 +590,16 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 min-h-0 flex flex-col gap-4 p-4 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 min-h-0 flex flex-col gap-4 p-4 overflow-hidden">
 
                     {/* QR Display Area */}
-                    <div className={`flex flex-col items-center justify-center rounded-2xl p-3.5 shrink-0 ${
-                        qrMode === 'full'
+                    <div className={`flex-1 min-h-0 flex flex-col items-center justify-center rounded-2xl p-3.5 ${
+                        effectiveQrMode === 'full'
                             ? 'bg-blue-50/80 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30'
                             : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/40'
                     }`}>
-                        {qrMode === 'compact' ? (
-                            <div className="w-full max-w-[300px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200/80 dark:border-gray-700 flex items-center justify-center">
+                        {effectiveQrMode === 'compact' ? (
+                            <div className="w-full max-w-[280px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200/80 dark:border-gray-700 flex items-center justify-center">
                                 {qrData.length > 2300 ? (
                                     <div className="text-center px-4">
                                         <p className="text-2xl mb-2">⚠️</p>
@@ -610,7 +611,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                                 )}
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center w-full max-w-[300px]">
+                            <div className="flex flex-col items-center w-full max-w-[280px]">
                                 <div className="w-full flex items-center justify-between mb-2">
                                     <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">
                                         {frameIdx + 1} / {frames.length}
