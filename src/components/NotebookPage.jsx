@@ -122,7 +122,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
                                         </span>
                                     )}
                                     {wardStr && (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap ${badge}`}>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap ${badge}`} title={wardStr}>
                                             {wardStr}
                                         </span>
                                     )}
@@ -360,7 +360,7 @@ const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionM
                                 {hospStr}
                             </span>
                         ) : wardStr ? (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`}>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`} title={wardStr}>
                                 {wardStr}
                             </span>
                         ) : null}

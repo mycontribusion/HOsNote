@@ -98,7 +98,7 @@ export default function PatientDetailModal({
                                         </span>
                                     )}
                                     {wardStr && (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap ${pillColor}`}>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-normal break-all ${pillColor}`}>
                                             {wardStr}
                                         </span>
                                     )}

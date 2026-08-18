@@ -141,7 +141,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             ]
         })
 
-        const transferDocs = (docs || []).map(d => [
+        const transferDocs = isNotebook ? (docs || []).map(d => [
             d.id || '',
             d.color || 'blue',
             d.diagnosis || d.patientDiagnosis || '',
@@ -152,7 +152,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             d.createdAt || '',
             d.updatedAt || '',
             d.patientId || ''
-        ])
+        ]) : []
 
         return {
             __sid: sid,
@@ -185,7 +185,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             ]
         })
 
-        const shareDocs = (docs || []).map(d => ({
+        const shareDocs = isNotebook ? (docs || []).map(d => ({
             id: d.id || '',
             color: d.color || 'blue',
             diagnosis: d.diagnosis || d.patientDiagnosis || '',
@@ -196,7 +196,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             createdAt: d.createdAt || '',
             updatedAt: d.updatedAt || '',
             patientId: d.patientId || ''
-        }))
+        })) : []
 
         return {
             type: isNotebook ? 'notebook' : 'patients',

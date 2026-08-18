@@ -177,7 +177,7 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
                                                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                                                             {patient.name || 'Unnamed'}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={patient.ward ? `Ward ${patient.ward}${patient.bed ? ` · Bed ${patient.bed}` : ''}${patient.hospitalNumber ? ` · ${patient.hospitalNumber}` : ''}` : ''}>
                                                             {patient.ward && patient.bed
                                                                 ? `Ward ${patient.ward} · Bed `
                                                                 : (patient.ward || patient.bed ? '' : 'No ward/bed')}
@@ -207,7 +207,7 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
                                                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                                                             {patient.name || 'Unnamed'}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={patient.ward ? `Ward ${patient.ward}${patient.bed ? ` · Bed ${patient.bed}` : ''}${patient.hospitalNumber ? ` · ${patient.hospitalNumber}` : ''}` : ''}>
                                                             {patient.ward && patient.bed
                                                                 ? `Ward ${patient.ward} · Bed `
                                                                 : (patient.ward || patient.bed ? '' : 'No ward/bed')}
@@ -274,7 +274,7 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
                                                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                                                             {patient.name || 'Unnamed'}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={patient.ward ? `Ward ${patient.ward}${patient.bed ? ` · Bed ${patient.bed}` : ''}${patient.hospitalNumber ? ` · ${patient.hospitalNumber}` : ''}` : ''}>
                                                             {patient.ward && patient.bed
                                                                 ? `Ward ${patient.ward} · Bed `
                                                                 : (patient.ward || patient.bed ? '' : 'No ward/bed')}

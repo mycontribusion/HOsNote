@@ -265,7 +265,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                         <div className={`flex flex-col items-center justify-center rounded-2xl border-2 px-2.5 py-2 text-center w-[60px] min-h-[60px] shadow-sm ${badgeColor} relative overflow-hidden transition-all duration-200`}>
                             {ward || bed ? (
                                 <>
-                                    {ward && <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-none mb-1 truncate max-w-full">{ward}</div>}
+                                    {ward && <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-none mb-1 truncate max-w-full" title={ward}>{ward}</div>}
                                     {bed && <div className="text-[22px] font-black leading-tight"><SuffixedValue value={bed} /></div>}
                                     {!bed && ward && <div className="text-[22px] font-black leading-tight">—</div>}
                                 </>

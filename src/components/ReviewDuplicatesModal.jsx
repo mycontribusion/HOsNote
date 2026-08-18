@@ -61,7 +61,7 @@ export default function ReviewDuplicatesModal({ pendingImport, onResolve, onCanc
                                     <div className="font-semibold text-gray-900 mb-1">{p.name || 'Unnamed'}</div>
                                     <div className="text-xs text-gray-500 mb-3 space-y-1">
                                         {p.hospitalNumber && <div>Hosp ID: <span className="font-medium text-gray-700"><SuffixedValue value={p.hospitalNumber} /></span></div>}
-                                        {p.ward && <div>Ward/Bed: <span className="font-medium text-gray-700">{p.ward} <SuffixedValue value={p.bed} /></span></div>}
+                                        {p.ward && <div>Ward/Bed: <span className="font-medium text-gray-700 whitespace-normal break-all">{p.ward} <SuffixedValue value={p.bed} /></span></div>}
                                     </div>
 
                                     {conflict.duplicateFields && conflict.duplicateFields.length > 0 && (

@@ -63,7 +63,7 @@ export default function DuplicatePromptModal({ duplicate, onAddAsNew, onCancel }
                                         </p>
                                         {duplicate.existingBed.ward && duplicate.existingBed.bed && (
                                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                Ward/Bed: <span className="font-medium">{duplicate.existingBed.ward} <SuffixedValue value={duplicate.existingBed.bed} /></span>
+                                                Ward/Bed: <span className="font-medium whitespace-normal break-all">{duplicate.existingBed.ward} <SuffixedValue value={duplicate.existingBed.bed} /></span>
                                             </p>
                                         )}
                                     </div>
@@ -81,7 +81,7 @@ export default function DuplicatePromptModal({ duplicate, onAddAsNew, onCancel }
                                 )}
                                 {!isHosp && existing.ward && existing.bed && (
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        Ward/Bed: <span className="font-medium">{existing.ward} <SuffixedValue value={existing.bed} /></span>
+                                        Ward/Bed: <span className="font-medium whitespace-normal break-all">{existing.ward} <SuffixedValue value={existing.bed} /></span>
                                     </p>
                                 )}
                             </div>

@@ -59,7 +59,7 @@ function PrintView({ patients, listName }) {
                 <tbody>
                     {patients.map(p => (
                         <tr key={p.id} className={p.critical ? 'critical-row' : ''}>
-                            <td className="font-bold">{p.ward}</td>
+                            <td className="font-bold whitespace-normal break-all">{p.ward}</td>
                             <td className="font-bold">{p.bed}</td>
                             <td>
                                 {p.critical && <span className="critical-tag">CRITICAL</span>}
