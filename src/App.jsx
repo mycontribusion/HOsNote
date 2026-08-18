@@ -311,7 +311,9 @@ const pendingEditRef = useRef(null)
     const [showFeedback, setShowFeedback] = useState(false)
     const [showSettings, setShowSettings] = useState(false)
     const [showSearch, setShowSearch] = useState(false)
+    const searchReturnPathRef = useRef('/team/my_team')
     const [initialSelectedDocId, setInitialSelectedDocId] = useState(null)
+    const [reviewedExpandTrigger, setReviewedExpandTrigger] = useState(0)
     const [notebookSearchHighlight, setNotebookSearchHighlight] = useState('')
     const [searchHighlightField, setSearchHighlightField] = useState(null)
     const [searchHighlightQuery, setSearchHighlightQuery] = useState('')
@@ -1245,6 +1247,7 @@ const pendingEditRef = useRef(null)
     }, [selectedPatientIds, activePatients])
 
     const navigateToPatient = useCallback((patientId, highlightField, highlightQuery, targetTeam) => {
+        setMortalitiesOnly(false)
         // Determine target tab based on patient team
         let targetTab = activeTab
         if (targetTeam === 'mortalities') {
@@ -1257,36 +1260,42 @@ const pendingEditRef = useRef(null)
 
         // Navigate to correct tab if needed
         if (activeTab !== targetTab || activePage !== 'patients') {
-            navigate(`/team/${targetTab}`)
+            navigate(targetTab === 'mortalities' ? '/mortalities' : `/team/${targetTab}`)
         }
 
         // Store highlight info for PatientCard
         setSearchHighlightField(highlightField)
         setSearchHighlightQuery(highlightQuery)
-        // Find the patient and scroll to them
+
+        // Find the patient and check if they are reviewed
         const allPatients = [...patients, ...mortalities]
         const found = allPatients.find(p => p.id === patientId)
-        if (found) {
-            setTimeout(() => {
-                const el = document.getElementById(`patient-${patientId}`)
-                if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                    el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2')
-                    setTimeout(() => el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2'), 3000)
-                }
-            }, 300)
+        if (found && found.reviewed && targetTab !== 'mortalities') {
+            // Expand the reviewed section so the patient card is in the DOM
+            setReviewedExpandTrigger(prev => prev + 1)
         }
+
+        // Scroll to the patient
+        setTimeout(() => {
+            const el = document.getElementById(`patient-${patientId}`)
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                el.classList.add('ring-2', 'ring-purple-400', 'ring-offset-2')
+                setTimeout(() => el.classList.remove('ring-2', 'ring-purple-400', 'ring-offset-2'), 3000)
+            }
+        }, found && found.reviewed && targetTab !== 'mortalities' ? 400 : 300)
         // Clear highlight after a few seconds
         setTimeout(() => {
             setSearchHighlightField(null)
             setSearchHighlightQuery('')
         }, 5000)
-    }, [activePage, activeTab, navigate, patients, mortalities])
+    }, [activePage, activeTab, navigate, patients, mortalities, setReviewedExpandTrigger])
 
     const navigateToNote = useCallback((noteId, highlightQuery) => {
+        setMortalitiesOnly(false)
         // Navigate to notebook page
         if (activePage !== 'notebook') {
-            goToPage('notebook')
+            navigate('/notebook')
         }
         setInitialSelectedDocId(noteId)
         setNotebookSearchHighlight(highlightQuery)
@@ -1302,7 +1311,7 @@ const pendingEditRef = useRef(null)
                 }
             }, 300)
         }
-    }, [activePage, goToPage, docs])
+    }, [activePage, navigate, docs])
 
     const handleNotebookStartEdit = useCallback((doc) => {
         setNotebookEditDoc(doc)
@@ -1336,7 +1345,9 @@ const pendingEditRef = useRef(null)
                 onOpenSettings={() => navigate('/settings')}
                 activePage={activePage}
                 onPageChange={goToPage}
-                onOpenSearch={() => navigate('/search')}
+                onOpenSearch={() => {
+                    setShowSearch(true)
+                }}
                 onHome={onHome}
                 theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
             />
@@ -1463,6 +1474,8 @@ const pendingEditRef = useRef(null)
                                     onToggleSelect={toggleSelectPatient}
                                     onToggleSelectAll={toggleSelectAll}
                                     isMortality
+                                    reviewedExpandTrigger={reviewedExpandTrigger}
+                                    onReviewedExpanded={() => setReviewedExpandTrigger(prev => prev + 1)}
                                 />
                             )}
                         </div>
@@ -1484,6 +1497,8 @@ const pendingEditRef = useRef(null)
                             moveTeamLabel={activeTab === 'other_team' ? 'Move to My Team' : undefined}
                             highlightField={searchHighlightField}
                             highlightQuery={searchHighlightQuery}
+                            reviewedExpandTrigger={reviewedExpandTrigger}
+                            onReviewedExpanded={() => setReviewedExpandTrigger(prev => prev + 1)}
                         />
                     )}
 
@@ -1595,7 +1610,12 @@ const pendingEditRef = useRef(null)
                         docs={docs}
                         activePage={activePage}
                         activeTab={activeTab}
-                        onClose={() => { setShowSearch(false); navigateBackFromUrlRoute(); }}
+                        onClose={() => {
+                            setShowSearch(false)
+                            if (location.pathname === '/search') {
+                                navigate(searchReturnPathRef.current || '/team/my_team')
+                            }
+                        }}
                         onNavigateToPatient={navigateToPatient}
                         onNavigateToNote={navigateToNote}
                     />

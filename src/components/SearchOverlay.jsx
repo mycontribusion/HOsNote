@@ -110,7 +110,7 @@ export default function SearchOverlay({ patients, mortalities, docs, activePage,
     const renderSection = (category, title, items, icon, iconBg, iconColor, renderItem) => {
         if (items.length === 0) return null
         return (
-            <div className="mb-2">
+            <div key={category} className="mb-2">
                 <p className="px-4 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                     {title} ({items.length})
                 </p>

@@ -91,6 +91,21 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     const hospStr = (doc.patientHosp || '').trim()
     const hasBio = hasName || Boolean(wardStr) || Boolean(hospStr)
 
+    const bodyRef = useRef(null)
+    useEffect(() => {
+        if (highlightText && bodyRef.current) {
+            const timer = setTimeout(() => {
+                const markEl = bodyRef.current?.querySelector('mark')
+                if (markEl) {
+                    const markTop = markEl.offsetTop
+                    const containerTop = bodyRef.current.offsetTop
+                    bodyRef.current.scrollTop = Math.max(0, markTop - containerTop - 10)
+                }
+            }, 100)
+            return () => clearTimeout(timer)
+        }
+    }, [highlightText])
+
     return (
         <div
             className="modal-backdrop"
@@ -110,7 +125,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
                                 {hasDiag && (
                                     <div className="overflow-x-auto whitespace-nowrap custom-scrollbar pb-0.5">
                                         <h2 id="note-detail-title" className="font-bold text-gray-900 dark:text-white text-base leading-tight inline-block whitespace-nowrap">
-                                            {diagStr}
+                                            {highlightText ? <HighlightText text={diagStr} query={highlightText} /> : diagStr}
                                         </h2>
                                     </div>
                                 )}
@@ -118,17 +133,21 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
                                 <div className="flex flex-wrap items-center gap-2 py-0.5">
                                     {hasName && (
                                         <span className={`whitespace-nowrap ${hasDiag ? 'text-xs font-semibold text-gray-700 dark:text-gray-300' : 'font-bold text-base text-gray-900 dark:text-white'}`}>
-                                            {hasDiag ? `Patient: ${nameStr}` : nameStr}
+                                            {hasDiag ? (
+                                                <>Patient: {highlightText ? <HighlightText text={nameStr} query={highlightText} /> : nameStr}</>
+                                            ) : (
+                                                highlightText ? <HighlightText text={nameStr} query={highlightText} /> : nameStr
+                                            )}
                                         </span>
                                     )}
                                     {wardStr && (
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap ${badge}`} title={wardStr}>
-                                            {wardStr}
+                                            {highlightText ? <HighlightText text={wardStr} query={highlightText} /> : wardStr}
                                         </span>
                                     )}
                                     {hospStr && (
                                         <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded whitespace-nowrap">
-                                            {hospStr}
+                                            {highlightText ? <HighlightText text={hospStr} query={highlightText} /> : hospStr}
                                         </span>
                                     )}
                                     <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
@@ -148,7 +167,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
                 </div>
 
                 {/* Body — full note text */}
-                <div className="px-5 py-4 flex-1 overflow-y-auto custom-scrollbar min-w-0 max-w-full">
+                <div ref={bodyRef} className="px-5 py-4 flex-1 overflow-y-auto custom-scrollbar min-w-0 max-w-full">
                     <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word]">
                         {highlightText ? <HighlightText text={doc.text} query={highlightText} /> : doc.text}
                     </p>
@@ -185,7 +204,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
-const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionMode = false, onSelect }) => {
+const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionMode = false, onSelect, searchHighlight }) => {
     const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
     const bg = COLOR_BG[doc.color] || COLOR_BG.blue
     const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
@@ -237,6 +256,21 @@ const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionM
         window.addEventListener('resize', check)
         return () => window.removeEventListener('resize', check)
     }, [doc.text])
+
+    // Auto-scroll note preview container to highlight mark if matching text is inside
+    useEffect(() => {
+        if (searchHighlight && ref.current) {
+            const timer = setTimeout(() => {
+                const markEl = ref.current?.querySelector('mark')
+                if (markEl) {
+                    const markTop = markEl.offsetTop
+                    const containerTop = ref.current.offsetTop
+                    ref.current.scrollTop = Math.max(0, markTop - containerTop - 10)
+                }
+            }, 100)
+            return () => clearTimeout(timer)
+        }
+    }, [searchHighlight, doc.text])
 
     const handleNoteScroll = () => syncThumb.current?.()
 
@@ -346,22 +380,22 @@ const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionM
                 {hasDiag ? (
                     <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex-1 min-w-0">
                         <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                            {diagStr}
+                            {searchHighlight ? <HighlightText text={diagStr} query={searchHighlight} /> : diagStr}
                         </span>
                     </div>
                 ) : (
                     <div className="overflow-x-auto whitespace-nowrap custom-scrollbar flex items-center gap-1.5 flex-1 min-w-0">
                         {hasName ? (
                             <span className="font-bold text-sm text-gray-900 dark:text-white whitespace-nowrap shrink-0">
-                                {nameStr}
+                                {searchHighlight ? <HighlightText text={nameStr} query={searchHighlight} /> : nameStr}
                             </span>
                         ) : hospStr ? (
                             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
-                                {hospStr}
+                                {searchHighlight ? <HighlightText text={hospStr} query={searchHighlight} /> : hospStr}
                             </span>
                         ) : wardStr ? (
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shrink-0 ${badge}`} title={wardStr}>
-                                {wardStr}
+                                {searchHighlight ? <HighlightText text={wardStr} query={searchHighlight} /> : wardStr}
                             </span>
                         ) : null}
                     </div>
@@ -380,7 +414,7 @@ const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionM
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     onScroll={handleNoteScroll}
                 >
-                    {doc.text}
+                    {searchHighlight ? <HighlightText text={doc.text} query={searchHighlight} /> : doc.text}
                 </p>
                 {/* Custom right scrollbar (Micro-thin ghost bar) */}
                 {overflows && (
@@ -541,18 +575,6 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
         }
     }, [initialEditDoc, editingDoc])
 
-    // Auto-open a note detail when navigating from search
-    useEffect(() => {
-        if (initialSelectedDocId && docs.length > 0) {
-            const doc = docs.find(d => d.id === initialSelectedDocId)
-            if (doc) {
-                setSelectedDoc(doc)
-                onDocOpened?.()
-            }
-        }
-    }, [initialSelectedDocId, docs, onDocOpened])
-
-
     const sortDocs = (list) => {
         if (sortBy === 'default') {
             return [...list].sort((a, b) => {
@@ -610,6 +632,44 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
 
     const sortedDocs = useMemo(() => sortDocs(filteredDocs), [filteredDocs, sortBy])
     const visibleDocs = useMemo(() => sortedDocs.slice(0, visibleCount), [sortedDocs, visibleCount])
+
+    // Auto-open note detail & expand limits/filters when navigating from search
+    useEffect(() => {
+        if ((initialSelectedDocId || searchHighlight) && docs.length > 0) {
+            if (initialSelectedDocId) {
+                const doc = docs.find(d => d.id === initialSelectedDocId)
+                if (doc) {
+                    const isPatientNote = doc.patientId != null || Boolean(doc.patientName?.trim() || doc.patientWard?.trim() || doc.patientHosp?.trim())
+                    if ((noteFilter === 'patient' && !isPatientNote) || (noteFilter === 'standalone' && isPatientNote)) {
+                        setNoteFilter('all')
+                    }
+                    setSelectedDoc(doc)
+                    onDocOpened?.()
+                }
+            } else if (searchHighlight) {
+                setNoteFilter('all')
+            }
+
+            if (initialSelectedDocId) {
+                const idx = sortedDocs.findIndex(d => d.id === initialSelectedDocId)
+                if (idx >= 0) {
+                    setVisibleCount(prev => Math.max(prev, idx + 1))
+                }
+            } else if (searchHighlight) {
+                const q = searchHighlight.toLowerCase()
+                const idx = sortedDocs.findIndex(d =>
+                    (d.text || '').toLowerCase().includes(q) ||
+                    (d.diagnosis || d.patientDiagnosis || '').toLowerCase().includes(q) ||
+                    (d.patientName || '').toLowerCase().includes(q) ||
+                    (d.patientWard || '').toLowerCase().includes(q) ||
+                    (d.patientHosp || '').toLowerCase().includes(q)
+                )
+                if (idx >= 0) {
+                    setVisibleCount(prev => Math.max(prev, idx + 1))
+                }
+            }
+        }
+    }, [initialSelectedDocId, searchHighlight, docs, sortedDocs, noteFilter, onDocOpened])
 
     const toggleSelectAllDocs = useCallback(() => {
         setSelectedDocIds(prev => {
@@ -794,6 +854,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                                 onToggleSelect={toggleSelectDoc}
                                 selectionMode={selectedDocIds.size > 0}
                                 onSelect={() => setSelectedDoc(doc)}
+                                searchHighlight={searchHighlight}
                             />
                         ))}
                         {visibleCount < sortedDocs.length && (

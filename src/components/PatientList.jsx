@@ -12,7 +12,7 @@ const SORT_OPTIONS = [
     { value: 'hospnum', label: 'Hosp No.' },
 ]
 
-const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery }) => {
+const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, reviewedExpandTrigger, onReviewedExpanded }) => {
     const [sortBy, setSortBy] = useState('none')
     const [isReviewedOpen, setIsReviewedOpen] = useState(false)
     const [selectedDetailPatient, setSelectedDetailPatient] = useState(null)
@@ -63,6 +63,48 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
         setVisibleCount(30)
         setVisibleReviewedCount(30)
     }, [sortBy, patients, isReviewedOpen])
+
+    // Expand reviewed section & windowing limits when triggered from search navigation
+    useEffect(() => {
+        if (reviewedExpandTrigger > 0 && reviewedPatients.length > 0) {
+            if (!isReviewedOpen) {
+                setIsReviewedOpen(true)
+                onReviewedExpanded?.()
+            }
+            setVisibleReviewedCount(sortedReviewed.length)
+        }
+    }, [reviewedExpandTrigger, reviewedPatients.length, sortedReviewed.length, onReviewedExpanded])
+
+    // Automatically expand windowing limits if search query matches an item beyond visible count
+    useEffect(() => {
+        if (highlightQuery) {
+            const q = highlightQuery.toLowerCase()
+            const activeIdx = sortedActive.findIndex(p =>
+                (p.name || '').toLowerCase().includes(q) ||
+                (p.hospitalNumber || '').toLowerCase().includes(q) ||
+                (p.ward || '').toLowerCase().includes(q) ||
+                (p.bed || '').toLowerCase().includes(q) ||
+                (p.diagnosis || '').toLowerCase().includes(q) ||
+                (p.note || '').toLowerCase().includes(q)
+            )
+            if (activeIdx >= 0) {
+                setVisibleCount(prev => Math.max(prev, activeIdx + 1))
+            }
+
+            const reviewedIdx = sortedReviewed.findIndex(p =>
+                (p.name || '').toLowerCase().includes(q) ||
+                (p.hospitalNumber || '').toLowerCase().includes(q) ||
+                (p.ward || '').toLowerCase().includes(q) ||
+                (p.bed || '').toLowerCase().includes(q) ||
+                (p.diagnosis || '').toLowerCase().includes(q) ||
+                (p.note || '').toLowerCase().includes(q)
+            )
+            if (reviewedIdx >= 0) {
+                setIsReviewedOpen(true)
+                setVisibleReviewedCount(prev => Math.max(prev, reviewedIdx + 1))
+            }
+        }
+    }, [highlightQuery, sortedActive, sortedReviewed])
 
     const visibleActive   = useMemo(() => sortedActive.slice(0, visibleCount), [sortedActive, visibleCount])
     const visibleReviewed = useMemo(() => sortedReviewed.slice(0, visibleReviewedCount), [sortedReviewed, visibleReviewedCount])
@@ -282,5 +324,7 @@ export default memo(PatientListInner, (prev, next) => {
     if (prev.onToggleSelectAll !== next.onToggleSelectAll) return false
     if (prev.onMoveTeam !== next.onMoveTeam) return false
     if (prev.moveTeamLabel !== next.moveTeamLabel) return false
+    if (prev.reviewedExpandTrigger !== next.reviewedExpandTrigger) return false
+    if (prev.onReviewedExpanded !== next.onReviewedExpanded) return false
     return true
 })

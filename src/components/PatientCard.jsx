@@ -70,6 +70,21 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
         return () => window.removeEventListener('resize', check)
     }, [note])
 
+    // Auto-scroll note container to highlight mark if matching text is inside note
+    useEffect(() => {
+        if (highlightQuery && noteRef.current) {
+            const timer = setTimeout(() => {
+                const markEl = noteRef.current?.querySelector('mark')
+                if (markEl) {
+                    const markTop = markEl.offsetTop
+                    const containerTop = noteRef.current.offsetTop
+                    noteRef.current.scrollTop = Math.max(0, markTop - containerTop - 10)
+                }
+            }, 100)
+            return () => clearTimeout(timer)
+        }
+    }, [highlightQuery, note])
+
     const handleNoteScroll = () => syncThumb.current?.()
 
     const handleThumbPointerDown = (e) => {
@@ -265,8 +280,16 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                         <div className={`flex flex-col items-center justify-center rounded-2xl border-2 px-2.5 py-2 text-center w-[60px] min-h-[60px] shadow-sm ${badgeColor} relative overflow-hidden transition-all duration-200`}>
                             {ward || bed ? (
                                 <>
-                                    {ward && <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-none mb-1 truncate max-w-full" title={ward}>{ward}</div>}
-                                    {bed && <div className="text-[22px] font-black leading-tight"><SuffixedValue value={bed} /></div>}
+                                    {ward && (
+                                        <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-none mb-1 truncate max-w-full" title={ward}>
+                                            {highlightQuery ? <HighlightText text={ward} query={highlightQuery} /> : ward}
+                                        </div>
+                                    )}
+                                    {bed && (
+                                        <div className="text-[22px] font-black leading-tight">
+                                            {highlightQuery ? <HighlightText text={String(bed)} query={highlightQuery} /> : <SuffixedValue value={bed} />}
+                                        </div>
+                                    )}
                                     {!bed && ward && <div className="text-[22px] font-black leading-tight">—</div>}
                                 </>
                             ) : (
@@ -308,7 +331,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                             )}
                             {name && (
                                 <div className={`text-[15px] font-bold leading-tight overflow-x-auto whitespace-nowrap ${reviewed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
-                                    {highlightField === 'name' && highlightQuery ? (
+                                    {highlightQuery && (!highlightField || highlightField === 'name') ? (
                                         <HighlightText text={name} query={highlightQuery} />
                                     ) : (
                                         name
@@ -317,7 +340,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                             )}
                             {hospitalNumber && (
                                 <span className={`inline-flex items-center px-1.5 py-0.5 rounded-lg text-[11px] font-semibold whitespace-nowrap overflow-hidden text-ellipsis font-mono ${reviewed ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 line-through' : 'bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300'}`}>
-                                    {highlightField === 'hospitalNumber' && highlightQuery ? (
+                                    {highlightQuery && (!highlightField || highlightField === 'hospitalNumber') ? (
                                         <HighlightText text={hospitalNumber} query={highlightQuery} />
                                     ) : (
                                         <SuffixedValue value={hospitalNumber} />
@@ -341,7 +364,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                         {/* Row 2: Diagnosis */}
                         {diagnosis && (
                             <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5 truncate">
-                                {highlightField === 'diagnosis' && highlightQuery ? (
+                                {highlightQuery && (!highlightField || highlightField === 'diagnosis') ? (
                                     <HighlightText text={diagnosis} query={highlightQuery} />
                                 ) : (
                                     diagnosis
@@ -368,7 +391,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                     style={{ whiteSpace: 'pre-wrap', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                                     onScroll={handleNoteScroll}
                                 >
-                                    {highlightField === 'note' && highlightQuery ? (
+                                    {highlightQuery && (!highlightField || highlightField === 'note') ? (
                                         <HighlightText text={note} query={highlightQuery} />
                                     ) : (
                                         note
