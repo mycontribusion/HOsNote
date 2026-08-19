@@ -62,7 +62,7 @@ const NOTE_FILTER_OPTIONS = [
 ]
 
 // Detail view modal for a single note
-function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
+export function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
     const bg = COLOR_BG[doc.color] || COLOR_BG.blue
     const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue
@@ -195,7 +195,7 @@ function NoteDetailModal({ doc, onClose, onEdit, onDelete, highlightText }) {
     )
 }
 
-const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionMode = false, onSelect, searchHighlight }) => {
+export const NoteCardItem = memo(({ doc, isSelected = false, onToggleSelect, selectionMode = false, onSelect, searchHighlight }) => {
     const border = COLOR_BORDER[doc.color] || COLOR_BORDER.blue
     const bg = COLOR_BG[doc.color] || COLOR_BG.blue
     const badge = COLOR_BADGE[doc.color] || COLOR_BADGE.blue

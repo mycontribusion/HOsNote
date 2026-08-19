@@ -20,7 +20,7 @@ const ReviewDuplicatesModal = lazy(() => import('./components/ReviewDuplicatesMo
 const SettingsModal = lazy(() => import('./components/SettingsModal'))
 const NotebookPage = lazy(() => import('./components/NotebookPage'))
 const DocComposer = lazy(() => import('./components/DocComposer'))
-const SearchOverlay = lazy(() => import('./components/SearchOverlay'))
+const SearchResultsPage = lazy(() => import('./components/SearchResultsPage'))
 
 const STORAGE_KEY = '4myteam_patients'
 const MORTALITIES_KEY = '4myteam_mortalities'
@@ -89,7 +89,7 @@ export default function App() {
     //   /                 -> patients page, my_team tab
     //   /team/:tab        -> patients page, :tab in {my_team, other_team, mortalities}
     //   /notebook         -> clinical notebook page
-    const activePage = location.pathname.startsWith('/notebook') ? 'notebook' : 'patients'
+    const activePage = location.pathname === '/search' ? 'search' : location.pathname.startsWith('/notebook') ? 'notebook' : 'patients'
     const activeTab = params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
         ? params.tab
         : location.pathname === '/mortalities'
@@ -1378,7 +1378,8 @@ const pendingEditRef = useRef(null)
                 activePage={activePage}
                 onPageChange={goToPage}
                 onOpenSearch={() => {
-                    setShowSearch(true)
+                    searchReturnPathRef.current = location.pathname
+                    navigate('/search')
                 }}
                 onHome={onHome}
                 theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
@@ -1414,6 +1415,29 @@ const pendingEditRef = useRef(null)
                             setShowExport(true)
                             navigate('/notebook/handover')
                         }}
+                    />
+                </Suspense>
+            )}
+
+            {/* Search Page */}
+            {activePage === 'search' && (
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+                    <SearchResultsPage
+                        patients={patients}
+                        mortalities={mortalities}
+                        docs={docs}
+                        initialQuery={searchHighlightQuery}
+                        onBack={() => navigate(searchReturnPathRef.current || '/team/my_team')}
+                        onEditPatient={startEditing}
+                        onDeletePatient={startRemovalProcess}
+                        onReviewPatient={toggleReview}
+                        onDocumentPatient={(patient) => setComposingFor(patient)}
+                        getDocCount={getDocCount}
+                        onDeleteMortality={deleteMortalityRecord}
+                        onUpdateDoc={updateDoc}
+                        onDeleteDoc={deleteDoc}
+                        onStartEditDoc={handleNotebookStartEdit}
+                        navigate={navigate}
                     />
                 </Suspense>
             )}
@@ -1639,23 +1663,7 @@ const pendingEditRef = useRef(null)
                         hasAnyData={patients.length > 0 || mortalities.length > 0 || docs.length > 0 || discharges.length > 0}
                     />
                 )}
-                {showSearch && (
-                    <SearchOverlay
-                        patients={patients}
-                        mortalities={mortalities}
-                        docs={docs}
-                        activePage={activePage}
-                        activeTab={activeTab}
-                        onClose={() => {
-                            setShowSearch(false)
-                            if (location.pathname === '/search') {
-                                navigate(searchReturnPathRef.current || '/team/my_team')
-                            }
-                        }}
-                        onNavigateToPatient={navigateToPatient}
-                        onNavigateToNote={navigateToNote}
-                    />
-                )}
+
                 {composingFor && (
                     <DocComposer
                         patient={composingFor}
