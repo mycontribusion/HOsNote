@@ -151,10 +151,10 @@ export default function SearchResultsPage({
 
                 {/* Filter Category Pills */}
                 {debouncedQuery.trim() && (
-                    <div className="max-w-3xl mx-auto flex items-center gap-2 mt-3 overflow-x-auto custom-scrollbar pb-1">
+                    <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-1.5 mt-2.5">
                         <button
                             onClick={() => setFilterCategory('all')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
                                 filterCategory === 'all'
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -164,7 +164,7 @@ export default function SearchResultsPage({
                         </button>
                         <button
                             onClick={() => setFilterCategory('my_team')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
                                 filterCategory === 'my_team'
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -174,7 +174,7 @@ export default function SearchResultsPage({
                         </button>
                         <button
                             onClick={() => setFilterCategory('other_team')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
                                 filterCategory === 'other_team'
                                     ? 'bg-purple-600 text-white shadow-sm'
                                     : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -184,7 +184,7 @@ export default function SearchResultsPage({
                         </button>
                         <button
                             onClick={() => setFilterCategory('notes')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
                                 filterCategory === 'notes'
                                     ? 'bg-teal-600 text-white shadow-sm'
                                     : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -194,7 +194,7 @@ export default function SearchResultsPage({
                         </button>
                         <button
                             onClick={() => setFilterCategory('mortalities')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
                                 filterCategory === 'mortalities'
                                     ? 'bg-red-600 text-white shadow-sm'
                                     : 'bg-gray-100 dark:bg-gray-700/70 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -241,18 +241,18 @@ export default function SearchResultsPage({
                                 </div>
                                 <div className="space-y-3">
                                     {searchResults.my_team.map(patient => (
-                                        <div key={patient.id} onClick={() => setSelectedPatient(patient)} className="cursor-pointer">
-                                            <PatientCard
-                                                patient={patient}
-                                                onEdit={onEditPatient}
-                                                onDelete={onDeletePatient}
-                                                onReview={onReviewPatient}
-                                                onDocument={onDocumentPatient}
-                                                getDocCount={getDocCount}
-                                                highlightField={patient.matchedField}
-                                                highlightQuery={debouncedQuery}
-                                            />
-                                        </div>
+                                        <PatientCard
+                                            key={patient.id}
+                                            patient={patient}
+                                            onEdit={onEditPatient}
+                                            onDelete={onDeletePatient}
+                                            onReview={onReviewPatient}
+                                            onDocument={onDocumentPatient}
+                                            getDocCount={getDocCount}
+                                            highlightField={patient.matchedField}
+                                            highlightQuery={debouncedQuery}
+                                            onOpenDetail={(p) => setSelectedPatient(p)}
+                                        />
                                     ))}
                                 </div>
                             </section>
@@ -269,18 +269,18 @@ export default function SearchResultsPage({
                                 </div>
                                 <div className="space-y-3">
                                     {searchResults.on_call.map(patient => (
-                                        <div key={patient.id} onClick={() => setSelectedPatient(patient)} className="cursor-pointer">
-                                            <PatientCard
-                                                patient={patient}
-                                                onEdit={onEditPatient}
-                                                onDelete={onDeletePatient}
-                                                onReview={onReviewPatient}
-                                                onDocument={onDocumentPatient}
-                                                getDocCount={getDocCount}
-                                                highlightField={patient.matchedField}
-                                                highlightQuery={debouncedQuery}
-                                            />
-                                        </div>
+                                        <PatientCard
+                                            key={patient.id}
+                                            patient={patient}
+                                            onEdit={onEditPatient}
+                                            onDelete={onDeletePatient}
+                                            onReview={onReviewPatient}
+                                            onDocument={onDocumentPatient}
+                                            getDocCount={getDocCount}
+                                            highlightField={patient.matchedField}
+                                            highlightQuery={debouncedQuery}
+                                            onOpenDetail={(p) => setSelectedPatient(p)}
+                                        />
                                     ))}
                                 </div>
                             </section>
@@ -319,16 +319,16 @@ export default function SearchResultsPage({
                                 </div>
                                 <div className="space-y-3">
                                     {searchResults.mortalities.map(patient => (
-                                        <div key={patient.id} onClick={() => setSelectedPatient(patient)} className="cursor-pointer">
-                                            <PatientCard
-                                                patient={patient}
-                                                onEdit={onEditPatient}
-                                                onDelete={onDeleteMortality}
-                                                isMortality
-                                                highlightField={patient.matchedField}
-                                                highlightQuery={debouncedQuery}
-                                            />
-                                        </div>
+                                        <PatientCard
+                                            key={patient.id}
+                                            patient={patient}
+                                            onEdit={onEditPatient}
+                                            onDelete={onDeleteMortality}
+                                            isMortality
+                                            highlightField={patient.matchedField}
+                                            highlightQuery={debouncedQuery}
+                                            onOpenDetail={(p) => setSelectedPatient(p)}
+                                        />
                                     ))}
                                 </div>
                             </section>
