@@ -265,12 +265,14 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                             {ward || bed ? (
                                 <>
                                     {ward && (
-                                        <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 leading-none mb-1 truncate max-w-full" title={ward}>
+                                        <div className="text-[9px] font-bold uppercase tracking-wider opacity-75 leading-tight break-words max-w-full mb-1 text-center" title={ward}>
                                             {highlightQuery ? <HighlightText text={ward} query={highlightQuery} /> : ward}
                                         </div>
                                     )}
                                     {bed && (
-                                        <div className="text-[22px] font-black leading-tight">
+                                        <div className={`font-black leading-tight break-words max-w-full text-center ${
+                                            String(bed).length > 6 ? 'text-[11px]' : String(bed).length > 3 ? 'text-[14px]' : 'text-[20px]'
+                                        }`}>
                                             {highlightQuery ? <HighlightText text={String(bed)} query={highlightQuery} /> : <SuffixedValue value={bed} />}
                                         </div>
                                     )}
@@ -328,6 +330,19 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                         <HighlightText text={hospitalNumber} query={highlightQuery} />
                                     ) : (
                                         <SuffixedValue value={hospitalNumber} />
+                                    )}
+                                </span>
+                            )}
+                            {ward && ward.length > 6 && (
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap overflow-hidden text-ellipsis border ${
+                                    reviewed
+                                        ? 'bg-gray-100 dark:bg-gray-700/60 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-600 line-through'
+                                        : 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-800/40'
+                                }`}>
+                                    {highlightQuery && (!highlightField || highlightField === 'ward') ? (
+                                        <HighlightText text={ward} query={highlightQuery} />
+                                    ) : (
+                                        ward
                                     )}
                                 </span>
                             )}
