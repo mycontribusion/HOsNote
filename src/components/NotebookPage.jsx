@@ -443,24 +443,26 @@ const NotebookActionBar = memo(({
         if (hasSelection) setIsCollapsed(false)
     }, [hasSelection])
 
+    const headerBg = 'bg-gradient-to-r from-blue-700 via-blue-800 to-blue-900 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 shadow-blue-900/40 border-blue-500/40'
+
     return (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl h-[54px] pointer-events-none mb-[env(safe-area-inset-bottom,0px)]">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl h-[56px] pointer-events-none mb-[env(safe-area-inset-bottom,0px)]">
             <div className="relative w-full h-full">
-                {/* Collapse / expand button */}
+                {/* Collapse / expand button — Aligned right-0 */}
                 <button
                     type="button"
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     aria-label={isCollapsed ? "Expand action bar" : "Collapse action bar"}
-                    className="absolute -top-2.5 right-4 bg-white dark:bg-gray-800 border border-gray-200/80 dark:border-gray-700/80 shadow-md text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-1 rounded-full transition-all active:scale-90 cursor-pointer z-20 pointer-events-auto flex items-center justify-center"
+                    className={`absolute -top-3.5 right-0 z-30 pointer-events-auto ${headerBg} text-white border-2 border-white/40 dark:border-gray-700 shadow-lg p-1.5 rounded-full transition-all duration-200 active:scale-90 cursor-pointer flex items-center justify-center ring-2 ring-white/20`}
                     title={isCollapsed ? "Expand action bar" : "Collapse action bar"}
                 >
                     {isCollapsed ? (
-                        <ChevronUp size={18} strokeWidth={2.5} />
+                        <ChevronUp size={18} strokeWidth={3} />
                     ) : (
-                        <ChevronDown size={18} strokeWidth={2.5} />
+                        <ChevronDown size={18} strokeWidth={3} />
                     )}
                     {isCollapsed && hasSelection && (
-                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-xs animate-pulse">
+                        <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-xs animate-pulse">
                             {selectedCount}
                         </span>
                     )}
@@ -468,55 +470,55 @@ const NotebookActionBar = memo(({
 
                 {/* 3-Button Action Bar */}
                 {!isCollapsed && (
-                    <div className="w-full h-full p-1.5 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/80 dark:border-gray-700/80 rounded-2xl shadow-xl shadow-gray-900/10 dark:shadow-black/40 flex items-center justify-between pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200">
+                    <div className={`w-full h-full p-1.5 ${headerBg} text-white backdrop-blur-xl border-2 border-white/25 dark:border-gray-700/80 rounded-2xl shadow-2xl flex items-center justify-between pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200 ring-1 ring-white/20`}>
                         {/* 1. Receive */}
                         <button
                             type="button"
                             onClick={onImport}
                             aria-label="Receive or import notes"
-                            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/70 transition-all active:scale-95 cursor-pointer"
+                            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-extrabold text-white hover:bg-white/15 active:bg-white/25 transition-all active:scale-95 cursor-pointer group"
                         >
-                            <QrCode size={19} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.2} />
-                            <span>Receive</span>
+                            <QrCode size={19} className="text-emerald-300 group-hover:scale-110 transition-transform" strokeWidth={2.5} />
+                            <span className="tracking-wide">Receive</span>
                         </button>
 
                         {/* Divider */}
-                        <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700/80 shrink-0" />
+                        <div className="w-[1px] h-6 bg-white/25 dark:bg-gray-700 shrink-0" />
 
                         {/* 2. Send */}
                         <button
                             type="button"
                             onClick={onHandover}
                             aria-label={hasSelection ? `Send ${selectedCount} selected notes` : 'Send notes'}
-                            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-extrabold transition-all ${
                                 hasSelection
-                                    ? 'bg-purple-600 dark:bg-purple-600 text-white shadow-xs shadow-purple-500/30 font-extrabold active:scale-95 cursor-pointer'
-                                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/70 active:scale-95 cursor-pointer'
+                                    ? 'bg-white text-purple-900 shadow-md font-black active:scale-95 cursor-pointer'
+                                    : 'text-white hover:bg-white/15 active:bg-white/25 active:scale-95 cursor-pointer group'
                             }`}
                         >
                             <div className="relative flex items-center justify-center">
-                                <Send size={19} className={hasSelection ? 'text-white' : 'text-purple-600 dark:text-purple-400'} strokeWidth={2.2} />
+                                <Send size={19} className={hasSelection ? 'text-purple-900' : 'text-purple-300 group-hover:scale-110 transition-transform'} strokeWidth={2.5} />
                                 {hasSelection && (
                                     <span className="absolute -top-1.5 -right-3 bg-red-500 text-white text-[9px] font-black px-1 rounded-full min-w-[16px] h-[16px] flex items-center justify-center shadow-xs border border-white dark:border-gray-800">
                                         {selectedCount}
                                     </span>
                                 )}
                             </div>
-                            <span>Send</span>
+                            <span className="tracking-wide">Send</span>
                         </button>
 
                         {/* Divider */}
-                        <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700/80 shrink-0" />
+                        <div className="w-[1px] h-6 bg-white/25 dark:bg-gray-700 shrink-0" />
 
                         {/* 3. Add Note */}
                         <button
                             type="button"
                             onClick={onAddNote}
                             aria-label="Add note to notebook"
-                            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/70 transition-all active:scale-95 cursor-pointer"
+                            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl text-[11px] font-extrabold text-white hover:bg-white/15 active:bg-white/25 transition-all active:scale-95 cursor-pointer group"
                         >
-                            <BookOpen size={19} className="text-blue-600 dark:text-blue-400" strokeWidth={2.2} />
-                            <span>Add Note</span>
+                            <BookOpen size={19} className="text-blue-200 group-hover:scale-110 transition-transform" strokeWidth={2.5} />
+                            <span className="tracking-wide">Add Note</span>
                         </button>
                     </div>
                 )}
