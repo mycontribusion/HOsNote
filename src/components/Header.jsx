@@ -1,51 +1,97 @@
-import { Moon, Sun, Settings, Stethoscope, BookOpen, Search, ArrowLeft } from 'lucide-react'
-import { memo } from 'react'
+import { Moon, Sun, Settings, Stethoscope, BookOpen, Search, ArrowLeft, X } from 'lucide-react'
+import { memo, useRef, useEffect } from 'react'
 import { useSearch } from '../context/SearchContext'
 
 const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange, onOpenSearch, onHome, onBackFromSearch, theme = 'blue' }) => {
     const isRed = theme === 'red'
     const { query, setQuery } = useSearch()
+    const searchInputRef = useRef(null)
+
+    // Auto-focus input when search page opens
+    useEffect(() => {
+        if (activePage === 'search' && searchInputRef.current) {
+            const timer = setTimeout(() => {
+                searchInputRef.current?.focus()
+            }, 60)
+            return () => clearTimeout(timer)
+        }
+    }, [activePage])
+
+    // Keyboard navigation: Escape key clears query or exits search
+    const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            if (query) {
+                setQuery('')
+            } else {
+                if (onBackFromSearch) onBackFromSearch()
+                else if (onHome) onHome()
+            }
+        }
+    }
 
     const headerBg = isRed
-        ? 'bg-gradient-to-r from-red-700 to-red-800 dark:from-red-900 dark:to-gray-900'
-        : 'bg-gradient-to-r from-blue-700 to-blue-800 dark:from-gray-900 dark:to-gray-900'
+        ? 'bg-gradient-to-r from-red-700 via-red-800 to-red-900 dark:from-red-950 dark:via-gray-900 dark:to-gray-900'
+        : 'bg-gradient-to-r from-blue-700 via-blue-800 to-blue-900 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950'
 
-    const shadowColor = isRed ? 'shadow-red-900/40' : 'shadow-blue-900/40'
+    const shadowColor = isRed ? 'shadow-red-900/30' : 'shadow-blue-900/30'
     const iconColor   = isRed ? 'text-red-200'   : 'text-blue-200'
     const pillActive  = isRed ? 'bg-red-600/70 border-red-500/50' : 'bg-blue-600/60 border-blue-500/40'
     const pillHover   = isRed ? 'hover:bg-red-700/40' : 'hover:bg-blue-600/40'
 
     return (
-        <header className={`${headerBg} text-white shadow-lg ${shadowColor} dark:shadow-black/50 sticky top-0 z-30 transition-colors duration-300`}>
-            <div className="max-w-2xl mx-auto px-4">
+        <header className={`${headerBg} text-white shadow-lg ${shadowColor} dark:shadow-black/50 sticky top-0 z-30 transition-colors duration-300 border-b border-white/10 dark:border-gray-800`}>
+            <div className="max-w-2xl mx-auto px-3.5 sm:px-4">
                 {/* Top row: Title + Controls */}
-                <div className="flex items-center justify-between gap-3 py-2.5">
+                <div className="flex items-center justify-between gap-2.5 py-2.5">
                     {activePage === 'search' ? (
-                        <>
-                            {/* Back button on search page */}
-                            <button
-                                type="button"
-                                onClick={onBackFromSearch || onHome}
-                                className="p-2 rounded-xl hover:bg-white/15 active:bg-white/25 transition-colors shrink-0"
-                                aria-label="Back"
-                                title="Back"
-                            >
-                                <ArrowLeft size={20} className={iconColor} />
-                            </button>
+                        <div className="w-full flex items-center">
+                            {/* Modern Unified Search Bar with Embedded Exit Button */}
+                            <div className="w-full relative flex items-center bg-white/15 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl border border-white/25 dark:border-gray-700/70 p-1 pl-1.5 pr-3 focus-within:ring-2 focus-within:ring-white/50 focus-within:bg-white/20 dark:focus-within:bg-gray-800 focus-within:border-white/40 transition-all duration-200 shadow-inner group">
+                                {/* Embedded Exit Arrow Button */}
+                                <button
+                                    type="button"
+                                    onClick={onBackFromSearch || onHome}
+                                    className="group/btn h-8 px-2 rounded-xl flex items-center gap-1 bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all shrink-0 cursor-pointer border border-white/20 shadow-xs focus:outline-none focus:ring-1 focus:ring-white/40"
+                                    aria-label="Exit Search"
+                                    title="Exit Search (Esc)"
+                                >
+                                    <ArrowLeft size={15} className="text-white group-hover/btn:-translate-x-0.5 transition-transform duration-200" />
+                                    <span className="text-xs font-semibold tracking-wide hidden xs:inline-block pr-0.5">Back</span>
+                                </button>
 
-                            {/* Search input in header */}
-                            <div className="flex-1 relative flex items-center bg-white/10 dark:bg-gray-700/60 rounded-2xl border border-white/20 dark:border-gray-600/60 px-3.5 py-2 focus-within:ring-2 focus-within:ring-white/50 transition-all">
+                                {/* Subtle vertical divider inside bar */}
+                                <div className="h-4 w-px bg-white/25 dark:bg-gray-700 mx-2 shrink-0" />
+
+                                {/* Input Field */}
                                 <input
+                                    ref={searchInputRef}
                                     type="search"
-                                    className="w-full bg-transparent text-sm font-medium text-white placeholder-white/60 dark:placeholder-gray-400 outline-none"
-                                    placeholder="Search patients, wards, notes, mortalities..."
+                                    className="w-full bg-transparent text-sm font-medium text-white placeholder-white/60 dark:placeholder-gray-400 outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+                                    placeholder="Search patients, wards, notes..."
                                     value={query}
                                     onChange={(e) => setQuery(e.target.value)}
+                                    onKeyDown={handleKeyDown}
                                     autoComplete="off"
                                     spellCheck={false}
                                 />
+
+                                {/* Clear Button inside bar */}
+                                {query && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setQuery('')
+                                            searchInputRef.current?.focus()
+                                        }}
+                                        className="p-1 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 text-white/80 hover:text-white transition-all ml-1 shrink-0 cursor-pointer"
+                                        aria-label="Clear search"
+                                        title="Clear search"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
                             </div>
-                        </>
+                        </div>
                     ) : (
                         <>
                             {/* Logo + Title */}
@@ -120,3 +166,4 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
 }
 
 export default memo(HeaderInner)
+
