@@ -491,13 +491,5 @@ export default memo(PatientCardInner, (prev, next) => {
     if (prev.isMortality !== next.isMortality) return false
     if (prev.highlightField !== next.highlightField) return false
     if (prev.highlightQuery !== next.highlightQuery) return false
-    if (prev.onEdit !== next.onEdit) return false
-    if (prev.onDelete !== next.onDelete) return false
-    if (prev.onReview !== next.onReview) return false
-    if (prev.onDocument !== next.onDocument) return false
-    if (prev.onToggleSelect !== next.onToggleSelect) return false
-    if (prev.onMoveTeam !== next.onMoveTeam) return false
-    if (prev.moveTeamLabel !== next.moveTeamLabel) return false
-    if (prev.onOpenDetail !== next.onOpenDetail) return false
     return true
 })

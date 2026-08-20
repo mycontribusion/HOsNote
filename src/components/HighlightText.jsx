@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { memo } from 'react'
 
-export default function HighlightText({ text, query }) {
+const HighlightText = memo(function HighlightText({ text, query }) {
     if (!query || !text) return <>{text}</>
     const trimmedQuery = String(query).trim()
     if (!trimmedQuery) return <>{text}</>
@@ -20,4 +20,7 @@ export default function HighlightText({ text, query }) {
             )}
         </>
     )
-}
+})
+
+export default HighlightText
+

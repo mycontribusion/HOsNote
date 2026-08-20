@@ -212,7 +212,7 @@ export default function SearchResultsPage({
                                             getDocCount={getDocCount}
                                             highlightField={patient.matchedField}
                                             highlightQuery={debouncedQuery}
-                                            onOpenDetail={(p) => setSelectedPatient(p)}
+                                            onOpenDetail={setSelectedPatient}
                                         />
                                     ))}
                                 </div>
@@ -240,7 +240,7 @@ export default function SearchResultsPage({
                                             getDocCount={getDocCount}
                                             highlightField={patient.matchedField}
                                             highlightQuery={debouncedQuery}
-                                            onOpenDetail={(p) => setSelectedPatient(p)}
+                                            onOpenDetail={setSelectedPatient}
                                         />
                                     ))}
                                 </div>
@@ -288,7 +288,7 @@ export default function SearchResultsPage({
                                             isMortality
                                             highlightField={patient.matchedField}
                                             highlightQuery={debouncedQuery}
-                                            onOpenDetail={(p) => setSelectedPatient(p)}
+                                            onOpenDetail={setSelectedPatient}
                                         />
                                     ))}
                                 </div>

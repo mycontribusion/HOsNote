@@ -20,7 +20,7 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
         debounceTimerRef.current = setTimeout(() => {
             setQuery(val)
-        }, 100)
+        }, 250)
     }
 
     const handleClearQuery = useCallback(() => {
@@ -69,7 +69,7 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
                     {activePage === 'search' ? (
                         <div className="w-full flex items-center">
                             {/* Modern Unified Search Bar with Embedded Exit Button */}
-                            <div className="w-full relative flex items-center bg-white/15 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl border border-white/25 dark:border-gray-700/70 p-1 pl-1.5 pr-3 focus-within:ring-2 focus-within:ring-white/50 focus-within:bg-white/20 dark:focus-within:bg-gray-800 focus-within:border-white/40 transition-all duration-200 shadow-inner group">
+                            <div className="w-full relative flex items-center bg-white/20 dark:bg-gray-800 rounded-2xl border border-white/30 dark:border-gray-700 p-1 pl-1.5 pr-3 focus-within:ring-2 focus-within:ring-white/50 focus-within:bg-white/25 dark:focus-within:bg-gray-800 shadow-inner group">
                                 {/* Embedded Exit Arrow Button */}
                                 <button
                                     type="button"
