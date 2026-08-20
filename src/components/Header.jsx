@@ -85,9 +85,6 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
                                 {/* Subtle vertical divider inside bar */}
                                 <div className="h-4 w-px bg-white/25 dark:bg-gray-700 mx-2 shrink-0" />
 
-                                {/* Search Icon */}
-                                <Search size={15} className="text-white/70 dark:text-gray-400 shrink-0 mr-2 transition-colors group-focus-within:text-white" />
-
                                 {/* Input Field */}
                                 <input
                                     ref={searchInputRef}
