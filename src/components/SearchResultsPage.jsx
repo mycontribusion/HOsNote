@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { Search, X, ArrowLeft, User, BookOpen, Heart, Frown, Users, Sparkles } from 'lucide-react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { User, BookOpen, Heart, Frown, Users, Sparkles } from 'lucide-react'
+import { useSearch } from '../context/SearchContext'
 import PatientCard from './PatientCard'
 import PatientDetailModal from './PatientDetailModal'
 import { NoteCardItem, NoteDetailModal } from './NotebookPage'
@@ -8,7 +9,6 @@ export default function SearchResultsPage({
     patients = [],
     mortalities = [],
     docs = [],
-    initialQuery = '',
     onBack,
     onEditPatient,
     onDeletePatient,
@@ -21,16 +21,16 @@ export default function SearchResultsPage({
     onStartEditDoc,
     navigate
 }) {
-    const [query, setQuery] = useState(initialQuery)
-    const [debouncedQuery, setDebouncedQuery] = useState(initialQuery)
+    const { query, clearQuery } = useSearch()
+    const [debouncedQuery, setDebouncedQuery] = useState(query)
     const [filterCategory, setFilterCategory] = useState('all') // 'all' | 'my_team' | 'other_team' | 'notes' | 'mortalities'
     const [selectedPatient, setSelectedPatient] = useState(null)
     const [selectedDoc, setSelectedDoc] = useState(null)
-    const inputRef = useRef(null)
 
+    // Sync debounced query when context query changes
     useEffect(() => {
-        inputRef.current?.focus()
-    }, [])
+        setDebouncedQuery(query)
+    }, [query])
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -107,51 +107,15 @@ export default function SearchResultsPage({
         searchResults.mortalities.length
 
     const handleClear = () => {
-        setQuery('')
-        setDebouncedQuery('')
-        inputRef.current?.focus()
+        clearQuery()
     }
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24 transition-colors">
-            {/* Header & Sticky Search Bar */}
-            <div className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-sm px-4 py-3">
-                <div className="max-w-3xl mx-auto flex items-center gap-3">
-                    <button
-                        onClick={onBack}
-                        className="p-2 rounded-xl text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0 cursor-pointer"
-                        aria-label="Back"
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-
-                    <div className="flex-1 relative flex items-center bg-gray-100 dark:bg-gray-700/60 rounded-2xl border border-gray-200 dark:border-gray-600/60 px-3.5 py-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                        <Search size={18} className="text-gray-400 dark:text-gray-400 shrink-0 mr-2.5" />
-                        <input
-                            ref={inputRef}
-                            type="search"
-                            className="w-full bg-transparent text-sm font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 outline-none"
-                            placeholder="Search patients, wards, notes, mortalities..."
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            autoComplete="off"
-                            spellCheck={false}
-                        />
-                        {query && (
-                            <button
-                                onClick={handleClear}
-                                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors shrink-0 ml-1"
-                                aria-label="Clear search"
-                            >
-                                <X size={15} />
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Filter Category Pills */}
-                {debouncedQuery.trim() && (
-                    <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-1.5 mt-2.5">
+            {/* Filter Category Pills */}
+            {debouncedQuery.trim() && (
+                <div className="sticky top-[57px] z-20 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-sm px-4 py-3">
+                    <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-1.5">
                         <button
                             onClick={() => setFilterCategory('all')}
                             className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
@@ -203,8 +167,8 @@ export default function SearchResultsPage({
                             Mortalities ({searchResults.mortalities.length})
                         </button>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* Content Body */}
             <div className="max-w-3xl mx-auto px-4 pt-4">

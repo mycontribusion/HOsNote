@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { SearchProvider } from './context/SearchContext'
 import Header from './components/Header'
 import AddPatientForm from './components/AddPatientForm'
 import PatientList from './components/PatientList'
@@ -1368,22 +1369,24 @@ const pendingEditRef = useRef(null)
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col transition-colors duration-300">
-            <Header
-                patientCount={patients.length}
-                docCount={docs.length}
-                darkMode={darkMode}
-                toggleDarkMode={toggleDarkMode}
-                onOpenSettings={() => navigate('/settings')}
-                activePage={activePage}
-                onPageChange={goToPage}
-                onOpenSearch={() => {
-                    searchReturnPathRef.current = location.pathname
-                    navigate('/search')
-                }}
-                onHome={onHome}
-                theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
-            />
+        <SearchProvider>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col transition-colors duration-300">
+                <Header
+                    patientCount={patients.length}
+                    docCount={docs.length}
+                    darkMode={darkMode}
+                    toggleDarkMode={toggleDarkMode}
+                    onOpenSettings={() => navigate('/settings')}
+                    activePage={activePage}
+                    onPageChange={goToPage}
+                    onOpenSearch={() => {
+                        searchReturnPathRef.current = location.pathname
+                        navigate('/search')
+                    }}
+                    onHome={onHome}
+                    onBackFromSearch={() => navigate(searchReturnPathRef.current || '/team/my_team')}
+                    theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
+                />
 
             {/* Notebook Page */}
             {activePage === 'notebook' && (
@@ -1426,7 +1429,6 @@ const pendingEditRef = useRef(null)
                         patients={patients}
                         mortalities={mortalities}
                         docs={docs}
-                        initialQuery={searchHighlightQuery}
                         onBack={() => navigate(searchReturnPathRef.current || '/team/my_team')}
                         onEditPatient={startEditing}
                         onDeletePatient={startRemovalProcess}
@@ -1719,6 +1721,7 @@ const pendingEditRef = useRef(null)
                 patients={patientsToExport}
                 listName={listName}
             />
-        </div>
+            </div>
+        </SearchProvider>
     )
 }
