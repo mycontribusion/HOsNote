@@ -1,11 +1,34 @@
 import { Moon, Sun, Settings, Stethoscope, BookOpen, Search, ArrowLeft, X } from 'lucide-react'
-import { memo, useRef, useEffect } from 'react'
+import { memo, useRef, useEffect, useState, useCallback } from 'react'
 import { useSearch } from '../context/SearchContext'
 
 const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onOpenSettings, activePage, onPageChange, onOpenSearch, onHome, onBackFromSearch, theme = 'blue' }) => {
     const isRed = theme === 'red'
     const { query, setQuery } = useSearch()
+    const [localQuery, setLocalQuery] = useState(query)
     const searchInputRef = useRef(null)
+    const debounceTimerRef = useRef(null)
+
+    // Sync localQuery when global query changes externally (e.g. clear)
+    useEffect(() => {
+        setLocalQuery(query)
+    }, [query])
+
+    const handleInputChange = (e) => {
+        const val = e.target.value
+        setLocalQuery(val)
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = setTimeout(() => {
+            setQuery(val)
+        }, 100)
+    }
+
+    const handleClearQuery = useCallback(() => {
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+        setLocalQuery('')
+        setQuery('')
+        searchInputRef.current?.focus()
+    }, [setQuery])
 
     // Auto-focus input when search page opens
     useEffect(() => {
@@ -20,8 +43,8 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
     // Keyboard navigation: Escape key clears query or exits search
     const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
-            if (query) {
-                setQuery('')
+            if (localQuery) {
+                handleClearQuery()
             } else {
                 if (onBackFromSearch) onBackFromSearch()
                 else if (onHome) onHome()
@@ -62,27 +85,27 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
                                 {/* Subtle vertical divider inside bar */}
                                 <div className="h-4 w-px bg-white/25 dark:bg-gray-700 mx-2 shrink-0" />
 
+                                {/* Search Icon */}
+                                <Search size={15} className="text-white/70 dark:text-gray-400 shrink-0 mr-2 transition-colors group-focus-within:text-white" />
+
                                 {/* Input Field */}
                                 <input
                                     ref={searchInputRef}
                                     type="search"
                                     className="w-full bg-transparent text-sm font-medium text-white placeholder-white/60 dark:placeholder-gray-400 outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
                                     placeholder="Search patients, wards, notes..."
-                                    value={query}
-                                    onChange={(e) => setQuery(e.target.value)}
+                                    value={localQuery}
+                                    onChange={handleInputChange}
                                     onKeyDown={handleKeyDown}
                                     autoComplete="off"
                                     spellCheck={false}
                                 />
 
                                 {/* Clear Button inside bar */}
-                                {query && (
+                                {localQuery && (
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setQuery('')
-                                            searchInputRef.current?.focus()
-                                        }}
+                                        onClick={handleClearQuery}
                                         className="p-1 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 text-white/80 hover:text-white transition-all ml-1 shrink-0 cursor-pointer"
                                         aria-label="Clear search"
                                         title="Clear search"

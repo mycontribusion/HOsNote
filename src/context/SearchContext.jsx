@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
 const SearchContext = createContext(null)
 
@@ -12,30 +12,36 @@ export function SearchProvider({ children }) {
         }
     })
 
-    // Sync query to URL search params
+    // Debounce syncing query to URL & sessionStorage to avoid main thread layout blocks
+    const saveTimerRef = useRef(null)
     useEffect(() => {
-        const url = new URL(window.location.href)
-        if (query) {
-            url.searchParams.set('q', query)
-        } else {
-            url.searchParams.delete('q')
-        }
-        window.history.replaceState({}, '', url.toString())
-    }, [query])
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = setTimeout(() => {
+            try {
+                const url = new URL(window.location.href)
+                if (query) {
+                    url.searchParams.set('q', query)
+                } else {
+                    url.searchParams.delete('q')
+                }
+                window.history.replaceState({}, '', url.toString())
+                sessionStorage.setItem('hosnote_search_query', query)
+            } catch {
+                // ignore
+            }
+        }, 300)
 
-    // Persist query to sessionStorage
-    useEffect(() => {
-        try {
-            sessionStorage.setItem('hosnote_search_query', query)
-        } catch {
-            // ignore
+        return () => {
+            if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
         }
     }, [query])
 
     const clearQuery = useCallback(() => setQuery(''), [])
 
+    const value = useMemo(() => ({ query, setQuery, clearQuery }), [query, clearQuery])
+
     return (
-        <SearchContext.Provider value={{ query, setQuery, clearQuery }}>
+        <SearchContext.Provider value={value}>
             {children}
         </SearchContext.Provider>
     )
@@ -48,3 +54,4 @@ export function useSearch() {
     }
     return ctx
 }
+

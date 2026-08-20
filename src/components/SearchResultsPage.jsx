@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useDeferredValue } from 'react'
 import { User, BookOpen, Heart, Frown, Users, Sparkles } from 'lucide-react'
 import { useSearch } from '../context/SearchContext'
 import PatientCard from './PatientCard'
@@ -22,22 +22,19 @@ export default function SearchResultsPage({
     navigate
 }) {
     const { query, clearQuery } = useSearch()
-    const [debouncedQuery, setDebouncedQuery] = useState(query)
+    const deferredQuery = useDeferredValue(query)
+    const [debouncedQuery, setDebouncedQuery] = useState(deferredQuery)
     const [filterCategory, setFilterCategory] = useState('all') // 'all' | 'my_team' | 'other_team' | 'notes' | 'mortalities'
     const [selectedPatient, setSelectedPatient] = useState(null)
     const [selectedDoc, setSelectedDoc] = useState(null)
 
-    // Sync debounced query when context query changes
-    useEffect(() => {
-        setDebouncedQuery(query)
-    }, [query])
-
+    // Debounce search calculations by 150ms to ensure 60fps typing speed
     useEffect(() => {
         const timer = setTimeout(() => {
-            setDebouncedQuery(query)
+            setDebouncedQuery(deferredQuery)
         }, 150)
         return () => clearTimeout(timer)
-    }, [query])
+    }, [deferredQuery])
 
     // Index notebook documents for search matching
     const indexedDocs = useMemo(() => {
