@@ -42,6 +42,6 @@ src/test_json.js
 src/**/*.test.js
 src/**/*.spec.js
 
-# Capacitor
-android/.gradle/
-android/capacitor-cordova-android-plugins/build/
+# Capacitor generated platform files
+android/
+ios/

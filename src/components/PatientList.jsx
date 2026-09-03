@@ -212,25 +212,26 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                 className="flex flex-col gap-2.5 mb-6"
                 aria-label={isMortality ? 'Mortality list' : 'Patient list'}
             >
-                {visibleActive.map((patient) => (
-                    <PatientCard
-                        key={patient.id}
-                        patient={patient}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onReview={onReview}
-                        onDocument={onDocument}
-                        docCount={getDocCount ? getDocCount(patient.id) : 0}
-                        isSelected={selectedIds.has(patient.id)}
-                        onToggleSelect={onToggleSelect}
-                        selectionMode={selectedIds.size > 0}
-                        isMortality={isMortality}
-                        onMoveTeam={onMoveTeam}
-                        moveTeamLabel={moveTeamLabel}
-                        highlightField={highlightField}
-                        highlightQuery={highlightQuery}
-                        onOpenDetail={setSelectedDetailPatient}
-                    />
+                {visibleActive.map((patient, idx) => (
+                    <div key={patient.id} id={idx === 0 ? 'tour-patient-card' : undefined}>
+                        <PatientCard
+                            patient={patient}
+                            onEdit={onEdit}
+                            onDelete={onDelete}
+                            onReview={onReview}
+                            onDocument={onDocument}
+                            docCount={getDocCount ? getDocCount(patient.id) : 0}
+                            isSelected={selectedIds.has(patient.id)}
+                            onToggleSelect={onToggleSelect}
+                            selectionMode={selectedIds.size > 0}
+                            isMortality={isMortality}
+                            onMoveTeam={onMoveTeam}
+                            moveTeamLabel={moveTeamLabel}
+                            highlightField={highlightField}
+                            highlightQuery={highlightQuery}
+                            onOpenDetail={setSelectedDetailPatient}
+                        />
+                    </div>
                 ))}
                 {visibleCount < sortedActive.length && (
                     <div ref={sentinelRef} className="py-4 text-center text-xs text-gray-400 dark:text-gray-500 font-medium">

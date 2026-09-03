@@ -15,6 +15,8 @@ import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 
+import DemoBanner from './components/DemoBanner'
+
 const ExportModal = lazy(() => import('./components/ExportModal'))
 const ScannerComponent = lazy(() => import('./components/ScannerComponent'))
 const ReviewDuplicatesModal = lazy(() => import('./components/ReviewDuplicatesModal'))
@@ -22,6 +24,7 @@ const SettingsModal = lazy(() => import('./components/SettingsModal'))
 const NotebookPage = lazy(() => import('./components/NotebookPage'))
 const DocComposer = lazy(() => import('./components/DocComposer'))
 const SearchResultsPage = lazy(() => import('./components/SearchResultsPage'))
+const InteractiveSpotlightTour = lazy(() => import('./components/InteractiveSpotlightTour'))
 
 const STORAGE_KEY = '4myteam_patients'
 const MORTALITIES_KEY = '4myteam_mortalities'
@@ -337,6 +340,24 @@ const pendingEditRef = useRef(null)
     const [showUndoToast, setShowUndoToast] = useState(false)
     const [selectedPatientIds, setSelectedPatientIds] = useState(new Set())
     const [pendingClearAction, setPendingClearAction] = useState(null)
+    const [showDemoModal, setShowDemoModal] = useState(false)
+    const [showDemoBanner, setShowDemoBanner] = useState(() => {
+        try {
+            return localStorage.getItem('hosnote_demo_banner_dismissed') !== 'true'
+        } catch {
+            return true
+        }
+    })
+    const [showDemoSkipToast, setShowDemoSkipToast] = useState(false)
+
+    const handleSkipDemoBanner = useCallback(() => {
+        setShowDemoBanner(false)
+        try {
+            localStorage.setItem('hosnote_demo_banner_dismissed', 'true')
+        } catch { /* ignore */ }
+        setShowDemoSkipToast(true)
+        setTimeout(() => setShowDemoSkipToast(false), 5000)
+    }, [])
 
     // Clear selection when switching tabs or pages
     useEffect(() => {
@@ -1388,6 +1409,13 @@ const pendingEditRef = useRef(null)
                     theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
                 />
 
+                {showDemoBanner && (
+                    <DemoBanner
+                        onStartDemo={() => setShowDemoModal(true)}
+                        onSkip={handleSkipDemoBanner}
+                    />
+                )}
+
             {/* Notebook Page */}
             {activePage === 'notebook' && (
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
@@ -1475,7 +1503,7 @@ const pendingEditRef = useRef(null)
 
                     {/* Tabs */}
                     {!showAddForm && !editingPatient && !showMortalityForm && !mortalitiesOnly && activeTab !== 'mortalities' && (
-                        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+                        <div id="tour-team-tabs" className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
                             <button
                                 onClick={() => goToTab('my_team')}
                                 className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'my_team' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
@@ -1663,6 +1691,13 @@ const pendingEditRef = useRef(null)
                         hasMortalities={mortalities.length > 0}
                         hasDocs={docs.length > 0}
                         hasAnyData={patients.length > 0 || mortalities.length > 0 || docs.length > 0 || discharges.length > 0}
+                        onStartDemo={() => setShowDemoModal(true)}
+                    />
+                )}
+
+                {showDemoModal && (
+                    <InteractiveSpotlightTour
+                        onClose={() => setShowDemoModal(false)}
                     />
                 )}
 
@@ -1700,6 +1735,15 @@ const pendingEditRef = useRef(null)
                     onConfirm={confirmClear}
                     onCancel={() => setPendingClearAction(null)}
                 />
+            )}
+            {/* Demo Skip Toast */}
+            {showDemoSkipToast && (
+                <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-800 text-white px-4 py-3 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-sm border border-gray-700">
+                    <span className="text-xs font-semibold">Demo skipped. You can replay it anytime from Settings ⚙️</span>
+                    <button onClick={() => setShowDemoSkipToast(false)} className="text-gray-400 hover:text-white p-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /></svg>
+                    </button>
+                </div>
             )}
             {/* Undo Toast */}
             {showUndoToast && (

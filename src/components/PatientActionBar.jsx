@@ -34,7 +34,7 @@ const PatientActionBarInner = ({
             <div className="relative w-full h-full">
                 {/* Micro-collapse / expand button — Matching Header Theme Glass Floating Pill */}
                 <button
-                    id={isCollapsed ? "pat-action-expand" : "pat-action-collapse"}
+                    id="tour-action-collapse"
                     type="button"
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     aria-label={isCollapsed ? "Expand action bar" : "Collapse action bar"}

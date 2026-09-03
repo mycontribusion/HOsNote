@@ -129,6 +129,7 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
                             <div className="flex items-center gap-1 flex-shrink-0">
                                 {/* Page switch pill */}
                                 <button
+                                    id="tour-page-switch"
                                     type="button"
                                     onClick={() => onPageChange(activePage === 'patients' ? 'notebook' : 'patients')}
                                     className={`flex items-center gap-1.5 ${pillActive} border backdrop-blur-sm rounded-full px-3 py-1.5 transition-all active:scale-95 text-white ${pillHover}`}
@@ -146,6 +147,7 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
 
                                 {/* Search button */}
                                 <button
+                                    id="tour-search-btn"
                                     onClick={onOpenSearch}
                                     className="w-9 h-9 rounded-xl hover:bg-white/15 active:bg-white/25 transition-colors flex items-center justify-center"
                                     aria-label="Search"
@@ -156,6 +158,7 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
 
                                 {/* Settings button */}
                                 <button
+                                    id="tour-settings-btn"
                                     onClick={onOpenSettings}
                                     className="w-9 h-9 rounded-xl hover:bg-white/15 active:bg-white/25 transition-colors flex items-center justify-center"
                                     aria-label="Settings"
@@ -166,6 +169,7 @@ const HeaderInner = ({ patientCount, docCount = 0, darkMode, toggleDarkMode, onO
 
                                 {/* Dark mode toggle */}
                                 <button
+                                    id="tour-dark-mode-btn"
                                     onClick={toggleDarkMode}
                                     className="w-9 h-9 rounded-xl hover:bg-white/15 active:bg-white/25 transition-colors flex items-center justify-center"
                                     aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull } from 'lucide-react'
+import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull, Sparkles } from 'lucide-react'
 
 export default function SettingsModal({
     onClose,
@@ -16,6 +16,7 @@ export default function SettingsModal({
     hasMortalities,
     hasDocs,
     hasAnyData,
+    onStartDemo,
 }) {
     const [backupDone, setBackupDone] = useState(false)
     const [restoreMsg, setRestoreMsg] = useState('')
@@ -126,6 +127,22 @@ export default function SettingsModal({
 
                 {/* Scrollable body */}
                 <div className="overflow-y-auto flex flex-col gap-5 px-4 pb-8">
+
+                    {/* App Tour & Demo */}
+                    <Section title="Help & Tour">
+                        <Row
+                            icon={<Sparkles size={15} className="text-white animate-pulse" />}
+                            iconBg="bg-gradient-to-r from-blue-600 to-indigo-600 shadow-xs"
+                            label="Watch App Demo"
+                            sublabel="Interactive tour of all features & workflows"
+                            right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
+                            onClick={() => {
+                                onClose()
+                                if (onStartDemo) onStartDemo()
+                            }}
+                            noBorder
+                        />
+                    </Section>
 
                     {/* Text Size */}
                     <Section title="Appearance">
