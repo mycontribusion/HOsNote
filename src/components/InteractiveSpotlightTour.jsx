@@ -68,7 +68,7 @@ const DEMO_DOCS = [
 ]
 
 // First step index that belongs to the notebook section
-const NOTEBOOK_START_STEP = 8
+const NOTEBOOK_START_STEP = 9
 
 export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRemoveDemoData }) {
     const navigate = useNavigate()
@@ -120,11 +120,17 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
             route: '/team/my_team',
         },
         {
-            targetId: 'tour-patient-card',
-            title: 'Patient Cards & Swipe Gestures',
-            description: 'Patient cards support 2 fast swipe gestures: Swipe Left-to-Right ➡️ to mark as Reviewed/Done, or Right-to-Left ⬅️ for Quick Actions (Edit, Delete, Notes).',
+            targetId: 'tour-patient-card-right',
+            title: 'Swipe Right to Mark Reviewed',
+            description: 'Swipe Left-to-Right ➡️ on a patient card to instantly mark them as Reviewed/Done.',
             preferredPos: 'bottom',
-            showSwipeDemo: true,
+            route: '/team/my_team',
+        },
+        {
+            targetId: 'tour-patient-card-left',
+            title: 'Swipe Left for Quick Actions',
+            description: 'Swipe Right-to-Left ⬅️ on a patient card to reveal Quick Actions (Edit, Delete, Notes).',
+            preferredPos: 'top',
             route: '/team/my_team',
         },
         {

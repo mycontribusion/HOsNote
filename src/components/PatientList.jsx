@@ -213,7 +213,18 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                 aria-label={isMortality ? 'Mortality list' : 'Patient list'}
             >
                 {visibleActive.map((patient, idx) => (
-                    <div key={patient.id} id={idx === 0 ? 'tour-patient-card' : undefined}>
+                    <div
+                        key={patient.id}
+                        id={
+                            patient.id === '__demo_patient_right__'
+                                ? 'tour-patient-card-right'
+                                : patient.id === '__demo_patient_left__'
+                                ? 'tour-patient-card-left'
+                                : idx === 0
+                                ? 'tour-patient-card'
+                                : undefined
+                        }
+                    >
                         <PatientCard
                             patient={patient}
                             onEdit={onEdit}
