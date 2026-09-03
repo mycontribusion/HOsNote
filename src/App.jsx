@@ -133,7 +133,8 @@ const navigateBackFromUrlRoute = useCallback(() => {
 useEffect(() => {
     const path = location.pathname
 
-    // Reset all modal states first
+    // Reset all modal states first (but NOT showDemoModal — the tour
+    // manages its own lifecycle and navigates between routes internally)
     setShowAddForm(false)
     setShowMortalityForm(false)
     if (!path.includes('/edit')) {
@@ -143,7 +144,6 @@ useEffect(() => {
     setShowScanner(false)
     setShowSettings(false)
     setShowSearch(false)
-    setShowDemoModal(false)
     if (path !== '/notebook/edit' && path !== '/notebook/add') {
         setNotebookEditDoc(null)
     }

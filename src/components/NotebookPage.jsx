@@ -473,6 +473,7 @@ const NotebookActionBar = memo(({
                     <div className={`w-full h-full p-1.5 ${headerBg} text-white backdrop-blur-xl border-2 border-white/25 dark:border-gray-700/80 rounded-2xl shadow-2xl flex items-center justify-between pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200 ring-1 ring-white/20`}>
                         {/* 1. Receive */}
                         <button
+                            id="note-action-import"
                             type="button"
                             onClick={onImport}
                             aria-label="Receive or import notes"
@@ -487,6 +488,7 @@ const NotebookActionBar = memo(({
 
                         {/* 2. Send */}
                         <button
+                            id="note-action-handover"
                             type="button"
                             onClick={onHandover}
                             aria-label={hasSelection ? `Send ${selectedCount} selected notes` : 'Send notes'}
@@ -512,6 +514,7 @@ const NotebookActionBar = memo(({
 
                         {/* 3. Add Note */}
                         <button
+                            id="note-action-add"
                             type="button"
                             onClick={onAddNote}
                             aria-label="Add note to notebook"
@@ -741,7 +744,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                 {docs.length > 0 && (
                     <div className="flex items-center justify-between gap-2 mb-3">
                         {/* Left: Note type filter */}
-                        <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
+                        <div id="tour-notebook-filter" className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
                             {NOTE_FILTER_OPTIONS.map((opt) => {
                                 const Icon = opt.icon
                                 const isActive = noteFilter === opt.value
@@ -773,7 +776,7 @@ const NotebookPageInner = ({ docs, onUpdateDoc, onDeleteDoc, showUndoToast, onUn
                         </div>
 
                         {/* Right: Sort controls */}
-                        <div className="flex items-center">
+                        <div id="tour-notebook-sort" className="flex items-center">
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value)}

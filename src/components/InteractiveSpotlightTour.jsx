@@ -1,66 +1,117 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { X, ChevronRight, ChevronLeft, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react'
 
 export default function InteractiveSpotlightTour({ onClose }) {
+    const navigate = useNavigate()
+    const location = useLocation()
     const [currentStep, setCurrentStep] = useState(0)
     const [targetRect, setTargetRect] = useState(null)
     const [popoverHeight, setPopoverHeight] = useState(240)
     const popoverRef = useRef(null)
 
     const steps = [
-        {
-            targetId: 'tour-page-switch',
-            title: 'Patients vs. Notebook Switcher',
-            description: 'Tap here to switch between your Patients Tracker (active ward lists) and your Clinical Notebook (standalone & patient notes).',
-            preferredPos: 'bottom',
-        },
+        // --- PART 1: PATIENTS TRACKER GUIDE ---
         {
             targetId: 'tour-search-btn',
             title: 'Global Instant Search',
             description: 'Search across active patients, hospital numbers, ward names, diagnoses, and notes in real time.',
             preferredPos: 'bottom',
+            route: '/team/my_team',
         },
         {
             targetId: 'tour-settings-btn',
             title: 'Settings & Data Backups',
             description: 'Export JSON data backups, adjust font sizes, toggle dark mode, or replay this tour anytime!',
             preferredPos: 'bottom',
+            route: '/team/my_team',
         },
         {
             targetId: 'tour-team-tabs',
             title: 'My Team & On Call Tabs',
             description: 'Separate your primary ward team patients from temporary on-call patients with two dedicated list tabs.',
             preferredPos: 'bottom',
+            route: '/team/my_team',
         },
         {
             targetId: 'tour-patient-card',
             title: 'Patient Cards & Swipe Gestures',
-            description: 'Patient cards support 2 fast swipe gestures:\n\nSwipe Left-to-Right ➡️ to mark as Reviewed,\n\nRight-to-Left ⬅️ to remove a patient (Discharge or Mortality).',
+            description: 'Patient cards support 2 fast swipe gestures: Swipe Left-to-Right ➡️ to mark as Reviewed/Done, or Right-to-Left ⬅️ for Quick Actions (Edit, Delete, Notes).',
             preferredPos: 'bottom',
+            showSwipeDemo: true,
+            route: '/team/my_team',
         },
         {
             targetId: 'tour-action-collapse',
             title: 'Collapse / Expand Action Bar',
             description: 'Tap this floating chevron pill to collapse the action bar for full-screen reading, or tap again to expand.',
             preferredPos: 'top',
+            route: '/team/my_team',
         },
         {
             targetId: 'pat-action-add',
             title: 'Add Patient / Record',
             description: 'Tap here anytime to admit a new patient or record details like ward, bed, hospital number & diagnosis.',
             preferredPos: 'top',
+            route: '/team/my_team',
         },
         {
             targetId: 'pat-action-handover',
             title: 'Instant Shift Handover',
             description: 'Export selected patients into an offline QR code or generate a formatted PDF handover report.',
             preferredPos: 'top',
+            route: '/team/my_team',
         },
         {
             targetId: 'pat-action-import',
             title: 'Receive & Scan Handover',
             description: 'Scan a colleague’s handover QR code to import their patient list directly into your tracker.',
             preferredPos: 'top',
+            route: '/team/my_team',
+        },
+
+        // --- PART 2: CLINICAL NOTEBOOK GUIDE (Transitions automatically to /notebook) ---
+        {
+            targetId: 'tour-page-switch',
+            title: 'Patients vs. Notebook Switcher',
+            description: 'Use this top header pill to switch seamlessly between your Patients Tracker (ward lists) and Clinical Notebook (standalone notes).',
+            preferredPos: 'bottom',
+            route: '/notebook',
+        },
+        {
+            targetId: 'tour-notebook-filter',
+            title: 'Filter Clinical Notes',
+            description: 'Filter your notebook list by All entries, Patient-linked notes, or Standalone clinical entries.',
+            preferredPos: 'bottom',
+            route: '/notebook',
+        },
+        {
+            targetId: 'tour-notebook-sort',
+            title: 'Sort Notebook Entries',
+            description: 'Sort your clinical notes by Newest First, Oldest First, Patient Name, Ward, or Diagnosis.',
+            preferredPos: 'bottom',
+            route: '/notebook',
+        },
+        {
+            targetId: 'note-action-add',
+            title: 'Add Standalone Note',
+            description: 'Create a standalone clinical note, medical reference entry, or consultation record.',
+            preferredPos: 'top',
+            route: '/notebook',
+        },
+        {
+            targetId: 'note-action-handover',
+            title: 'Send / Share Notebook Entries',
+            description: 'Select notes and generate an offline QR code or export package to share with team members.',
+            preferredPos: 'top',
+            route: '/notebook',
+        },
+        {
+            targetId: 'note-action-import',
+            title: 'Receive Notebook Entries',
+            description: 'Import standalone notes or clinical documentation from another user via QR scan.',
+            preferredPos: 'top',
+            route: '/notebook',
         },
     ]
 
@@ -97,6 +148,12 @@ export default function InteractiveSpotlightTour({ onClose }) {
 
     useEffect(() => {
         if (!activeStep) return
+
+        // Auto-navigate to section if step belongs to a different route
+        if (activeStep.route && location.pathname !== activeStep.route) {
+            navigate(activeStep.route)
+        }
+
         const el = document.getElementById(activeStep.targetId)
         if (el) {
             const rect = el.getBoundingClientRect()
@@ -108,7 +165,7 @@ export default function InteractiveSpotlightTour({ onClose }) {
         updateRect()
         const timer = setTimeout(updateRect, 350)
         return () => clearTimeout(timer)
-    }, [currentStep])
+    }, [currentStep, activeStep, navigate, location.pathname, updateRect])
 
     // Measure rendered popover card height
     useEffect(() => {
