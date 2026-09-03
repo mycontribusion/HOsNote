@@ -4,7 +4,7 @@ import { formatSmartDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
 import HighlightText from './HighlightText'
 
-const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail }) => {
+const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail, demoSwipeDir = null }) => {
     const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
     const noteRef = useRef(null)
     const [noteOverflows, setNoteOverflows] = useState(false)
@@ -22,6 +22,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
     }, [admissionDate, isMortality])
 
     const [offsetX, setOffsetX] = useState(0)
+    const [demoOffset, setDemoOffset] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
     const [pressRing, setPressRing] = useState(false)
     const startX = useRef(null)
@@ -53,6 +54,27 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
         window.addEventListener('resize', check)
         return () => window.removeEventListener('resize', check)
     }, [note])
+
+    // Demo swipe animation loop
+    useEffect(() => {
+        if (!demoSwipeDir) { setDemoOffset(0); return }
+        const PERIOD = 3200
+        const MAX = 130
+        const dir = demoSwipeDir === 'right' ? 1 : -1
+        let raf
+        const start = performance.now()
+        const animate = (now) => {
+            const t = ((now - start) % PERIOD) / PERIOD
+            let frac = 0
+            if (t < 0.35) frac = Math.sin((t / 0.35) * (Math.PI / 2))
+            else if (t < 0.6) frac = 1
+            else if (t < 0.85) frac = Math.sin(((0.85 - t) / 0.25) * (Math.PI / 2))
+            setDemoOffset(dir * MAX * frac)
+            raf = requestAnimationFrame(animate)
+        }
+        raf = requestAnimationFrame(animate)
+        return () => { cancelAnimationFrame(raf); setDemoOffset(0) }
+    }, [demoSwipeDir])
 
     // Auto-scroll note container to highlight mark if matching text is inside note
     useEffect(() => {
@@ -192,11 +214,13 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
         return wardColors[colorIdx]
     }, [ward, name, id, isMortality])
 
+    const effectiveOffset = demoSwipeDir ? demoOffset : offsetX
+
     return (
         <div className="relative overflow-hidden rounded-2xl" id={`patient-${id}`} role="listitem">
             {/* Background Actions */}
-            <div className={`absolute inset-0 flex justify-between items-center px-6 transition-colors duration-200 ${offsetX > 0 ? (reviewed ? 'bg-gray-200 dark:bg-gray-700' : 'bg-emerald-50 dark:bg-emerald-900/30') : (offsetX < 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-transparent')}`}>
-                <div className={`font-bold tracking-widest text-sm flex items-center gap-2 transition-opacity ${offsetX > 20 ? 'opacity-100' : 'opacity-0'} ${reviewed ? 'text-gray-500 dark:text-gray-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+            <div className={`absolute inset-0 flex justify-between items-center px-6 transition-colors duration-200 ${effectiveOffset > 0 ? (reviewed ? 'bg-gray-200 dark:bg-gray-700' : 'bg-emerald-50 dark:bg-emerald-900/30') : (effectiveOffset < 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-transparent')}`}>
+                <div className={`font-bold tracking-widest text-sm flex items-center gap-2 transition-opacity ${effectiveOffset > 20 ? 'opacity-100' : 'opacity-0'} ${reviewed ? 'text-gray-500 dark:text-gray-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
                     {!isMortality && (
                         <>
                             <CheckCircle2 size={20} />
@@ -204,7 +228,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                         </>
                     )}
                 </div>
-                <div className={`font-bold tracking-widest text-sm flex items-center gap-2 transition-opacity ${offsetX < -20 ? 'opacity-100 text-red-500 dark:text-red-400' : 'opacity-0'}`}>
+                <div className={`font-bold tracking-widest text-sm flex items-center gap-2 transition-opacity ${effectiveOffset < -20 ? 'opacity-100 text-red-500 dark:text-red-400' : 'opacity-0'}`}>
                     REMOVE
                     <Trash2 size={20} />
                 </div>
@@ -221,7 +245,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                         : critical ? 'bg-gradient-to-r from-red-50/60 to-white dark:from-red-900/10 dark:to-gray-800 border-red-200 dark:border-red-800/60'
                         : 'bg-white dark:bg-gray-800'
                     }`}
-                style={{ transform: `translateX(${offsetX}px)` }}
+                style={{ transform: `translateX(${effectiveOffset}px)` }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -491,5 +515,6 @@ export default memo(PatientCardInner, (prev, next) => {
     if (prev.isMortality !== next.isMortality) return false
     if (prev.highlightField !== next.highlightField) return false
     if (prev.highlightQuery !== next.highlightQuery) return false
+    if (prev.demoSwipeDir !== next.demoSwipeDir) return false
     return true
 })

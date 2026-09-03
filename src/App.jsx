@@ -466,7 +466,7 @@ const pendingEditRef = useRef(null)
 
     useEffect(() => {
         if (!isLoaded) return;
-        debouncedSave(STORAGE_KEY, patients)
+        debouncedSave(STORAGE_KEY, patients.filter(p => !p.isDemoData))
     }, [patients, isLoaded, debouncedSave])
 
     useEffect(() => {
@@ -482,10 +482,29 @@ const pendingEditRef = useRef(null)
 
     useEffect(() => {
         if (!isLoaded) return;
-        // Use a longer debounce for docs — the array can be large and changes
-        // frequently during note editing. 1500ms reduces write amplification.
-        debouncedSave(DOCUMENTATION_KEY, docs, 1500)
+        debouncedSave(DOCUMENTATION_KEY, docs.filter(d => !d.isDemoData), 1500)
     }, [docs, isLoaded, debouncedSave])
+
+    // ── Demo data callbacks (tour injects temporary patients/notes) ──────────
+    const addDemoData = useCallback(({ patients: demoPats = [], docs: demoDocs = [] }) => {
+        if (demoPats.length > 0) {
+            setPatients(prev => [
+                ...demoPats.filter(dp => !prev.some(p => p.id === dp.id)),
+                ...prev,
+            ])
+        }
+        if (demoDocs.length > 0) {
+            setDocs(prev => [
+                ...demoDocs.filter(dd => !prev.some(d => d.id === dd.id)),
+                ...prev,
+            ])
+        }
+    }, [])
+
+    const removeDemoData = useCallback(() => {
+        setPatients(prev => prev.filter(p => !p.isDemoData))
+        setDocs(prev => prev.filter(d => !d.isDemoData))
+    }, [])
 
     // ── Documentation callbacks ───────────────────────────────────────────────
 
@@ -1700,7 +1719,9 @@ const pendingEditRef = useRef(null)
 
                 {showDemoModal && (
                     <InteractiveSpotlightTour
-                        onClose={() => { setShowDemoModal(false); navigateBackFromUrlRoute(); }}
+                        onClose={() => { setShowDemoModal(false); navigateBackFromUrlRoute(); removeDemoData(); }}
+                        onAddDemoData={addDemoData}
+                        onRemoveDemoData={removeDemoData}
                     />
                 )}
 

@@ -2,13 +2,99 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { X, ChevronRight, ChevronLeft, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react'
 
-export default function InteractiveSpotlightTour({ onClose }) {
+// ── Demo data injected during the tour ─────────────────────────────────────
+const DEMO_PATIENTS = [
+    {
+        id: '__demo_patient_right__',
+        name: 'Sarah Ahmed',
+        hospitalNumber: 'DEMO-001',
+        ward: 'Ward 3B',
+        bed: '7',
+        diagnosis: 'Post-op Appendicitis · Day 2',
+        note: '',
+        team: 'my_team',
+        reviewed: false,
+        critical: false,
+        isDemoData: true,
+        demoSwipeDir: 'right',
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+    },
+    {
+        id: '__demo_patient_left__',
+        name: 'James Wilson',
+        hospitalNumber: 'DEMO-002',
+        ward: 'Ward 5A',
+        bed: '12',
+        diagnosis: 'Hypertensive Crisis',
+        note: '',
+        team: 'my_team',
+        reviewed: false,
+        critical: false,
+        isDemoData: true,
+        demoSwipeDir: 'left',
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+    },
+]
+
+const DEMO_DOCS = [
+    {
+        id: '__demo_doc_patient__',
+        patientId: null,
+        patientName: 'Sarah Ahmed',
+        patientWard: 'Ward 3B',
+        patientHosp: 'DEMO-001',
+        diagnosis: 'Post-op Appendicitis',
+        text: 'Day 2 post-op. Patient stable, tolerating oral fluids well. Wound site clean and dry. Plan to step down analgesia and commence mobilisation tomorrow.',
+        color: 'teal',
+        isDemoData: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+    {
+        id: '__demo_doc_standalone__',
+        patientId: null,
+        patientName: '',
+        patientWard: '',
+        patientHosp: '',
+        diagnosis: 'Sepsis 6 Bundle ⚡',
+        text: '1. O₂ if SpO₂ <94%\n2. Blood cultures ×2\n3. IV antibiotics (within 1hr)\n4. IV fluids — 500ml bolus\n5. Check lactate + FBC\n6. Monitor urine output (catheterise if needed)',
+        color: 'blue',
+        isDemoData: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+]
+
+// First step index that belongs to the notebook section
+const NOTEBOOK_START_STEP = 8
+
+export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRemoveDemoData }) {
     const navigate = useNavigate()
     const location = useLocation()
     const [currentStep, setCurrentStep] = useState(0)
     const [targetRect, setTargetRect] = useState(null)
     const [popoverHeight, setPopoverHeight] = useState(240)
     const popoverRef = useRef(null)
+    const notebookDataAdded = useRef(false)
+
+    // Inject demo patients immediately on mount
+    useEffect(() => {
+        onAddDemoData?.({ patients: DEMO_PATIENTS })
+        return () => {
+            // Clean up all demo data when tour unmounts
+            onRemoveDemoData?.()
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Inject demo notes when transitioning to notebook section
+    useEffect(() => {
+        if (currentStep >= NOTEBOOK_START_STEP && !notebookDataAdded.current) {
+            notebookDataAdded.current = true
+            onAddDemoData?.({ docs: DEMO_DOCS })
+        }
+    }, [currentStep, onAddDemoData])
 
     const steps = [
         // --- PART 1: PATIENTS TRACKER GUIDE ---

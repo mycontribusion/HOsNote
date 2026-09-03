@@ -230,6 +230,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                             highlightField={highlightField}
                             highlightQuery={highlightQuery}
                             onOpenDetail={setSelectedDetailPatient}
+                            demoSwipeDir={patient.isDemoData ? patient.demoSwipeDir ?? null : null}
                         />
                     </div>
                 ))}
