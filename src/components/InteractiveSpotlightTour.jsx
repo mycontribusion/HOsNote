@@ -35,9 +35,8 @@ export default function InteractiveSpotlightTour({ onClose }) {
         {
             targetId: 'tour-patient-card',
             title: 'Patient Cards & Swipe Gestures',
-            description: 'Patient cards support 2 fast swipe gestures: Swipe Left-to-Right ➡️ to mark as Reviewed/Done, or Right-to-Left ⬅️ for Quick Actions (Edit, Delete, Notes).',
+            description: 'Patient cards support 2 fast swipe gestures:\n\nSwipe Left-to-Right ➡️ to mark as Reviewed,\n\nRight-to-Left ⬅️ to remove a patient (Discharge or Mortality).',
             preferredPos: 'bottom',
-            showSwipeDemo: true,
         },
         {
             targetId: 'tour-action-collapse',
@@ -278,37 +277,9 @@ export default function InteractiveSpotlightTour({ onClose }) {
                 </div>
 
                 {/* Description Text */}
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 leading-relaxed">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
                     {activeStep.description}
                 </p>
-
-                {/* Dual Swipe Gestures Demo (Left-to-Right ➡️ AND Right-to-Left ⬅️) */}
-                {activeStep.showSwipeDemo && (
-                    <div className="my-1 p-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 dark:from-blue-900/30 dark:to-purple-900/30 rounded-2xl border border-blue-200/60 dark:border-blue-800/60 flex flex-col gap-2.5 shadow-xs">
-                        <div className="flex items-center justify-between text-xs font-extrabold text-gray-600 dark:text-gray-300">
-                            <span>Swipe Gestures</span>
-                            <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-full">Interactive Shortcuts</span>
-                        </div>
-
-                        {/* 1. Left to Right */}
-                        <div className="bg-white dark:bg-gray-800 p-2.5 rounded-xl shadow-xs border border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black shrink-0">✓</div>
-                                <span className="text-xs font-bold text-gray-800 dark:text-gray-100">Swipe Left-to-Right ➡️</span>
-                            </div>
-                            <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">Mark Reviewed 🟢</span>
-                        </div>
-
-                        {/* 2. Right to Left */}
-                        <div className="bg-white dark:bg-gray-800 p-2.5 rounded-xl shadow-xs border border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-full bg-purple-500 text-white flex items-center justify-center text-xs font-black shrink-0">⚙️</div>
-                                <span className="text-xs font-bold text-gray-800 dark:text-gray-100">Swipe Right-to-Left ⬅️</span>
-                            </div>
-                            <span className="text-[11px] font-extrabold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/40 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-800">Quick Actions (Edit/Delete)</span>
-                        </div>
-                    </div>
-                )}
 
                 {/* Footer Controls */}
                 <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
