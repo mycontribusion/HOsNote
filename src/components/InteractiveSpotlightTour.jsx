@@ -6,7 +6,7 @@ import { X, ChevronRight, ChevronLeft, CheckCircle2, ArrowRight, ArrowLeft } fro
 const DEMO_PATIENTS = [
     {
         id: '__demo_patient_right__',
-        name: 'Sarah Ahmed',
+        name: 'Demo Abc',
         hospitalNumber: 'DEMO-001',
         ward: 'Ward 3B',
         bed: '7',
@@ -22,7 +22,7 @@ const DEMO_PATIENTS = [
     },
     {
         id: '__demo_patient_left__',
-        name: 'James Wilson',
+        name: 'Demo Def',
         hospitalNumber: 'DEMO-002',
         ward: 'Ward 5A',
         bed: '12',
@@ -42,7 +42,7 @@ const DEMO_DOCS = [
     {
         id: '__demo_doc_patient__',
         patientId: null,
-        patientName: 'Sarah Ahmed',
+        patientName: 'Demo Abc',
         patientWard: 'Ward 3B',
         patientHosp: 'DEMO-001',
         diagnosis: 'Post-op Appendicitis',
@@ -79,22 +79,10 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
     const popoverRef = useRef(null)
     const notebookDataAdded = useRef(false)
 
-    // Inject demo patients immediately on mount
+    // Inject demo patients and demo notes immediately on tour start
     useEffect(() => {
-        onAddDemoData?.({ patients: DEMO_PATIENTS })
-        return () => {
-            // Clean up all demo data when tour unmounts
-            onRemoveDemoData?.()
-        }
+        onAddDemoData?.({ patients: DEMO_PATIENTS, docs: DEMO_DOCS })
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Inject demo notes when transitioning to notebook section
-    useEffect(() => {
-        if (currentStep >= NOTEBOOK_START_STEP && !notebookDataAdded.current) {
-            notebookDataAdded.current = true
-            onAddDemoData?.({ docs: DEMO_DOCS })
-        }
-    }, [currentStep, onAddDemoData])
 
     const steps = [
         // --- PART 1: PATIENTS TRACKER GUIDE ---
