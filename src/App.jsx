@@ -124,7 +124,7 @@ const navigateBackFromUrlRoute = useCallback(() => {
     } else if (path.endsWith('/add') || path.includes('/edit') ||
         path.includes('/handover') || path.includes('/recieve') || path.includes('/receive')) {
         navigate(`/team/${activeTab}`)
-    } else if (path === '/settings' || path === '/search') {
+    } else if (path === '/settings' || path === '/search' || path === '/demo') {
         navigate('/team/my_team')
     }
 }, [location.pathname, navigate, activeTab])
@@ -143,6 +143,7 @@ useEffect(() => {
     setShowScanner(false)
     setShowSettings(false)
     setShowSearch(false)
+    setShowDemoModal(false)
     if (path !== '/notebook/edit' && path !== '/notebook/add') {
         setNotebookEditDoc(null)
     }
@@ -164,6 +165,8 @@ useEffect(() => {
         setShowSettings(true)
     } else if (path === '/search') {
         setShowSearch(true)
+    } else if (path === '/demo') {
+        setShowDemoModal(true)
     }
 }, [location.pathname])
 
@@ -1411,7 +1414,7 @@ const pendingEditRef = useRef(null)
 
                 {showDemoBanner && (
                     <DemoBanner
-                        onStartDemo={() => setShowDemoModal(true)}
+                        onStartDemo={() => navigate('/demo')}
                         onSkip={handleSkipDemoBanner}
                     />
                 )}
@@ -1691,13 +1694,13 @@ const pendingEditRef = useRef(null)
                         hasMortalities={mortalities.length > 0}
                         hasDocs={docs.length > 0}
                         hasAnyData={patients.length > 0 || mortalities.length > 0 || docs.length > 0 || discharges.length > 0}
-                        onStartDemo={() => setShowDemoModal(true)}
+                        onStartDemo={() => { setShowSettings(false); navigate('/demo'); }}
                     />
                 )}
 
                 {showDemoModal && (
                     <InteractiveSpotlightTour
-                        onClose={() => setShowDemoModal(false)}
+                        onClose={() => { setShowDemoModal(false); navigateBackFromUrlRoute(); }}
                     />
                 )}
 
