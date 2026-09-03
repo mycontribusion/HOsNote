@@ -360,7 +360,7 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
     const { popoverStyle, arrowPos, arrowStyle } = getPopoverStyle()
 
     return (
-        <div className="fixed inset-0 z-[200] overflow-hidden pointer-events-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="fixed inset-0 z-[200] overflow-hidden pointer-events-auto">
             {/* Fallback backdrop when no target rect */}
             {!targetRect && (
                 <div className="absolute inset-0 bg-black/75 transition-opacity duration-300" />
