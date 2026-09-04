@@ -177,7 +177,7 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
         {
             targetId: 'tour-patient-card-left',
             title: 'Swipe Left for Quick Actions',
-            description: 'Swipe Right-to-Left ⬅️ on a patient card to reveal Quick Actions (Dischare or Mortality).',
+            description: 'Swipe Right-to-Left ⬅️ on a patient card to reveal Quick Actions (Discharge or Mortality).',
             preferredPos: 'top',
             route: '/team/my_team',
         },
