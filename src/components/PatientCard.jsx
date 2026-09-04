@@ -410,6 +410,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                             <div className="mt-1 flex items-start gap-1.5 min-w-0 max-w-full">
                                 <div
                                     ref={noteRef}
+                                    id={id === '__demo_patient_left__' ? 'tour-card-note-container' : undefined}
                                     className="flex-1 text-sm text-gray-700 dark:text-gray-300 max-h-[5.2rem] overflow-y-auto pointer-events-none select-none break-all [overflow-wrap:anywhere] [word-break:break-word] min-w-0 leading-relaxed"
                                     style={{ whiteSpace: 'pre-wrap', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                                     onScroll={handleNoteScroll}
@@ -422,7 +423,12 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                 </div>
                                 {/* Custom right scrollbar (Micro-thin ghost bar) */}
                                 {noteOverflows && (
-                                    <div className="flex-shrink-0 w-[2.5px] rounded-full bg-transparent relative self-stretch opacity-20 group-hover:opacity-75 hover:!opacity-100 transition-opacity duration-300">
+                                    <div
+                                        id={id === '__demo_patient_left__' ? 'tour-card-scrollbar' : undefined}
+                                        className={`flex-shrink-0 w-[4px] rounded-full relative self-stretch transition-opacity duration-300 ${
+                                            id === '__demo_patient_left__' ? 'opacity-100 bg-blue-500/20' : 'opacity-20 group-hover:opacity-75 hover:!opacity-100 bg-transparent'
+                                        }`}
+                                    >
                                         <div
                                             className="absolute -left-1.5 -right-1.5 top-0 bottom-0 cursor-grab active:cursor-grabbing touch-none flex justify-center"
                                             style={{
@@ -434,7 +440,9 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                             onPointerUp={handleThumbPointerUp}
                                             onPointerCancel={handleThumbPointerUp}
                                         >
-                                            <div className="w-[2.5px] h-full rounded-full bg-gray-400/70 dark:bg-gray-500/70 hover:bg-blue-600 dark:hover:bg-blue-400 transition-colors" />
+                                            <div className={`w-[4px] h-full rounded-full transition-colors ${
+                                                id === '__demo_patient_left__' ? 'bg-blue-600 dark:bg-blue-400' : 'bg-gray-400/70 dark:bg-gray-500/70 hover:bg-blue-600 dark:hover:bg-blue-400'
+                                            }`} />
                                         </div>
                                     </div>
                                 )}

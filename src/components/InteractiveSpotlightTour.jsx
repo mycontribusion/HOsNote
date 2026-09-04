@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import { X, ChevronRight, ChevronLeft, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react'
 
 // ── Demo data injected during the tour ─────────────────────────────────────
@@ -11,12 +10,12 @@ const DEMO_PATIENTS = [
         ward: 'Ward 3B',
         bed: '7',
         diagnosis: 'Post-op Appendicitis · Day 2',
-        note: '',
+        note: 'Day 2 Post-Op Appendectomy.\n• Vitals stable (BP 120/80, HR 72).\n• Tolerating oral fluids & light diet.\n• Wound site clean, dry and intact.\n• Plan: Step down analgesia and review for discharge AM.',
         team: 'my_team',
         reviewed: false,
         critical: false,
         isDemoData: true,
-        demoSwipeDir: 'right',
+        demoSwipeDir: null,
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
     },
@@ -27,12 +26,12 @@ const DEMO_PATIENTS = [
         ward: 'Ward 5A',
         bed: '12',
         diagnosis: 'Hypertensive Crisis',
-        note: '',
+        note: 'Admitted with Hypertensive Crisis (BP 190/115).\n• Given IV Labetalol bolus in ED.\n• BP now controlled at 140/90 on ward.\n• No acute end-organ damage.\n• Plan: Continue oral Labetalol & Ramipril. Repeat EUC tomorrow.',
         team: 'my_team',
         reviewed: false,
         critical: false,
         isDemoData: true,
-        demoSwipeDir: 'left',
+        demoSwipeDir: null,
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
     },
@@ -68,11 +67,9 @@ const DEMO_DOCS = [
 ]
 
 // First step index that belongs to the notebook section
-const NOTEBOOK_START_STEP = 9
+const NOTEBOOK_START_STEP = 11
 
-export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRemoveDemoData }) {
-    const navigate = useNavigate()
-    const location = useLocation()
+export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRemoveDemoData, onUpdateDemoPatients, onStepRoute, onToggleSelect }) {
     const [currentStep, setCurrentStep] = useState(0)
     const [targetRect, setTargetRect] = useState(null)
     const [popoverHeight, setPopoverHeight] = useState(240)
@@ -83,6 +80,69 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
     useEffect(() => {
         onAddDemoData?.({ patients: DEMO_PATIENTS, docs: DEMO_DOCS })
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Control card swipe movement per step (only animate during swipe gesture demonstration steps 3 & 4; static for guides 6, 7 & rest)
+    useEffect(() => {
+        if (!onUpdateDemoPatients) return
+        if (currentStep === 3) {
+            onUpdateDemoPatients({ '__demo_patient_right__': 'right', '__demo_patient_left__': null })
+        } else if (currentStep === 4) {
+            onUpdateDemoPatients({ '__demo_patient_right__': null, '__demo_patient_left__': 'left' })
+        } else {
+            onUpdateDemoPatients({ '__demo_patient_right__': null, '__demo_patient_left__': null })
+        }
+    }, [currentStep, onUpdateDemoPatients])
+
+    // Guide 6 (Step index 5): Auto select & unselect card repeatedly until user clicks next
+    useEffect(() => {
+        if (currentStep !== 5 || !onToggleSelect) return
+
+        let isSelected = false
+        const initialTimer = setTimeout(() => {
+            onToggleSelect('__demo_patient_right__')
+            isSelected = true
+        }, 400)
+
+        const loopInterval = setInterval(() => {
+            onToggleSelect('__demo_patient_right__')
+            isSelected = !isSelected
+        }, 1500)
+
+        return () => {
+            clearTimeout(initialTimer)
+            clearInterval(loopInterval)
+            if (isSelected) {
+                onToggleSelect('__demo_patient_right__')
+            }
+        }
+    }, [currentStep, onToggleSelect])
+
+    // Guide 7 (Step index 6): Auto scroll card note container to demonstrate micro scrollbar
+    useEffect(() => {
+        if (currentStep !== 6) return
+        const el = document.getElementById('tour-card-note-container')
+        if (!el) return
+
+        let dir = 1
+        const interval = setInterval(() => {
+            const maxScroll = el.scrollHeight - el.clientHeight
+            if (maxScroll <= 0) return
+            let next = el.scrollTop + dir * 2
+            if (next >= maxScroll) {
+                next = maxScroll
+                dir = -1
+            } else if (next <= 0) {
+                next = 0
+                dir = 1
+            }
+            el.scrollTop = next
+        }, 35)
+
+        return () => {
+            clearInterval(interval)
+            if (el) el.scrollTop = 0
+        }
+    }, [currentStep])
 
     const steps = [
         // --- PART 1: PATIENTS TRACKER GUIDE ---
@@ -96,7 +156,7 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
         {
             targetId: 'tour-settings-btn',
             title: 'Settings & Data Backups',
-            description: '• Your app control center.\n• Back up all records.\n• Adjust text size for comfortable reading.\n• Restart the guided tour anytime.\n• Clear specific data sections',
+            description: '• Your app control center.\n• Back up all records. \n• View mortalities record.\n• Adjust text size for comfortable reading.\n• Restart the guided tour anytime.\n• Clear specific data sections',
             preferredPos: 'bottom',
             route: '/team/my_team',
         },
@@ -119,6 +179,20 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
             title: 'Swipe Left for Quick Actions',
             description: 'Swipe Right-to-Left ⬅️ on a patient card to reveal Quick Actions (Dischare or Mortality).',
             preferredPos: 'top',
+            route: '/team/my_team',
+        },
+        {
+            targetId: 'tour-patient-card-right',
+            title: 'Long Press to Select Patient',
+            description: 'Press and hold (hold for 0.5s) on any patient card to select it.',
+            preferredPos: 'bottom',
+            route: '/team/my_team',
+        },
+        {
+            targetId: 'tour-card-scrollbar',
+            title: 'Scrollable Card Notes',
+            description: 'Scroll the scrollbar inside the card to read longer clinical entries without opening the detail view.',
+            preferredPos: 'left',
             route: '/team/my_team',
         },
         {
@@ -229,9 +303,9 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
     useEffect(() => {
         if (!activeStep) return
 
-        // Auto-navigate to section if step belongs to a different route
-        if (activeStep.route && location.pathname !== activeStep.route) {
-            navigate(activeStep.route)
+        // Notify parent of active step route (e.g. '/notebook' or '/team/my_team') without changing browser URL
+        if (activeStep.route && onStepRoute) {
+            onStepRoute(activeStep.route)
         }
 
         const el = document.getElementById(activeStep.targetId)
@@ -245,7 +319,7 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
         updateRect()
         const timer = setTimeout(updateRect, 350)
         return () => clearTimeout(timer)
-    }, [currentStep, activeStep, navigate, location.pathname, updateRect])
+    }, [currentStep, activeStep, onStepRoute, updateRect])
 
     // Measure rendered popover card height
     useEffect(() => {

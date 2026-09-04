@@ -89,11 +89,16 @@ export default function App() {
     const navigate = useNavigate()
     const location = useLocation()
 
+    const [showDemoModal, setShowDemoModal] = useState(false)
+    const [demoSubPage, setDemoSubPage] = useState('patients')
+
     // Real URL-based navigation:
     //   /                 -> patients page, my_team tab
     //   /team/:tab        -> patients page, :tab in {my_team, other_team, mortalities}
     //   /notebook         -> clinical notebook page
-    const activePage = location.pathname === '/search' ? 'search' : location.pathname.startsWith('/notebook') ? 'notebook' : 'patients'
+    const activePage = showDemoModal
+        ? demoSubPage
+        : (location.pathname === '/search' ? 'search' : location.pathname.startsWith('/notebook') ? 'notebook' : 'patients')
     const activeTab = params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
         ? params.tab
         : location.pathname === '/mortalities'
@@ -102,18 +107,35 @@ export default function App() {
 
     const goToPage = useCallback((page) => {
         setMortalitiesOnly(false)
+        if (showDemoModal) {
+            setDemoSubPage(page === 'notebook' ? 'notebook' : 'patients')
+            return
+        }
         if (page === 'notebook') navigate('/notebook')
         else navigate(`/team/${activeTab}`)
-    }, [navigate, activeTab])
+    }, [navigate, activeTab, showDemoModal])
+
     const goToTab = useCallback((tab) => {
         setMortalitiesOnly(false)
-        navigate(`/team/${tab}`)
-    }, [navigate])
+        if (!showDemoModal) {
+            navigate(`/team/${tab}`)
+        }
+    }, [navigate, showDemoModal])
+
+    const handleStepRoute = useCallback((route) => {
+        if (route === '/notebook') {
+            setDemoSubPage('notebook')
+        } else {
+            setDemoSubPage('patients')
+        }
+    }, [])
 
     const onHome = useCallback(() => {
         setMortalitiesOnly(false)
-        navigate('/team/my_team')
-    }, [navigate])
+        if (!showDemoModal) {
+            navigate('/team/my_team')
+        }
+    }, [navigate, showDemoModal])
 
 // Navigate back to default page when closing a URL-triggered modal/form
 const navigateBackFromUrlRoute = useCallback(() => {
@@ -134,7 +156,7 @@ useEffect(() => {
     const path = location.pathname
 
     // Reset all modal states first (but NOT showDemoModal — the tour
-    // manages its own lifecycle and navigates between routes internally)
+    // manages its own lifecycle and stays on /demo route)
     setShowAddForm(false)
     setShowMortalityForm(false)
     if (!path.includes('/edit')) {
@@ -167,6 +189,7 @@ useEffect(() => {
         setShowSearch(true)
     } else if (path === '/demo') {
         setShowDemoModal(true)
+        setDemoSubPage('patients')
     }
 }, [location.pathname])
 
@@ -343,7 +366,6 @@ const pendingEditRef = useRef(null)
     const [showUndoToast, setShowUndoToast] = useState(false)
     const [selectedPatientIds, setSelectedPatientIds] = useState(new Set())
     const [pendingClearAction, setPendingClearAction] = useState(null)
-    const [showDemoModal, setShowDemoModal] = useState(false)
     const [showDemoBanner, setShowDemoBanner] = useState(() => {
         try {
             return localStorage.getItem('hosnote_demo_banner_dismissed') !== 'true'
@@ -504,6 +526,14 @@ const pendingEditRef = useRef(null)
     const removeDemoData = useCallback(() => {
         setPatients(prev => prev.filter(p => !p.isDemoData))
         setDocs(prev => prev.filter(d => !d.isDemoData))
+    }, [])
+
+    const updateDemoPatients = useCallback((swipeDirMap) => {
+        setPatients(prev => prev.map(p => {
+            if (!p.isDemoData) return p
+            const dir = swipeDirMap[p.id] !== undefined ? swipeDirMap[p.id] : null
+            return { ...p, demoSwipeDir: dir }
+        }))
     }, [])
 
     // ── Documentation callbacks ───────────────────────────────────────────────
@@ -1719,9 +1749,17 @@ const pendingEditRef = useRef(null)
 
                 {showDemoModal && (
                     <InteractiveSpotlightTour
-                        onClose={() => { setShowDemoModal(false); navigateBackFromUrlRoute(); removeDemoData(); }}
+                        onClose={() => {
+                            setShowDemoModal(false);
+                            setDemoSubPage('patients');
+                            removeDemoData();
+                            navigateBackFromUrlRoute();
+                        }}
                         onAddDemoData={addDemoData}
                         onRemoveDemoData={removeDemoData}
+                        onUpdateDemoPatients={updateDemoPatients}
+                        onStepRoute={handleStepRoute}
+                        onToggleSelect={toggleSelectPatient}
                     />
                 )}
 
