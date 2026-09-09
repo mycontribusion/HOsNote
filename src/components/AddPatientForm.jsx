@@ -6,9 +6,9 @@ import { generateUniqueValue } from '../utils/uniqueSuffix'
 import DuplicatePromptModal from './DuplicatePromptModal'
 
 const DRAFT_KEY = '4myteam_draft_patient'
-const EDIT_DRAFT_KEY = '4myteam_edit_draft_patient'
+const EDIT_DRAFT_KEY = '4myteam_edit_draft_patient_'
+const EDIT_DRAFT_KEY_NOTE = '4myteam_edit_draft_note_'
 const DRAFT_KEY_NOTE = '4myteam_draft_note'
-const EDIT_DRAFT_KEY_NOTE = '4myteam_edit_draft_note'
 
 function today() {
     return new Date().toISOString().split('T')[0]
@@ -67,20 +67,45 @@ function clearDraft() {
     catch { /* ignore */ }
 }
 
-function loadEditDraft() {
+function hasDraftDifferences(draftFields, initial) {
+    if (!draftFields || !initial) return false
+    const keys = ['name', 'hospitalNumber', 'ward', 'bed', 'admissionDate', 'diagnosis', 'note']
+    return keys.some(k => (draftFields[k] || '').trim() !== (initial[k] || '').trim())
+}
+
+function loadEditDraft(patientId) {
+    if (!patientId) return null
     try {
-        const raw = localStorage.getItem(EDIT_DRAFT_KEY)
-        return raw ? JSON.parse(raw) : null
+        const raw = localStorage.getItem(EDIT_DRAFT_KEY + patientId)
+        if (raw) return JSON.parse(raw)
+        // Backward-compatibility: check un-suffixed legacy key if it matches this patient
+        const legacyRaw = localStorage.getItem('4myteam_edit_draft_patient')
+        if (legacyRaw) {
+            try {
+                const legacy = JSON.parse(legacyRaw)
+                if (legacy && String(legacy.patientId) === String(patientId)) {
+                    localStorage.removeItem('4myteam_edit_draft_patient')
+                    saveEditDraft(patientId, legacy)
+                    return legacy
+                }
+            } catch { /* ignore */ }
+        }
+        return null
     } catch { return null }
 }
 
-function saveEditDraft(data) {
-    try { localStorage.setItem(EDIT_DRAFT_KEY, JSON.stringify(data)) }
+function saveEditDraft(patientId, data) {
+    if (!patientId) return
+    try { localStorage.setItem(EDIT_DRAFT_KEY + patientId, JSON.stringify(data)) }
     catch { /* quota exceeded */ }
 }
 
-function clearEditDraft() {
-    try { localStorage.removeItem(EDIT_DRAFT_KEY) }
+function clearEditDraft(patientId) {
+    if (!patientId) return
+    try {
+        localStorage.removeItem(EDIT_DRAFT_KEY + patientId)
+        localStorage.removeItem('4myteam_edit_draft_patient')
+    }
     catch { /* ignore */ }
 }
 
@@ -101,20 +126,38 @@ function clearNoteDraft() {
     catch { /* ignore */ }
 }
 
-function loadNoteEditDraft() {
+function loadNoteEditDraft(patientId) {
+    if (!patientId) return null
     try {
-        const raw = localStorage.getItem(EDIT_DRAFT_KEY_NOTE)
-        return raw ? JSON.parse(raw) : null
+        const raw = localStorage.getItem(EDIT_DRAFT_KEY_NOTE + patientId)
+        if (raw) return JSON.parse(raw)
+        const legacyRaw = localStorage.getItem('4myteam_edit_draft_note')
+        if (legacyRaw) {
+            try {
+                const legacy = JSON.parse(legacyRaw)
+                if (legacy && String(legacy.patientId) === String(patientId)) {
+                    localStorage.removeItem('4myteam_edit_draft_note')
+                    saveNoteEditDraft(patientId, legacy)
+                    return legacy
+                }
+            } catch { /* ignore */ }
+        }
+        return null
     } catch { return null }
 }
 
-function saveNoteEditDraft(data) {
-    try { localStorage.setItem(EDIT_DRAFT_KEY_NOTE, JSON.stringify(data)) }
+function saveNoteEditDraft(patientId, data) {
+    if (!patientId) return
+    try { localStorage.setItem(EDIT_DRAFT_KEY_NOTE + patientId, JSON.stringify(data)) }
     catch { /* quota exceeded */ }
 }
 
-function clearNoteEditDraft() {
-    try { localStorage.removeItem(EDIT_DRAFT_KEY_NOTE) }
+function clearNoteEditDraft(patientId) {
+    if (!patientId) return
+    try {
+        localStorage.removeItem(EDIT_DRAFT_KEY_NOTE + patientId)
+        localStorage.removeItem('4myteam_edit_draft_note')
+    }
     catch { /* ignore */ }
 }
 
@@ -146,11 +189,25 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         return initialTeam
     })
     
-    const [fields, setFields] = useState({ name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' })
+    const [fields, setFields] = useState(() => {
+        if (initialData) {
+            return {
+                name: toTitleCase(initialData.name || ''),
+                hospitalNumber: initialData.hospitalNumber || '',
+                ward: initialData.ward || '',
+                bed: initialData.bed || '',
+                admissionDate: initialData.admissionDate || today(),
+                diagnosis: initialData.diagnosis || '',
+                note: initialData.note || ''
+            }
+        }
+        return { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
+    })
     
-    const [critical, setCritical] = useState(false)
+    const [critical, setCritical] = useState(() => initialData ? !!initialData.critical : false)
     const [error, setError] = useState('')
     const [duplicateInfo, setDuplicateInfo] = useState(null)
+    const [pendingDraft, setPendingDraft] = useState(null) // draft waiting for user to restore or discard
 
     const nameRef = useRef(null)
     const hospRef = useRef(null)
@@ -163,6 +220,8 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     const scrollRestoreRef = useRef(0)
 
     const hasSavedRef = useRef(false)
+    const isDiscardedRef = useRef(false)
+    const hasEditedRef = useRef(false)
     const fieldsRef = useRef(fields)
     const teamRef = useRef(team)
     const criticalRef = useRef(critical)
@@ -194,26 +253,43 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     useEffect(() => {
         hasSavedRef.current = false
+        isDiscardedRef.current = false
+        hasEditedRef.current = false
+        setPendingDraft(null)
+
         let initialFields = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
+        let initialCrit = false
+
         if (initialData) {
-            // Check for edit draft first — retains unsaved changes across tab closes
-            const loadEditDraftFn = isNoteMode ? loadNoteEditDraft : loadEditDraft
-            const editDraft = loadEditDraftFn()
-            if (editDraft && editDraft.patientId === initialData.id) {
-                initialFields = editDraft.fields || initialFields
-                setCritical(!!editDraft.critical)
-            } else {
-                initialFields = {
-                    name: toTitleCase(initialData.name || ''),
-                    hospitalNumber: initialData.hospitalNumber || '',
-                    ward: initialData.ward || '',
-                    bed: initialData.bed || '',
-                    admissionDate: initialData.admissionDate || today(),
-                    diagnosis: initialData.diagnosis || '',
-                    note: initialData.note || ''
-                }
-                setCritical(!!initialData.critical)
+            // Check for edit draft first — retains unsaved changes across closures
+            const loadFn = isNoteMode ? loadNoteEditDraft : loadEditDraft
+            const editDraft = loadFn(initialData.id)
+
+            const savedFields = {
+                name: toTitleCase(initialData.name || ''),
+                hospitalNumber: initialData.hospitalNumber || '',
+                ward: initialData.ward || '',
+                bed: initialData.bed || '',
+                admissionDate: initialData.admissionDate || today(),
+                diagnosis: initialData.diagnosis || '',
+                note: initialData.note || ''
             }
+            initialCrit = !!initialData.critical
+
+            if (editDraft && String(editDraft.patientId) === String(initialData.id) && hasDraftDifferences(editDraft.fields, savedFields)) {
+                // Always start with the committed patient data and show a restore banner —
+                // never silently auto-restore, regardless of how long ago the draft was saved.
+                initialFields = savedFields
+                setPendingDraft(editDraft)
+            } else {
+                initialFields = savedFields
+                // Clean up identical or empty draft
+                if (editDraft) {
+                    const clearFn = isNoteMode ? clearNoteEditDraft : clearEditDraft
+                    clearFn(initialData.id)
+                }
+            }
+            setCritical(initialCrit)
         } else if (isNoteMode) {
             setCritical(false)
             const draft = loadNoteDraft()
@@ -296,10 +372,13 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         clearTimeout(saveTimerRef.current)
         if (initialData) {
             const saveFn = isNoteMode ? saveNoteEditDraft : saveEditDraft
-            saveTimerRef.current = setTimeout(() => saveFn(patch), 500)
+            const patientId = initialData.id
+            saveTimerRef.current = setTimeout(() => {
+                saveFn(patientId, { ...patch, patientId, savedAt: new Date().toISOString() })
+            }, 300)
         } else {
             const saveFn = isNoteMode ? saveNoteDraft : saveDraft
-            saveTimerRef.current = setTimeout(() => saveFn(patch), 500)
+            saveTimerRef.current = setTimeout(() => saveFn(patch), 300)
         }
     }, [initialData, isMortalityMode, isNoteMode])
 
@@ -314,44 +393,58 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         onAddRef.current = onAdd
     })
 
-    // Auto-save on unmount when in edit mode (e.g., browser back button / URL navigation)
+    // Save draft on unmount when in edit mode (e.g., React Router navigation)
     useEffect(() => {
         return () => {
-            if (initialDataRef.current && !hasSavedRef.current) {
-                Promise.resolve(onAddRef.current({
-                    team: teamRef.current,
-                    name: fieldsRef.current.name,
-                    hospitalNumber: fieldsRef.current.hospitalNumber,
-                    ward: fieldsRef.current.ward,
-                    bed: fieldsRef.current.bed,
-                    note: fieldsRef.current.note,
-                    critical: criticalRef.current,
-                    admissionDate: fieldsRef.current.admissionDate,
-                    diagnosis: fieldsRef.current.diagnosis,
-                })).catch(() => {})
+            if (initialDataRef.current && !hasSavedRef.current && !isDiscardedRef.current && hasEditedRef.current) {
+                const f = fieldsRef.current
+                if (hasDraftDifferences(f, initialDataRef.current)) {
+                    clearTimeout(saveTimerRef.current)
+                    const saveFn = isNoteMode ? saveNoteEditDraft : saveEditDraft
+                    saveFn(initialDataRef.current.id, {
+                        patientId: initialDataRef.current.id,
+                        team: teamRef.current,
+                        fields: {
+                            name: f.name,
+                            hospitalNumber: f.hospitalNumber,
+                            ward: f.ward,
+                            bed: f.bed,
+                            admissionDate: f.admissionDate,
+                            diagnosis: f.diagnosis,
+                            note: f.note,
+                        },
+                        critical: criticalRef.current,
+                        savedAt: new Date().toISOString(),
+                    })
+                }
             }
         }
-    }, [])
+    }, [isNoteMode])
 
     // Save edit draft immediately on tab/browser close
     useEffect(() => {
         const handleBeforeUnload = () => {
-            if (initialData && !hasSavedRef.current) {
-                const saveFn = isNoteMode ? saveNoteEditDraft : saveEditDraft
-                saveFn({
-                    patientId: initialData.id,
-                    team: teamRef.current,
-                    fields: {
-                        name: fieldsRef.current.name,
-                        hospitalNumber: fieldsRef.current.hospitalNumber,
-                        ward: fieldsRef.current.ward,
-                        bed: fieldsRef.current.bed,
-                        admissionDate: fieldsRef.current.admissionDate,
-                        diagnosis: fieldsRef.current.diagnosis,
-                        note: fieldsRef.current.note,
-                    },
-                    critical: criticalRef.current,
-                })
+            if (initialData && !hasSavedRef.current && !isDiscardedRef.current && hasEditedRef.current) {
+                const f = fieldsRef.current
+                if (hasDraftDifferences(f, initialData)) {
+                    clearTimeout(saveTimerRef.current)
+                    const saveFn = isNoteMode ? saveNoteEditDraft : saveEditDraft
+                    saveFn(initialData.id, {
+                        patientId: initialData.id,
+                        team: teamRef.current,
+                        fields: {
+                            name: fieldsRef.current.name,
+                            hospitalNumber: fieldsRef.current.hospitalNumber,
+                            ward: fieldsRef.current.ward,
+                            bed: fieldsRef.current.bed,
+                            admissionDate: fieldsRef.current.admissionDate,
+                            diagnosis: fieldsRef.current.diagnosis,
+                            note: fieldsRef.current.note,
+                        },
+                        critical: criticalRef.current,
+                        savedAt: new Date().toISOString(),
+                    })
+                }
             }
         }
         window.addEventListener('beforeunload', handleBeforeUnload)
@@ -407,8 +500,11 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     
     // Add custom field update handler
     const updateField = (key, value) => {
+        hasEditedRef.current = true
+        if (pendingDraft) setPendingDraft(null)
         setFields(prev => {
             const next = { ...prev, [key]: key === 'name' ? toTitleCase(value) : value }
+            fieldsRef.current = next
             scheduleDraftSave(currentDraft({ fields: next }))
             return next
         })
@@ -419,11 +515,14 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         e.preventDefault()
         const raw = e.clipboardData?.getData('text/plain') || ''
         const cleaned = cleanPastedText(raw)
+        hasEditedRef.current = true
+        if (pendingDraft) setPendingDraft(null)
 
         if (!fieldKey || fieldKey === 'note') {
             const hasLabels = /^(Name|Hosp#|Ward|Bed|Date|Notes):/im.test(cleaned)
             if (hasLabels) {
                 const parsed = parsePatientText(cleaned)
+                fieldsRef.current = parsed
                 setFields(parsed)
                 scheduleDraftSave(currentDraft({ fields: parsed }))
                 setError('')
@@ -461,7 +560,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                 if (!initialData) {
                     clearNoteDraft()
                 } else {
-                    clearNoteEditDraft()
+                    clearNoteEditDraft(initialData.id)
                 }
                 const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
                 setFields(newBlank)
@@ -489,7 +588,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         }
         if (result) {
             if (!initialData) clearDraft()
-            else clearEditDraft()
+            else clearEditDraft(initialData.id)
             const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
             setFields(newBlank)
             setHistory({ stack: [newBlank], index: 0 })
@@ -555,7 +654,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
         hasSavedRef.current = true
 
         if (!initialData) clearDraft()
-        else clearEditDraft()
+        else clearEditDraft(initialData.id)
         const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
         setFields(newBlank)
         setHistory({ stack: [newBlank], index: 0 })
@@ -566,51 +665,68 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const handleCancel = () => {
         if (initialData) {
-            const clearFn = isNoteMode ? clearNoteEditDraft : clearEditDraft
-            clearFn()
-            hasSavedRef.current = true
-            // Auto-save changes when exiting edit mode
-            if (isNoteMode) {
-                const result = onAdd({ text: fields.note, diagnosis: fields.diagnosis, isStandaloneNote: true })
-                if (result && result.type === 'duplicate_both') {
-                    setError('A patient with this Hospital Number and Ward/Bed already exists.')
-                    return
-                }
-                if (result && result.type === 'duplicate_hosp') {
-                    setError('A patient with this Hospital Number already exists.')
-                    return
-                }
-                if (result && result.type === 'duplicate_bed') {
-                    setError('This Ward/Bed is already occupied by another patient.')
-                    return
-                }
-            } else {
-                const result = onAdd({
-                    team,
-                    name: fields.name,
-                    hospitalNumber: fields.hospitalNumber,
-                    ward: fields.ward,
-                    bed: fields.bed,
-                    note: fields.note,
-                    critical,
-                    admissionDate: fields.admissionDate,
-                    diagnosis: fields.diagnosis,
+            // Save any pending changes immediately before closing!
+            if (!isDiscardedRef.current && hasEditedRef.current && hasDraftDifferences(fieldsRef.current, initialDataRef.current)) {
+                clearTimeout(saveTimerRef.current)
+                const saveFn = isNoteMode ? saveNoteEditDraft : saveEditDraft
+                saveFn(initialData.id, {
+                    patientId: initialData.id,
+                    team: teamRef.current,
+                    fields: { ...fieldsRef.current },
+                    critical: criticalRef.current,
+                    savedAt: new Date().toISOString(),
                 })
-                if (result && result.type === 'duplicate_both') {
-                    setError('A patient with this Hospital Number and Ward/Bed already exists.')
-                    return
-                }
-                if (result && result.type === 'duplicate_hosp') {
-                    setError('A patient with this Hospital Number already exists.')
-                    return
-                }
-                if (result && result.type === 'duplicate_bed') {
-                    setError('This Ward/Bed is already occupied by another patient.')
-                    return
-                }
             }
+            hasSavedRef.current = true
         }
         onCancel()
+    }
+
+    const handleRestoreDraft = () => {
+        if (!pendingDraft) return
+        const savedFields = {
+            name: toTitleCase(initialData?.name || ''),
+            hospitalNumber: initialData?.hospitalNumber || '',
+            ward: initialData?.ward || '',
+            bed: initialData?.bed || '',
+            admissionDate: initialData?.admissionDate || today(),
+            diagnosis: initialData?.diagnosis || '',
+            note: initialData?.note || ''
+        }
+        const restoredFields = {
+            ...savedFields,
+            ...(pendingDraft.fields || {}),
+            name: toTitleCase(pendingDraft.fields?.name || savedFields.name)
+        }
+        setFields(restoredFields)
+        if (pendingDraft.critical !== undefined) setCritical(Boolean(pendingDraft.critical))
+        setPendingDraft(null)
+        setHistory({ stack: [restoredFields], index: 0 })
+        hasEditedRef.current = true
+        isUndoRedo.current = true
+    }
+
+    const handleDiscardDraft = () => {
+        isDiscardedRef.current = true
+        hasEditedRef.current = false
+        if (initialData) {
+            const clearFn = isNoteMode ? clearNoteEditDraft : clearEditDraft
+            clearFn(initialData.id)
+            const resetFields = {
+                name: toTitleCase(initialData.name || ''),
+                hospitalNumber: initialData.hospitalNumber || '',
+                ward: initialData.ward || '',
+                bed: initialData.bed || '',
+                admissionDate: initialData.admissionDate || today(),
+                diagnosis: initialData.diagnosis || '',
+                note: initialData.note || ''
+            }
+            setFields(resetFields)
+            setCritical(!!initialData.critical)
+            setHistory({ stack: [resetFields], index: 0 })
+            isUndoRedo.current = true
+        }
+        setPendingDraft(null)
     }
 
     const handleEnter = (e, nextRef) => {
@@ -623,13 +739,40 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     const hospSplit = splitSuffix(fields.hospitalNumber)
     const bedSplit = splitSuffix(fields.bed)
 
+    const renderDraftBanner = () => {
+        if (!pendingDraft) return <div />
+        return (
+            <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 rounded-lg px-2 py-0.5 text-xs font-semibold min-w-0 animate-in fade-in duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-amber-600 dark:text-amber-400">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span className="truncate text-[11px] sm:text-xs">Draft found</span>
+                <button
+                    type="button"
+                    onClick={handleRestoreDraft}
+                    className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white text-[10px] sm:text-[11px] font-bold active:scale-95 shadow-xs transition-colors shrink-0"
+                >
+                    Restore
+                </button>
+                <button
+                    type="button"
+                    onClick={handleDiscardDraft}
+                    className="px-1.5 py-0.5 rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-[10px] sm:text-[11px] font-bold active:scale-95 transition-colors shrink-0"
+                >
+                    Discard
+                </button>
+            </div>
+        )
+    }
+
     return (
         <div className="fixed top-0 left-0 w-full h-[100dvh] z-50 bg-gray-50 dark:bg-gray-950 flex flex-col sm:p-4 sm:items-center sm:justify-center overflow-hidden animate-in fade-in duration-200 min-w-0 max-w-full">
             <div className="bg-white dark:bg-gray-800 w-full h-full sm:h-[85vh] sm:max-h-[800px] sm:max-w-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:border sm:border-gray-200 dark:sm:border-gray-700 overflow-hidden min-w-0 max-w-full">
                 <form id="add-patient-form" onSubmit={handleSubmit} className="flex flex-col h-full min-w-0 max-w-full overflow-hidden">
                     {/* Scrollable Form Body (Unified scrolling for Biodata + Notes) */}
                     <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar overflow-x-hidden flex flex-col bg-white dark:bg-gray-800 min-w-0 max-w-full">
-                        
+
                         {/* Error */}
                         {error && (
                             <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm font-bold mx-3 sm:mx-4 mb-3 shrink-0 shadow-sm">
@@ -646,13 +789,18 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                         <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Note title (optional)" />
                                     </div>
                                     <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
+                                        <div className="flex items-center justify-between w-full min-w-0 max-w-full mb-1 gap-2">
+                                            {renderDraftBanner()}
                                             <MicrophoneButton
                                                 onTranscript={(transcript) => {
+                                                    hasEditedRef.current = true
+                                                    if (pendingDraft) setPendingDraft(null)
                                                     setFields(prev => {
-                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
-                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
-                                                        return { ...prev, note: next }
+                                                        const nextNote = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                        const next = { ...prev, note: nextNote }
+                                                        fieldsRef.current = next
+                                                        scheduleDraftSave(currentDraft({ fields: next }))
+                                                        return next
                                                      })
                                                 }}
                                                 title="Dictate note"
@@ -706,13 +854,18 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                         <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Diagnosis" />
                                     </div>
                                     <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end w-full min-w-0 max-w-full mb-1">
+                                        <div className="flex items-center justify-between w-full min-w-0 max-w-full mb-1 gap-2">
+                                            {renderDraftBanner()}
                                             <MicrophoneButton
                                                 onTranscript={(transcript) => {
+                                                    hasEditedRef.current = true
+                                                    if (pendingDraft) setPendingDraft(null)
                                                     setFields(prev => {
-                                                        const next = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
-                                                        scheduleDraftSave(currentDraft({ fields: { ...prev, note: next } }))
-                                                        return { ...prev, note: next }
+                                                        const nextNote = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                        const next = { ...prev, note: nextNote }
+                                                        fieldsRef.current = next
+                                                        scheduleDraftSave(currentDraft({ fields: next }))
+                                                        return next
                                                      })
                                                 }}
                                                 title="Dictate note"
@@ -784,7 +937,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                 <button
                                     type="button"
                                     aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
-                                    onClick={() => { const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
+                                    onClick={() => { hasEditedRef.current = true; if (pendingDraft) setPendingDraft(null); const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
                                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
                                         critical
                                             ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm shadow-red-500/30'

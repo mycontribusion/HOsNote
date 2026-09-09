@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull, Sparkles } from 'lucide-react'
+import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull, Sparkles, ShieldCheck } from 'lucide-react'
 
 export default function SettingsModal({
     onClose,
@@ -17,6 +17,8 @@ export default function SettingsModal({
     hasDocs,
     hasAnyData,
     onStartDemo,
+    isStoragePersisted,
+    onRequestStoragePersist,
 }) {
     const [backupDone, setBackupDone] = useState(false)
     const [restoreMsg, setRestoreMsg] = useState('')
@@ -173,6 +175,24 @@ export default function SettingsModal({
 
                     {/* Backup & Restore */}
                     <Section title="Data">
+                        <Row
+                            icon={<ShieldCheck size={15} className="text-white" />}
+                            iconBg={isStoragePersisted ? 'bg-emerald-500' : 'bg-amber-500'}
+                            label="Storage Protection"
+                            sublabel={isStoragePersisted ? 'Persistent storage active (Protected)' : 'Tap to request eviction protection'}
+                            right={
+                                isStoragePersisted ? (
+                                    <span className="px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 rounded-full shrink-0">
+                                        Protected
+                                    </span>
+                                ) : (
+                                    <span className="px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 rounded-full shrink-0">
+                                        Enable
+                                    </span>
+                                )
+                            }
+                            onClick={onRequestStoragePersist}
+                        />
                         <Row
                             icon={backupDone ? <CheckCircle size={15} className="text-white" /> : <Download size={15} className="text-white" />}
                             iconBg={backupDone ? 'bg-emerald-500' : 'bg-blue-500'}

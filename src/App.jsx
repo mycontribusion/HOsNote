@@ -193,9 +193,25 @@ useEffect(() => {
     }
 }, [location.pathname])
 
-const [isLoaded, setIsLoaded] = useState(false)
-const [patients, setPatients] = useState([])
-const [mortalities, setMortalities] = useState([])
+    const [isLoaded, setIsLoaded] = useState(false)
+
+    // Request persistent storage to protect IndexedDB from automatic eviction
+    useEffect(() => {
+        const requestPersistentStorage = async () => {
+            if ('storage' in navigator && 'persist' in navigator.storage) {
+                try {
+                    const granted = await navigator.storage.persist()
+                    console.log(`[Storage] Persistent storage ${granted ? 'granted' : 'denied'}`)
+                } catch (err) {
+                    console.error('[Storage] Failed to request persistence:', err)
+                }
+            }
+        }
+        requestPersistentStorage()
+    }, [])
+
+    const [patients, setPatients] = useState([])
+    const [mortalities, setMortalities] = useState([])
 const [discharges, setDischarges] = useState([])
 const [docs, setDocs] = useState([])
 const [notebookExportDocs, setNotebookExportDocs] = useState(null)
@@ -204,15 +220,53 @@ const [composingFor, setComposingFor] = useState(null) // patient object when Do
 const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
 const [mortalitiesOnly, setMortalitiesOnly] = useState(false)
 const [initialSelectedPatientId, setInitialSelectedPatientId] = useState(null)
-const [darkMode, setDarkMode] = useState(() => {
-    try {
-        const stored = localStorage.getItem(DARK_MODE_KEY)
-        if (stored !== null) return JSON.parse(stored)
-        return window.matchMedia('(prefers-color-scheme: dark)').matches
-    } catch {
-        return false
+    const [darkMode, setDarkMode] = useState(() => {
+        try {
+            const stored = localStorage.getItem(DARK_MODE_KEY)
+            if (stored !== null) return JSON.parse(stored)
+            return window.matchMedia('(prefers-color-scheme: dark)').matches
+        } catch {
+            return false
+        }
+    })
+    const [isStoragePersisted, setIsStoragePersisted] = useState(false)
+
+const checkStoragePersistence = useCallback(async () => {
+    if ('storage' in navigator && 'persisted' in navigator.storage) {
+        try {
+            const isPersisted = await navigator.storage.persisted()
+            setIsStoragePersisted(isPersisted)
+            return isPersisted
+        } catch (err) {
+            console.error('[Storage] Error checking persistence:', err)
+        }
     }
-})
+    return false
+}, [])
+
+const requestStoragePersistence = useCallback(async () => {
+    if ('storage' in navigator && 'persist' in navigator.storage) {
+        try {
+            const granted = await navigator.storage.persist()
+            setIsStoragePersisted(granted)
+            console.log(`[Storage] Persistence requested: ${granted}`)
+            return granted
+        } catch (err) {
+            console.error('[Storage] Error requesting persistence:', err)
+        }
+    }
+    return false
+}, [])
+
+useEffect(() => {
+    const initStorage = async () => {
+        const persisted = await checkStoragePersistence()
+        if (!persisted) {
+            await requestStoragePersistence()
+        }
+    }
+    initStorage()
+}, [checkStoragePersistence, requestStoragePersistence])
 
 // Refs for route detection effect (avoid re-running effect on every patient change)
 const patientsRef = useRef(patients)
@@ -1743,6 +1797,8 @@ const pendingEditRef = useRef(null)
                         hasMortalities={mortalities.length > 0}
                         hasDocs={docs.length > 0}
                         hasAnyData={patients.length > 0 || mortalities.length > 0 || docs.length > 0 || discharges.length > 0}
+                        isStoragePersisted={isStoragePersisted}
+                        onRequestStoragePersist={requestStoragePersistence}
                         onStartDemo={() => { setShowSettings(false); navigate('/demo'); }}
                     />
                 )}

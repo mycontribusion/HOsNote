@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
-import { X, Save, Undo2, Redo2 } from 'lucide-react'
+import { X, Save, Undo2, Redo2, Check, FileText } from 'lucide-react'
 import MicrophoneButton from './MicrophoneButton'
 import { cleanPastedText } from '../utils/clipboard'
 
@@ -12,23 +12,44 @@ const COLOR_OPTIONS = [
     { value: 'indigo', label: 'Indigo', bg: 'bg-indigo-500' },
 ]
 
-const DRAFT_KEY = 'hosnote_doc_draft'
+function getDocDraftKey(patient, existingDoc) {
+    if (existingDoc?.id) return `hosnote_doc_draft_edit_${existingDoc.id}`
+    if (patient?.id) return `hosnote_doc_draft_patient_${patient.id}`
+    return 'hosnote_doc_draft'
+}
 
-function loadDocDraft() {
+function loadDocDraft(patient, existingDoc) {
     try {
-        const raw = localStorage.getItem(DRAFT_KEY)
-        return raw ? JSON.parse(raw) : null
+        const key = getDocDraftKey(patient, existingDoc)
+        const raw = localStorage.getItem(key)
+        if (raw) return JSON.parse(raw)
+        // Fallback check legacy global key if patient draft is empty
+        if (!existingDoc) {
+            const legacy = localStorage.getItem('hosnote_doc_draft')
+            if (legacy) {
+                try {
+                    const parsed = JSON.parse(legacy)
+                    if (parsed && parsed.text) return parsed
+                } catch { /* ignore */ }
+            }
+        }
+        return null
     } catch { return null }
 }
 
-function saveDocDraft(data) {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)) }
-    catch { /* quota exceeded */ }
+function saveDocDraft(patient, existingDoc, data) {
+    try {
+        const key = getDocDraftKey(patient, existingDoc)
+        localStorage.setItem(key, JSON.stringify(data))
+    } catch { /* quota exceeded */ }
 }
 
-function clearDocDraft() {
-    try { localStorage.removeItem(DRAFT_KEY) }
-    catch { /* ignore */ }
+function clearDocDraft(patient, existingDoc) {
+    try {
+        const key = getDocDraftKey(patient, existingDoc)
+        localStorage.removeItem(key)
+        localStorage.removeItem('hosnote_doc_draft')
+    } catch { /* ignore */ }
 }
 
 export default function DocComposer({ patient, existingDoc = null, onSave, onClose }) {
@@ -36,6 +57,8 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
     const [text, setText] = useState(initialText)
     const [color, setColor] = useState(existingDoc?.color ?? 'blue')
     const [error, setError] = useState('')
+    const [draftStatus, setDraftStatus] = useState('') // 'saving' | 'saved' | ''
+    const [draftRestoredNotice, setDraftRestoredNotice] = useState(false)
     const textareaRef = useRef(null)
     const saveTimerRef = useRef(null)
     const pendingScrollRef = useRef(null)
@@ -61,25 +84,40 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
         return () => clearTimeout(timer)
     }, [text])
 
-    // ── Draft saving (mirrors AddPatientForm pattern) ─────────────────────────
+    // ── Draft saving with 150ms debounce and safety nets ─────────────────────
     const scheduleDraftSave = useCallback((patch) => {
         if (existingDoc) return // don't draft when editing an existing doc
+        setDraftStatus('saving')
         clearTimeout(saveTimerRef.current)
-        saveTimerRef.current = setTimeout(() => saveDocDraft(patch), 500)
-    }, [existingDoc])
+        saveTimerRef.current = setTimeout(() => {
+            saveDocDraft(patient, existingDoc, patch)
+            setDraftStatus('saved')
+        }, 150)
+    }, [patient, existingDoc])
+
+    const handleBlur = useCallback(() => {
+        if (existingDoc) return
+        if (text.trim() || color) {
+            saveDocDraft(patient, existingDoc, { text, color })
+            setDraftStatus('saved')
+        }
+    }, [patient, existingDoc, text, color])
 
     useEffect(() => () => clearTimeout(saveTimerRef.current), [])
 
     // Load draft on mount when creating a new doc
     useEffect(() => {
         if (existingDoc) return
-        const draft = loadDocDraft()
+        const draft = loadDocDraft(patient, existingDoc)
         if (draft && draft.text) {
             setText(draft.text)
+            if (draft.color) setColor(draft.color)
             setHistory({ stack: [draft.text], index: 0 })
             isUndoRedo.current = true
+            setDraftRestoredNotice(true)
+            setTimeout(() => setDraftRestoredNotice(false), 3500)
         }
-    }, [existingDoc])
+    }, [patient, existingDoc])
 
     // Save draft whenever text changes (skip undo/redo)
     useEffect(() => {
@@ -148,7 +186,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
 
     const handleSave = () => {
         if (!text.trim()) { setError('Note text cannot be empty.'); return }
-        clearDocDraft()
+        clearDocDraft(patient, existingDoc)
         onSave({ text: text.trim(), color })
     }
 
@@ -210,6 +248,28 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                     {/* Scrollable Form Body */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-white dark:bg-gray-800 p-4 sm:p-6" onClick={() => textareaRef.current?.focus()}>
 
+                        {/* Restored Draft Notice */}
+                        {draftRestoredNotice && (
+                            <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-2 text-xs font-bold mb-3 shrink-0 animate-in fade-in duration-200">
+                                <div className="flex items-center gap-2">
+                                    <FileText size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Restored unsaved draft note</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        clearDocDraft(patient, existingDoc)
+                                        setText('')
+                                        setHistory({ stack: [''], index: 0 })
+                                        setDraftRestoredNotice(false)
+                                    }}
+                                    className="px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/50 dark:hover:bg-emerald-900/80 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold transition-colors active:scale-95 shrink-0"
+                                >
+                                    Discard
+                                </button>
+                            </div>
+                        )}
+
                         {/* Error */}
                         {error && (
                             <div role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm font-bold mb-4 shrink-0 shadow-sm">
@@ -241,7 +301,20 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                         {/* Text area */}
                         <div className="flex-1 flex flex-col min-h-[200px] relative">
                             <div className="flex items-center justify-between mb-2">
-                                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest shrink-0">Note Content</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest shrink-0">Note Content</p>
+                                    {!existingDoc && draftStatus === 'saved' && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md animate-in fade-in">
+                                            <Check size={10} strokeWidth={3} />
+                                            Draft saved
+                                        </span>
+                                    )}
+                                    {!existingDoc && draftStatus === 'saving' && (
+                                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 animate-pulse">
+                                            Saving draft…
+                                        </span>
+                                    )}
+                                </div>
                                 <MicrophoneButton
                                     onTranscript={(transcript) => {
                                         setText(prev => {
@@ -258,6 +331,7 @@ export default function DocComposer({ patient, existingDoc = null, onSave, onClo
                                 className="w-full flex-1 bg-transparent border-0 outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto text-base sm:text-sm leading-relaxed pb-24"
                                 placeholder="Write your clinical documentation here…"
                                 value={text}
+                                onBlur={handleBlur}
                                 onChange={(e) => {
                                     const next = e.target.value
                                     setText(next)
