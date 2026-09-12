@@ -4,8 +4,8 @@ import { formatSmartDate } from '../utils/formatSmartDate'
 import SuffixedValue from './SuffixedValue'
 import HighlightText from './HighlightText'
 
-const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail, demoSwipeDir = null }) => {
-    const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate } = patient
+const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, docCount = 0, isSelected = false, onToggleSelect, selectionMode = false, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, onOpenDetail, onOpenDraft, demoSwipeDir = null, disableSwipeReview = false, isDraft = false }) => {
+    const { id, name, hospitalNumber, ward, bed, diagnosis, note, reviewed, critical, removedAt, lastUpdated, admissionDate, discardedAt } = patient
     const noteRef = useRef(null)
     const [noteOverflows, setNoteOverflows] = useState(false)
     const [thumbHeight, setThumbHeight] = useState(1)   // fraction of track
@@ -127,8 +127,8 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
         setIsDragging(true);
         e.currentTarget.setPointerCapture(e.pointerId);
 
-        // Long-press: 500ms hold triggers selection
-        if (onToggleSelect) {
+        // Long-press: 500ms hold triggers selection (disabled for drafts)
+        if (onToggleSelect && !isDraft) {
             longPressTimer.current = setTimeout(() => {
                 longPressTriggered.current = true;
                 suppressClick.current = true; // block the click that fires after pointerUp
@@ -147,6 +147,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
             clearTimeout(longPressTimer.current);
         }
         let diff = dx;
+        if (disableSwipeReview && diff > 0) diff = 0;
         if (diff > 120) diff = 120 + (diff - 120) * 0.2;
         if (diff < -120) diff = -120 + (diff + 120) * 0.2;
         setOffsetX(diff);
@@ -158,7 +159,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
         e.currentTarget.releasePointerCapture(e.pointerId);
 
         if (!longPressTriggered.current) {
-            if (offsetX > 80 && onReview && !isMortality) {
+            if (offsetX > 80 && onReview && !isMortality && !disableSwipeReview) {
                 onReview(id, !reviewed);
             } else if (offsetX < -80) {
                 onDelete(id);
@@ -185,6 +186,13 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
         if (selectionMode && onToggleSelect) {
             e.stopPropagation();
             onToggleSelect(id);
+            return;
+        }
+
+        // Draft view: open form directly instead of detail modal
+        if (isDraft && onOpenDraft) {
+            e.stopPropagation();
+            onOpenDraft(patient);
             return;
         }
 
@@ -310,24 +318,26 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                         </div>
 
                         {/* Mobile Actions (Under Badge - fixed 64px width) */}
-                        <div className="flex sm:hidden flex-row gap-0.5 justify-center w-full">
-                            {onToggleSelect && (
+                        {!isDraft && (
+                            <div className="flex sm:hidden flex-row gap-0.5 justify-center w-full">
+                                {onToggleSelect && (
+                                    <button
+                                        className={`btn-icon !min-h-[30px] !min-w-[30px] rounded-lg transition-all ${isSelected ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+                                        onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
+                                        aria-label="Toggle selection"
+                                    >
+                                        {isSelected ? <CheckCircle2 size={16} /> : <div className="w-3.5 h-3.5 rounded border-2 border-gray-300 dark:border-gray-500" />}
+                                    </button>
+                                )}
                                 <button
-                                    className={`btn-icon !min-h-[30px] !min-w-[30px] rounded-lg transition-all ${isSelected ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
-                                    onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
-                                    aria-label="Toggle selection"
+                                    className="btn-icon !min-h-[30px] !min-w-[30px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                                    onClick={(e) => { e.stopPropagation(); onEdit(patient) }}
+                                    aria-label="Edit patient"
                                 >
-                                    {isSelected ? <CheckCircle2 size={16} /> : <div className="w-3.5 h-3.5 rounded border-2 border-gray-300 dark:border-gray-500" />}
+                                    <Pencil size={15} strokeWidth={2} />
                                 </button>
-                            )}
-                            <button
-                                className="btn-icon !min-h-[30px] !min-w-[30px] rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                                onClick={(e) => { e.stopPropagation(); onEdit(patient) }}
-                                aria-label="Edit patient"
-                            >
-                                <Pencil size={15} strokeWidth={2} />
-                            </button>
-                        </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Patient Info */}
@@ -375,7 +385,7 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                     <FileText size={9} />{docCount}
                                 </span>
                             )}
-                            {durationText && (
+                            {durationText && !discardedAt && (
                                 <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium whitespace-nowrap flex-shrink-0">
                                     {durationText}
                                 </span>
@@ -400,7 +410,12 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                                 Recorded: {formatSmartDate(removedAt)}
                             </div>
                         )}
-                        {!isMortality && lastUpdated && (
+                        {discardedAt && (
+                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 leading-none">
+                                {formatSmartDate(discardedAt)}
+                            </div>
+                        )}
+                        {!isMortality && !discardedAt && lastUpdated && (
                             <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 leading-none">
                                 {formatSmartDate(lastUpdated)}
                             </div>
@@ -452,50 +467,51 @@ const PatientCardInner = ({ patient, onEdit, onDelete, onReview, onDocument, doc
                 </div>
 
                 {/* Desktop Actions */}
-                <div className="hidden sm:flex justify-end items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all duration-200 z-20">
-                    {/* Selection checkbox */}
-                    {onToggleSelect && (
-                        <button
-                            className={`btn-icon !min-h-[36px] !min-w-[36px] rounded-xl flex-shrink-0 transition-all ${
-                                isSelected
-                                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30'
-                                    : 'text-gray-300 dark:text-gray-600 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                            }`}
-                            onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
-                            aria-label={isSelected ? 'Deselect patient' : 'Select patient for handover'}
-                            title={isSelected ? 'Deselect' : 'Select for handover'}
-                        >
-                            {isSelected ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect width="18" height="18" x="3" y="3" rx="3" /><path d="m9 12 2 2 4-4" />
-                                </svg>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect width="18" height="18" x="3" y="3" rx="3" />
-                                </svg>
-                            )}
-                        </button>
-                    )}
-                    {onMoveTeam && (
+                {!isDraft && (
+                    <div className="hidden sm:flex justify-end items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all duration-200 z-20">
+                        {/* Selection checkbox */}
+                        {onToggleSelect && (
+                            <button
+                                className={`btn-icon !min-h-[36px] !min-w-[36px] rounded-xl flex-shrink-0 transition-all ${
+                                    isSelected
+                                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30'
+                                        : 'text-gray-300 dark:text-gray-600 hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                }`}
+                                onClick={(e) => { e.stopPropagation(); onToggleSelect(id) }}
+                                aria-label={isSelected ? 'Deselect patient' : 'Select patient for handover'}
+                                title={isSelected ? 'Deselect' : 'Select for handover'}
+                            >
+                                {isSelected ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect width="18" height="18" x="3" y="3" rx="3" /><path d="m9 12 2 2 4-4" />
+                                    </svg>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect width="18" height="18" x="3" y="3" rx="3" />
+                                    </svg>
+                                )}
+                            </button>
+                        )}
+                        {onMoveTeam && (
+                            <button
+                                className="btn-icon !min-h-[36px] !min-w-[36px] rounded-xl text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-200 flex-shrink-0"
+                                onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
+                                aria-label={moveTeamLabel || 'Move team'}
+                                title={moveTeamLabel || 'Move team'}
+                            >
+                                <ChevronsLeft size={17} strokeWidth={2} />
+                            </button>
+                        )}
                         <button
                             className="btn-icon !min-h-[36px] !min-w-[36px] rounded-xl text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-200 flex-shrink-0"
-                            onClick={(e) => { e.stopPropagation(); onMoveTeam(id) }}
-                            aria-label={moveTeamLabel || 'Move team'}
-                            title={moveTeamLabel || 'Move team'}
+                            onClick={() => onEdit(patient)}
+                            aria-label="Edit patient"
+                            title="Edit patient"
                         >
-                            <ChevronsLeft size={17} strokeWidth={2} />
+                            <Pencil size={17} strokeWidth={2} />
                         </button>
-                    )}
-                    <button
-                        className="btn-icon !min-h-[36px] !min-w-[36px] rounded-xl text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-200 flex-shrink-0"
-                        onClick={() => onEdit(patient)}
-                        aria-label="Edit patient"
-                        title="Edit patient"
-                    >
-                        <Pencil size={17} strokeWidth={2} />
-                    </button>
-
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -521,6 +537,9 @@ export default memo(PatientCardInner, (prev, next) => {
     if (prev.isSelected !== next.isSelected) return false
     if (prev.selectionMode !== next.selectionMode) return false
     if (prev.isMortality !== next.isMortality) return false
+    if (prev.disableSwipeReview !== next.disableSwipeReview) return false
+    if (prev.isDraft !== next.isDraft) return false
+    if (prev.onOpenDraft !== next.onOpenDraft) return false
     if (prev.highlightField !== next.highlightField) return false
     if (prev.highlightQuery !== next.highlightQuery) return false
     if (prev.demoSwipeDir !== next.demoSwipeDir) return false

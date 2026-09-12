@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull, Sparkles, ShieldCheck } from 'lucide-react'
+import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull, Sparkles, ShieldCheck, FileX } from 'lucide-react'
 
 export default function SettingsModal({
     onClose,
@@ -11,9 +11,11 @@ export default function SettingsModal({
     onSaveBackup,
     onRestoreBackup,
     onViewMortalities,
+    onViewDiscardedDrafts,
     hasMyTeamPatients,
     hasOnCallPatients,
     hasMortalities,
+    hasDiscardedDrafts,
     hasDocs,
     hasAnyData,
     onStartDemo,
@@ -63,6 +65,7 @@ export default function SettingsModal({
         { label: 'My Team', action: 'my_team' },
         { label: 'On Call', action: 'on_call' },
         { label: 'Mortalities', action: 'mortalities' },
+        { label: 'Discarded Drafts', action: 'discarded_drafts' },
         { label: 'Notebook', action: 'notebook' },
     ]
 
@@ -139,8 +142,11 @@ export default function SettingsModal({
                             sublabel="Interactive tour of all features & workflows"
                             right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
                             onClick={() => {
-                                onClose()
-                                if (onStartDemo) onStartDemo()
+                                if (onStartDemo) {
+                                    onStartDemo()
+                                } else {
+                                    onClose()
+                                }
                             }}
                             noBorder
                         />
@@ -219,8 +225,17 @@ export default function SettingsModal({
                         <input ref={fileInputRef} type="file" accept=".json,application/json,.txt,text/plain" className="hidden" onChange={handleFileChange} />
                     </Section>
 
-                    {/* View Mortalities */}
+                    {/* View Discarded Drafts */}
                     <Section title="Records">
+                        <Row
+                            icon={<FileX size={15} className="text-white" />}
+                            iconBg="bg-amber-500"
+                            label="Discarded Drafts"
+                            sublabel="Recover accidentally discarded drafts"
+                            right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
+                            onClick={onViewDiscardedDrafts}
+                            disabled={!hasDiscardedDrafts}
+                        />
                         <Row
                             icon={<Skull size={15} className="text-white" />}
                             iconBg="bg-red-500"
@@ -239,6 +254,7 @@ export default function SettingsModal({
                             const isDisabled = (opt.action === 'my_team' && !hasMyTeamPatients) ||
                                 (opt.action === 'on_call' && !hasOnCallPatients) ||
                                 (opt.action === 'mortalities' && !hasMortalities) ||
+                                (opt.action === 'discarded_drafts' && !hasDiscardedDrafts) ||
                                 (opt.action === 'notebook' && !hasDocs)
 
                             return confirmClear === opt.action ? (

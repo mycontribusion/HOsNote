@@ -31,7 +31,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     const [qrMode, setQrMode] = useState('compact') // 'compact' | 'full'
     const effectiveQrMode = listName === 'Notebook' ? 'full' : qrMode
 
-    // Stable session id for the Full Transfer animation. It MUST stay constant
+    // Stable session id for the Patients Record animation. It MUST stay constant
     // for the entire lifetime of this modal so every animated frame carries the
     // same sessionId — the receiver keys chunks by sessionId and can only
     // reassemble a transfer when all frames share one id. Generating it inside a
@@ -54,7 +54,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
     // 1. QR Data: Ultra-compact positional array to keep QR density low.
     // Format per patient: [ward, bed, name, hospNo, criticalFlag, mortalityFlag, note, removedAt]
     const isNotebookExport = listName === 'Notebook' || (docs && docs.length > 0 && patients.length === 0)
-    const qrCompressed = isNotebookExport
+    const qrCompressed = useMemo(() => isNotebookExport
         ? (docs || []).map(d => [
             d.patientWard || '',
             '',
@@ -74,8 +74,8 @@ export default function ExportModal({ patients, allPatients, listName, selection
             p.reason === 'mortality' ? 1 : 0,
             '', // no note for compact scan
             ''  // no removedAt for compact scan
-        ])
-    const qrData = JSON.stringify(qrCompressed)
+        ]), [isNotebookExport, docs, patients])
+    const qrData = useMemo(() => JSON.stringify(qrCompressed), [qrCompressed])
 
     // 2. Full Data: Includes everything for Copy/Paste sharing
     const fullCompressed = isNotebookExport
@@ -114,7 +114,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
         })
     const fullData = JSON.stringify(fullCompressed)
 
-    // 3. Full Transfer payload (QR animation) — respects selection.
+    // 3. Patients Record payload (QR animation) — respects selection.
     const transferPayload = useMemo(() => {
         const sid = transferSidRef.current
         const isNotebook = listName === 'Notebook' || (docs && docs.length > 0 && patients.length === 0)
@@ -221,6 +221,33 @@ export default function ExportModal({ patients, allPatients, listName, selection
         [transferPayload]
     )
 
+    // 3b. Compact Transfer payload (QR animation) — biodata only, 8-field arrays.
+    // Uses the same HN1 chunked-frame protocol as the Patients Record so that
+    // long patient lists that exceed a single QR's capacity are automatically
+    // split into multiple scannable frames.
+    const compactTransferPayload = useMemo(() => {
+        return {
+            __sid: transferSidRef.current,
+            __v: 1,
+            type: isNotebookExport ? 'notebook' : 'patients',
+            listName: listName || 'Notebook',
+            patients: qrCompressed,
+            mortalities: [],
+            docs: [],
+        }
+    }, [qrCompressed, listName, isNotebookExport])
+
+    const { frames: compactFrames } = useMemo(
+        () => buildFrames(compactTransferPayload),
+        [compactTransferPayload]
+    )
+
+    // Select active frames based on QR mode
+    const activeFrames = useMemo(
+        () => effectiveQrMode === 'compact' ? compactFrames : frames,
+        [effectiveQrMode, compactFrames, frames]
+    )
+
     // Animated frame playback state
     // Default to autoPlay so the scanner can instantly ingest all frames.
     const [frameIdx, setFrameIdx] = useState(0)
@@ -229,13 +256,23 @@ export default function ExportModal({ patients, allPatients, listName, selection
     // Fast enough for quick transfers while still reliable.
     const FRAME_MS = 900
 
+    // Reset frame index on mode switch
     useEffect(() => {
-        if (!autoPlay || frames.length <= 1) return
+        setFrameIdx(0)
+    }, [effectiveQrMode])
+
+    // Clamp frameIdx if frame count shrinks
+    useEffect(() => {
+        setFrameIdx((idx) => (idx >= activeFrames.length ? 0 : idx))
+    }, [activeFrames.length])
+
+    useEffect(() => {
+        if (!autoPlay || activeFrames.length <= 1) return
         const t = setInterval(() => {
-            setFrameIdx((i) => (i + 1) % frames.length)
+            setFrameIdx((i) => (i + 1) % activeFrames.length)
         }, FRAME_MS)
         return () => clearInterval(t)
-    }, [autoPlay, frames.length])
+    }, [autoPlay, activeFrames.length])
 
     // Human-readable text
     const textData = isNotebookExport
@@ -553,28 +590,33 @@ export default function ExportModal({ patients, allPatients, listName, selection
                         </button>
                     </div>
 
-                    {/* QR Mode Tabs — hidden in notebook view (always Full Transfer) */}
-                    <div className={`flex bg-blue-900/50 dark:bg-gray-800/60 p-1 rounded-xl mt-3 gap-0.5 ${listName === 'Notebook' ? 'invisible' : ''}`}>
-                        <button
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                                qrMode === 'compact'
-                                    ? 'bg-white text-blue-700 shadow-sm'
-                                    : 'text-blue-200/80 hover:text-white hover:bg-white/10'
-                            }`}
-                            onClick={() => setQrMode('compact')}
-                        >
-                            <QrCode size={13} /> List QR
-                        </button>
-                        <button
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                                qrMode === 'full'
-                                    ? 'bg-white text-blue-700 shadow-sm'
-                                    : 'text-blue-200/80 hover:text-white hover:bg-white/10'
-                            }`}
-                            onClick={() => setQrMode('full')}
-                        >
-                            <QrCode size={13} /> Full Transfer
-                        </button>
+                    {/* QR Mode Tabs — hidden in notebook view (always Patients Record) */}
+                    <div className={`bg-blue-900/50 dark:bg-gray-800/60 p-1 rounded-xl mt-3 ${listName === 'Notebook' ? 'invisible' : ''}`}>
+                        {/* Inner wrapper for spotlight targeting — no background/padding so both tabs are clearly visible */}
+                        <div id="tour-qr-tabs" className="flex gap-0.5">
+                            <button
+                                id="tour-qr-list-btn"
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                                    qrMode === 'compact'
+                                        ? 'bg-white text-blue-700 shadow-sm'
+                                        : 'text-blue-200/80 hover:text-white hover:bg-white/10'
+                                }`}
+                                onClick={() => setQrMode('compact')}
+                            >
+                                <QrCode size={13} /> {listName === 'Mortalities' ? 'List Only' : 'Patient List'}
+                            </button>
+                            <button
+                                id="tour-qr-full-btn"
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                                    qrMode === 'full'
+                                        ? 'bg-white text-blue-700 shadow-sm'
+                                        : 'text-blue-200/80 hover:text-white hover:bg-white/10'
+                                }`}
+                                onClick={() => setQrMode('full')}
+                            >
+                                <QrCode size={13} /> {listName === 'Mortalities' ? 'Full Record' : 'Patients Record'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -587,74 +629,61 @@ export default function ExportModal({ patients, allPatients, listName, selection
                             ? 'bg-blue-50/80 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30'
                             : 'bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/40'
                     }`}>
-                        {effectiveQrMode === 'compact' ? (
-                            <div className="w-full max-w-[300px] aspect-square bg-white p-3 rounded-xl shadow-sm border border-gray-200/80 dark:border-gray-700 flex items-center justify-center">
-                                {qrData.length > 2300 ? (
-                                    <div className="text-center px-4">
-                                        <p className="text-2xl mb-2">⚠️</p>
-                                        <p className="text-red-600 dark:text-red-400 text-sm font-bold">List too large for QR.</p>
-                                        <p className="text-gray-500 text-xs mt-1">Use Share File instead.</p>
-                                    </div>
-                                ) : (
-                                    <QRCodeSVG value={qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#111827" bgColor="#ffffff" />
+                        <div className="flex flex-col items-center w-full max-w-[300px]">
+                            <div className="w-full flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">
+                                    {frameIdx + 1} / {activeFrames.length}
+                                </span>
+                                {activeFrames.length > 1 && (
+                                    <button
+                                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 transition-all ${
+                                            autoPlay
+                                                ? 'bg-blue-700 text-white shadow-sm'
+                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600'
+                                        }`}
+                                        onClick={() => setAutoPlay(!autoPlay)}
+                                    >
+                                        {autoPlay ? <Pause size={10} /> : <Play size={10} />}
+                                        {autoPlay ? 'Auto' : 'Manual'}
+                                    </button>
                                 )}
                             </div>
-                        ) : (
-                            <div className="flex flex-col items-center w-full max-w-[300px]">
-                                <div className="w-full flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">
-                                        {frameIdx + 1} / {frames.length}
-                                    </span>
-                                    {frames.length > 1 && (
-                                        <button
-                                            className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 transition-all ${
-                                                autoPlay
-                                                    ? 'bg-blue-700 text-white shadow-sm'
-                                                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600'
-                                            }`}
-                                            onClick={() => setAutoPlay(!autoPlay)}
-                                        >
-                                            {autoPlay ? <Pause size={10} /> : <Play size={10} />}
-                                            {autoPlay ? 'Auto' : 'Manual'}
-                                        </button>
-                                    )}
-                                </div>
 
-                                <div className="w-full aspect-square bg-white p-3 rounded-xl shadow-sm border border-blue-200 dark:border-blue-700 relative mb-1.5">
-                                    <QRCodeSVG value={frames[frameIdx] || qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor="#1e3a8a" bgColor="#ffffff" />
-                                </div>
-
-                                {autoPlay && (
-                                    <div className="flex items-center justify-center gap-1.5 py-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                                        <span className="text-[11px] font-bold text-blue-700 dark:text-blue-400">Hold still — scanning in progress</span>
-                                    </div>
-                                )}
-
-                                {frames.length > 1 && !autoPlay && (
-                                    <div className="flex w-full gap-2">
-                                        <button
-                                            className="flex-1 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
-                                            onClick={() => setFrameIdx((i) => (i - 1 + frames.length) % frames.length)}
-                                        >
-                                            <ChevronLeft size={14} /> Prev
-                                        </button>
-                                        <button
-                                            className="flex-1 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
-                                            onClick={() => setFrameIdx((i) => (i + 1) % frames.length)}
-                                        >
-                                            Next <ChevronRight size={14} />
-                                        </button>
-                                    </div>
-                                )}
+                            <div className="w-full aspect-square bg-white p-3 rounded-xl shadow-sm border border-blue-200 dark:border-blue-700 relative mb-1.5">
+                                <QRCodeSVG value={activeFrames[frameIdx] || qrData} size="100%" level="M" style={{ width: '100%', height: '100%' }} includeMargin={false} fgColor={effectiveQrMode === 'compact' ? "#111827" : "#1e3a8a"} bgColor="#ffffff" />
                             </div>
-                        )}
+
+                            {autoPlay && activeFrames.length > 1 && (
+                                <div className="flex items-center justify-center gap-1.5 py-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                                    <span className="text-[11px] font-bold text-blue-700 dark:text-blue-400">Hold still — scanning in progress</span>
+                                </div>
+                            )}
+
+                            {activeFrames.length > 1 && !autoPlay && (
+                                <div className="flex w-full gap-2">
+                                    <button
+                                        className="flex-1 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                                        onClick={() => setFrameIdx((i) => (i - 1 + activeFrames.length) % activeFrames.length)}
+                                    >
+                                        <ChevronLeft size={14} /> Prev
+                                    </button>
+                                    <button
+                                        className="flex-1 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                                        onClick={() => setFrameIdx((i) => (i + 1) % activeFrames.length)}
+                                    >
+                                        Next <ChevronRight size={14} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Primary Actions */}
                     <div className="flex flex-col gap-2 shrink-0">
-                        <div className="grid grid-cols-2 gap-2">
+                        <div id="tour-share-copy-btns" className="grid grid-cols-2 gap-2">
                             <button
+                                id="tour-share-file-btn"
                                 className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.97] ${
                                     sharedCode
                                         ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25'
@@ -663,9 +692,10 @@ export default function ExportModal({ patients, allPatients, listName, selection
                                 onClick={handleShareCode}
                             >
                                 {sharedCode ? <CheckCircle size={14} /> : <Share2 size={14} />}
-                                {sharedCode ? 'Shared!' : 'Share File'}
+                                {sharedCode ? 'Shared!' : 'Share as File'}
                             </button>
                             <button
+                                id="tour-copy-code-btn"
                                 className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.97] border-2 ${
                                     copiedCode
                                         ? 'bg-emerald-500 text-white border-emerald-500'
@@ -674,7 +704,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                                 onClick={handleCopyCode}
                             >
                                 {copiedCode ? <CheckCircle size={14} /> : <Copy size={14} />}
-                                {copiedCode ? 'Copied!' : 'Copy Code'}
+                                {copiedCode ? 'Copied!' : 'Share as Text'}
                             </button>
                         </div>
 

@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
+      registerType: 'promptUpdate',
+      includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'fonts/*.ttf'],
       manifest: {
         name: 'HOsNote – Patient Tracker & Notebook',
         short_name: 'HOsNote',
@@ -32,7 +32,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,ttf}'],
       },
     }),
   ],

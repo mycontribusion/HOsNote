@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { Plus, Save, X, Undo2, Redo2 } from 'lucide-react'
+import { Plus, Save, X, Undo2, Redo2, Trash2 } from 'lucide-react'
 import MicrophoneButton from './MicrophoneButton'
 import { cleanPastedText } from '../utils/clipboard'
 import { generateUniqueValue } from '../utils/uniqueSuffix'
@@ -183,7 +183,7 @@ function splitSuffix(value) {
     return { base: value, suffix: '' }
 }
 
-export default function AddPatientForm({ onAdd, onCancel, initialData, initialTeam = 'my_team', isMortalityMode = false, patients = [], isNoteMode = false }) {
+export default function AddPatientForm({ onAdd, onCancel, onDiscardDraft, initialData, initialTeam = 'my_team', isMortalityMode = false, patients = [], isNoteMode = false, isDraftView = false, onDeleteDraft }) {
     const [team] = useState(() => {
         if (initialData?.team) return initialData.team
         return initialTeam
@@ -500,6 +500,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     
     // Add custom field update handler
     const updateField = (key, value) => {
+        if (isDraftView) return
         hasEditedRef.current = true
         if (pendingDraft) setPendingDraft(null)
         setFields(prev => {
@@ -552,6 +553,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
 
     const handleSubmit = (e) => {
         e.preventDefault()
+        if (isDraftView || !onAdd) return
         setError('')
         if (isNoteMode) {
             hasSavedRef.current = true
@@ -709,6 +711,26 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
     const handleDiscardDraft = () => {
         isDiscardedRef.current = true
         hasEditedRef.current = false
+
+        // Save discarded draft data before clearing
+        if (onDiscardDraft) {
+            const source = pendingDraft || { fields, critical }
+            const draftData = {
+                name: source.fields.name,
+                hospitalNumber: source.fields.hospitalNumber,
+                ward: source.fields.ward,
+                bed: source.fields.bed,
+                admissionDate: source.fields.admissionDate,
+                diagnosis: source.fields.diagnosis,
+                note: source.fields.note,
+                critical: source.critical,
+                draftType: initialData ? (isNoteMode ? 'edit_note' : 'edit_patient') : (isNoteMode ? 'new_note' : 'new_patient'),
+                patientId: initialData?.id || null,
+                team: team,
+            }
+            onDiscardDraft(draftData)
+        }
+
         if (initialData) {
             const clearFn = isNoteMode ? clearNoteEditDraft : clearEditDraft
             clearFn(initialData.id)
@@ -725,6 +747,12 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
             setCritical(!!initialData.critical)
             setHistory({ stack: [resetFields], index: 0 })
             isUndoRedo.current = true
+        } else {
+            const newBlank = { name: '', hospitalNumber: '', ward: '', bed: '', admissionDate: today(), diagnosis: '', note: '' }
+            setFields(newBlank)
+            setHistory({ stack: [newBlank], index: 0 })
+            isUndoRedo.current = true
+            setCritical(false)
         }
         setPendingDraft(null)
     }
@@ -782,29 +810,31 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                         )}
 
                         {/* Faux-textarea container */}
-                        <div className="text-left py-2 px-4 sm:px-6 font-sans leading-relaxed flex flex-col cursor-text min-h-[300px] min-w-0 max-w-full text-sm sm:text-base" onClick={() => noteRef.current?.focus()}>
+                        <div className="text-left py-2 px-4 sm:px-6 font-sans leading-relaxed flex flex-col cursor-text min-h-[300px] min-w-0 max-w-full text-sm sm:text-base" onClick={() => !isDraftView && noteRef.current?.focus()}>
                             {isNoteMode ? (
                                 <>
                                     <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Note title (optional)" />
+                                        <input ref={diagRef} disabled={isDraftView} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Note title (optional)" />
                                     </div>
                                     <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
                                         <div className="flex items-center justify-between w-full min-w-0 max-w-full mb-1 gap-2">
                                             {renderDraftBanner()}
-                                            <MicrophoneButton
-                                                onTranscript={(transcript) => {
-                                                    hasEditedRef.current = true
-                                                    if (pendingDraft) setPendingDraft(null)
-                                                    setFields(prev => {
-                                                        const nextNote = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
-                                                        const next = { ...prev, note: nextNote }
-                                                        fieldsRef.current = next
-                                                        scheduleDraftSave(currentDraft({ fields: next }))
-                                                        return next
-                                                     })
-                                                }}
-                                                title="Dictate note"
-                                            />
+                                            {!isDraftView && (
+                                                <MicrophoneButton
+                                                    onTranscript={(transcript) => {
+                                                        hasEditedRef.current = true
+                                                        if (pendingDraft) setPendingDraft(null)
+                                                        setFields(prev => {
+                                                            const nextNote = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                            const next = { ...prev, note: nextNote }
+                                                            fieldsRef.current = next
+                                                            scheduleDraftSave(currentDraft({ fields: next }))
+                                                            return next
+                                                         })
+                                                    }}
+                                                    title="Dictate note"
+                                                />
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
                                             <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
@@ -812,6 +842,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                             </div>
                                             <textarea
                                                 ref={noteRef}
+                                                disabled={isDraftView}
                                                 className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
                                                 value={fields.note}
                                                 onChange={e => updateField('note', e.target.value)}
@@ -826,10 +857,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                             ) : (
                                 <>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={nameRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" autoCapitalize="words" inputMode="text" />
+                                        <input ref={nameRef} disabled={isDraftView} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.name} onChange={e => updateField('name', e.target.value)} onPaste={e => handleCleanPaste(e, 'name')} onKeyDown={e => handleEnter(e, hospRef)} autoComplete="off" spellCheck={false} placeholder="Patient name" autoCapitalize="words" inputMode="text" />
                                     </div>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={hospRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={hospSplit.base} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
+                                        <input ref={hospRef} disabled={isDraftView} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={hospSplit.base} onChange={e => updateField('hospitalNumber', e.target.value)} onPaste={e => handleCleanPaste(e, 'hospitalNumber')} onKeyDown={e => handleEnter(e, wardRef)} autoComplete="off" spellCheck={false} placeholder="Hospital number" />
                                         {hospSplit.suffix && (
                                             <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
                                                 ({hospSplit.suffix})
@@ -837,10 +868,10 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                         )}
                                     </div>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={wardRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onPaste={e => handleCleanPaste(e, 'ward')} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} placeholder="Ward" />
+                                        <input ref={wardRef} disabled={isDraftView} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.ward} onChange={e => updateField('ward', e.target.value)} onPaste={e => handleCleanPaste(e, 'ward')} onKeyDown={e => handleEnter(e, bedRef)} autoComplete="off" spellCheck={false} placeholder="Ward" />
                                     </div>
                                     <div className="flex items-center min-h-[32px] min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={bedRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={bedSplit.base} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
+                                        <input ref={bedRef} disabled={isDraftView} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={bedSplit.base} onChange={e => updateField('bed', e.target.value)} onPaste={e => handleCleanPaste(e, 'bed')} onKeyDown={e => handleEnter(e, dateRef)} autoComplete="off" spellCheck={false} placeholder="Bed" />
                                         {bedSplit.suffix && (
                                             <span className="text-gray-500 dark:text-gray-400 text-sm font-medium ml-2 select-none pointer-events-none flex-shrink-0">
                                                 ({bedSplit.suffix})
@@ -848,28 +879,30 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                         )}
                                     </div>
                                     <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={dateRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onPaste={e => handleCleanPaste(e, 'admissionDate')} onKeyDown={e => handleEnter(e, diagRef)} autoComplete="off" spellCheck={false} placeholder="Admission date" />
+                                        <input ref={dateRef} disabled={isDraftView} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.admissionDate} onChange={e => updateField('admissionDate', e.target.value)} onPaste={e => handleCleanPaste(e, 'admissionDate')} onKeyDown={e => handleEnter(e, diagRef)} autoComplete="off" spellCheck={false} placeholder="Admission date" />
                                     </div>
                                     <div className="flex items-center min-h-[32px] mb-2 border-b border-gray-100 dark:border-gray-700/50 pb-2 min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
-                                        <input ref={diagRef} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Diagnosis" />
+                                        <input ref={diagRef} disabled={isDraftView} className="flex-1 bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 font-medium min-w-0 max-w-full placeholder-gray-300 dark:placeholder-gray-600" value={fields.diagnosis} onChange={e => updateField('diagnosis', e.target.value)} onPaste={e => handleCleanPaste(e, 'diagnosis')} onKeyDown={e => handleEnter(e, noteRef)} autoComplete="off" spellCheck={false} placeholder="Diagnosis" />
                                     </div>
                                     <div className="flex flex-col items-start gap-1.5 mt-2 relative min-w-0 max-w-full" onClick={e => e.stopPropagation()}>
                                         <div className="flex items-center justify-between w-full min-w-0 max-w-full mb-1 gap-2">
                                             {renderDraftBanner()}
-                                            <MicrophoneButton
-                                                onTranscript={(transcript) => {
-                                                    hasEditedRef.current = true
-                                                    if (pendingDraft) setPendingDraft(null)
-                                                    setFields(prev => {
-                                                        const nextNote = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
-                                                        const next = { ...prev, note: nextNote }
-                                                        fieldsRef.current = next
-                                                        scheduleDraftSave(currentDraft({ fields: next }))
-                                                        return next
-                                                     })
-                                                }}
-                                                title="Dictate note"
-                                            />
+                                            {!isDraftView && (
+                                                <MicrophoneButton
+                                                    onTranscript={(transcript) => {
+                                                        hasEditedRef.current = true
+                                                        if (pendingDraft) setPendingDraft(null)
+                                                        setFields(prev => {
+                                                            const nextNote = prev.note.trim() ? `${prev.note.trim()} ${transcript}` : transcript
+                                                            const next = { ...prev, note: nextNote }
+                                                            fieldsRef.current = next
+                                                            scheduleDraftSave(currentDraft({ fields: next }))
+                                                            return next
+                                                         })
+                                                    }}
+                                                    title="Dictate note"
+                                                />
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-[minmax(0,1fr)] w-full min-h-[150px] min-w-0 max-w-full overflow-hidden [tab-size:2]">
                                             <div className="col-start-1 row-start-1 w-full min-w-0 max-w-full whitespace-pre-wrap break-all [overflow-wrap:anywhere] [word-break:break-word] invisible pointer-events-none p-0 m-0 leading-relaxed overflow-hidden font-sans pb-24" aria-hidden="true" style={{ fontSize: 'inherit', fontFamily: 'inherit' }}>
@@ -877,6 +910,7 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                                             </div>
                                             <textarea
                                                 ref={noteRef}
+                                                disabled={isDraftView}
                                                 className="col-start-1 row-start-1 w-full h-full min-w-0 max-w-full bg-transparent outline-none p-0 text-gray-900 dark:text-gray-100 resize-none overflow-y-auto leading-relaxed font-sans break-all [overflow-wrap:anywhere] [word-break:break-word] placeholder-gray-300 dark:placeholder-gray-600 pb-24"
                                                 value={fields.note}
                                                 onChange={e => updateField('note', e.target.value)}
@@ -899,84 +933,109 @@ export default function AddPatientForm({ onAdd, onCancel, initialData, initialTe
                     {/* Bottom Action Bar (Stays on top of keyboard) */}
                     <div 
                         style={{ transform: `translateY(-${keyboardOffset}px)` }}
-                        className="flex items-center justify-between px-3 sm:px-4 py-2 min-h-[52px] border-t border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shrink-0 z-20 min-w-0 max-w-full transition-transform duration-75 ease-out pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-xs"
+                        className="flex items-center justify-between px-3 sm:px-4 py-2 min-h-[52px] border-t border-gray-200/70 dark:border-gray-700/70 bg-white/95 dark:bg-gray-800/95 backdrop:blur-md shrink-0 z-20 min-w-0 max-w-full transition-transform duration-75 ease-out pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-xs"
                     >
-                        {/* Left Group: Undo/Redo (Expands based on device width) */}
-                        <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-[140px] sm:max-w-[220px]">
-                            {/* Segmented Undo / Redo */}
-                            <div className="flex items-center w-full p-1 rounded-xl bg-gray-100/90 dark:bg-gray-700/60 border border-gray-200/60 dark:border-gray-600/60">
+                        {isDraftView ? (
+                            /* Draft view: Close + Delete */
+                            <div className="flex items-center gap-2 sm:gap-3 w-full">
                                 <button
                                     type="button"
-                                    onClick={handleUndo}
-                                    disabled={history.index <= 0}
-                                    className="flex-1 py-1.5 px-2 sm:px-3 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
-                                    aria-label="Undo"
-                                    title="Undo"
+                                    onClick={handleCancel}
+                                    aria-label="Close"
+                                    className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold text-xs transition-all active:scale-95"
                                 >
-                                    <Undo2 size={15} strokeWidth={2.5} />
-                                    <span className="hidden sm:inline">Undo</span>
+                                    Close
                                 </button>
-                                <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-600 mx-0.5" />
                                 <button
                                     type="button"
-                                    onClick={handleRedo}
-                                    disabled={history.index >= history.stack.length - 1}
-                                    className="flex-1 py-1.5 px-2 sm:px-3 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
-                                    aria-label="Redo"
-                                    title="Redo"
+                                    onClick={onDeleteDraft}
+                                    aria-label="Delete draft"
+                                    className="flex-1 py-2 rounded-xl bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
                                 >
-                                    <Redo2 size={15} strokeWidth={2.5} />
-                                    <span className="hidden sm:inline">Redo</span>
+                                    <Trash2 size={14} strokeWidth={2.5} />
+                                    Delete
                                 </button>
                             </div>
-                        </div>
+                        ) : (
+                            <>
+                                {/* Left Group: Undo/Redo (Expands based on device width) */}
+                                <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-[140px] sm:max-w-[220px]">
+                                    {/* Segmented Undo / Redo */}
+                                    <div className="flex items-center w-full p-1 rounded-xl bg-gray-100/90 dark:bg-gray-700/60 border border-gray-200/60 dark:border-gray-600/60">
+                                        <button
+                                            type="button"
+                                            onClick={handleUndo}
+                                            disabled={history.index <= 0}
+                                            className="flex-1 py-1.5 px-2 sm:px-3 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
+                                            aria-label="Undo"
+                                            title="Undo"
+                                        >
+                                            <Undo2 size={15} strokeWidth={2.5} />
+                                            <span className="hidden sm:inline">Undo</span>
+                                        </button>
+                                        <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-600 mx-0.5" />
+                                        <button
+                                            type="button"
+                                            onClick={handleRedo}
+                                            disabled={history.index >= history.stack.length - 1}
+                                            className="flex-1 py-1.5 px-2 sm:px-3 rounded-lg text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-600 disabled:opacity-30 disabled:hover:bg-transparent transition-all flex items-center justify-center gap-1.5 text-xs font-bold active:scale-95"
+                                            aria-label="Redo"
+                                            title="Redo"
+                                        >
+                                            <Redo2 size={15} strokeWidth={2.5} />
+                                            <span className="hidden sm:inline">Redo</span>
+                                        </button>
+                                    </div>
+                                </div>
 
-                        {/* Right Group: Critical toggle + Save + Cancel */}
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                            {!isNoteMode && !isMortalityMode && (
-                                <button
-                                    type="button"
-                                    aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
-                                    onClick={() => { hasEditedRef.current = true; if (pendingDraft) setPendingDraft(null); const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
-                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
-                                        critical
-                                            ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm shadow-red-500/30'
-                                            : 'bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400'
-                                    }`}
-                                >
-                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${critical ? 'bg-white animate-pulse' : 'bg-gray-400 dark:bg-gray-500'}`} />
-                                    {critical ? 'CRITICAL' : 'Critical'}
-                                </button>
-                            )}
+                                {/* Right Group: Critical toggle + Save + Cancel */}
+                                <div className="flex items-center gap-1.5 sm:gap-2">
+                                    {!isNoteMode && !isMortalityMode && (
+                                        <button
+                                            type="button"
+                                            aria-label={critical ? 'Unmark critical' : 'Mark as critical'}
+                                            onClick={() => { hasEditedRef.current = true; if (pendingDraft) setPendingDraft(null); const next = !critical; setCritical(next); scheduleDraftSave(currentDraft({ critical: next })) }}
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
+                                                critical
+                                                    ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm shadow-red-500/30'
+                                                    : 'bg-gray-100 dark:bg-gray-700/60 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400'
+                                            }`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${critical ? 'bg-white animate-pulse' : 'bg-gray-400 dark:bg-gray-500'}`} />
+                                            {critical ? 'CRITICAL' : 'Critical'}
+                                        </button>
+                                    )}
 
-                            {/* Add / Save Button */}
-                            <button
-                                id={isNoteMode ? 'btn-add-note' : 'btn-add-patient'}
-                                type="submit"
-                                aria-label={initialData ? 'Save' : 'Add'}
-                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white font-bold text-xs transition-all active:scale-95 shadow-sm ${
-                                    isMortalityMode
-                                        ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 shadow-red-500/25'
-                                        : isNoteMode
-                                            ? 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 shadow-teal-500/25'
-                                            : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 shadow-blue-500/25'
-                                }`}
-                            >
-                                {initialData ? <Save size={13} strokeWidth={2.5} /> : <Plus size={13} strokeWidth={2.5} />}
-                                {initialData ? 'Save' : 'Add'}
-                            </button>
+                                    {/* Add / Save Button */}
+                                    <button
+                                        id={isNoteMode ? 'btn-add-note' : 'btn-add-patient'}
+                                        type="submit"
+                                        aria-label={initialData ? 'Save' : 'Add'}
+                                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white font-bold text-xs transition-all active:scale-95 shadow-sm ${
+                                            isMortalityMode
+                                                ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 shadow-red-500/25'
+                                                : isNoteMode
+                                                    ? 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 shadow-teal-500/25'
+                                                    : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 shadow-blue-500/25'
+                                        }`}
+                                    >
+                                        {initialData ? <Save size={13} strokeWidth={2.5} /> : <Plus size={13} strokeWidth={2.5} />}
+                                        {initialData ? 'Save' : 'Add'}
+                                    </button>
 
-                            {/* Cancel / Dismiss */}
-                            <button
-                                type="button"
-                                onClick={handleCancel}
-                                aria-label="Cancel"
-                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90"
-                                title="Close"
-                            >
-                                <X size={14} strokeWidth={2.5} />
-                            </button>
-                        </div>
+                                    {/* Cancel / Dismiss */}
+                                    <button
+                                        type="button"
+                                        onClick={handleCancel}
+                                        aria-label="Cancel"
+                                        className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700/70 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300 flex items-center justify-center transition-all active:scale-90"
+                                        title="Close"
+                                    >
+                                        <X size={14} strokeWidth={2.5} />
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </form>
                 {duplicateInfo && (

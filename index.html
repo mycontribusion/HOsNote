@@ -7,11 +7,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#1d4ed8" />
   <meta name="description" content="HOsNote – Patient tracker and clinical notebook for medical teams. Zero-network, offline-first." />
+  <!-- Preload the most-used font weights so they are cached on first visit and
+       served from cache on every subsequent cold start (PWA/Android). -->
+  <link rel="preload" as="font" href="/fonts/Inter-400.ttf" type="font/ttf" crossorigin />
+  <link rel="preload" as="font" href="/fonts/Inter-500.ttf" type="font/ttf" crossorigin />
+  <link rel="preload" as="font" href="/fonts/Inter-600.ttf" type="font/ttf" crossorigin />
+  <link rel="preload" as="font" href="/fonts/Inter-700.ttf" type="font/ttf" crossorigin />
+  <link rel="preload" as="font" href="/fonts/Inter-800.ttf" type="font/ttf" crossorigin />
   <!-- Open Graph -->
   <meta property="og:title" content="HOsNote – Patient Tracker & Notebook" />
   <meta property="og:description" content="Track patients, write notes, archive forever. No internet needed." />
   <meta property="og:type" content="website" />
+  <!-- UPDATE: Replace with your actual deployment URL (e.g., https://your-domain.com/) -->
   <meta property="og:url" content="https://hosnote.vercel.app/" />
+  <!-- UPDATE: Replace with your actual deployment URL for the banner image -->
   <meta property="og:image" content="https://hosnote.vercel.app/hosnote-banner.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -20,11 +29,9 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="HOsNote – Patient Tracker & Notebook" />
   <meta name="twitter:description" content="Track patients, write notes, archive forever. No internet needed." />
+  <!-- UPDATE: Replace with your actual deployment URL for the banner image -->
   <meta name="twitter:image" content="https://hosnote.vercel.app/hosnote-banner.png" />
   <title>HOsNote – Patient Tracker & Notebook</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 </head>
 
 <body>

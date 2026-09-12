@@ -28,10 +28,37 @@ const InteractiveSpotlightTour = lazy(() => import('./components/InteractiveSpot
 
 const STORAGE_KEY = '4myteam_patients'
 const MORTALITIES_KEY = '4myteam_mortalities'
+const PERSIST_REQUESTED_KEY = '4myteam_persist_requested'
+
+// Startup performance markers — logged to console so we can measure cold-start cost.
+// Only enabled in development (or when localStorage.debugStartup === '1').
+const DEBUG_STARTUP = import.meta.env.DEV || localStorage.getItem('debugStartup') === '1'
+
+// General debug flag for non-startup logs (storage, speech, etc.)
+// Only enabled in development (or when localStorage.debug === '1').
+const DEBUG = import.meta.env.DEV || localStorage.getItem('debug') === '1'
+
+function perfLog(label) {
+  if (!DEBUG_STARTUP) return
+  try {
+    const t = typeof performance !== 'undefined' && performance.now ? performance.now() : 0
+    console.log(`[Startup] ${label}: ${t.toFixed(0)}ms`)
+  } catch { /* ignore */ }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => perfLog('window.load'))
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => perfLog('DOMContentLoaded'))
+}
+if (typeof performance !== 'undefined' && performance.mark) {
+  performance.mark('app-start')
+}
 const DISCHARGES_KEY = '4myteam_discharges'
 const DISCHARGES_RESET_KEY = '4myteam_discharges_reset'
 const DARK_MODE_KEY = '4myteam_darkmode'
 const DOCUMENTATION_KEY = 'hosnote_docs'
+const DISCARDED_DRAFTS_KEY = '4myteam_discarded_drafts'
 
 function generateId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -92,31 +119,60 @@ export default function App() {
     const [showDemoModal, setShowDemoModal] = useState(false)
     const [demoSubPage, setDemoSubPage] = useState('patients')
 
+    const previousPathRef = useRef(
+        location.pathname !== '/settings' && location.pathname !== '/demo' && location.pathname !== '/search'
+            ? location.pathname
+            : '/team/my_team'
+    )
+
+    useEffect(() => {
+        if (
+            location.pathname !== '/settings' &&
+            location.pathname !== '/demo' &&
+            location.pathname !== '/search'
+        ) {
+            previousPathRef.current = location.pathname
+        }
+    }, [location.pathname])
+
+    // When on /settings, the underlying page/tab remains what it was before opening settings
+    const effectivePath = location.pathname === '/settings'
+        ? (previousPathRef.current || '/team/my_team')
+        : location.pathname
+
     // Real URL-based navigation:
     //   /                 -> patients page, my_team tab
     //   /team/:tab        -> patients page, :tab in {my_team, other_team, mortalities}
     //   /notebook         -> clinical notebook page
-    const activePage = showDemoModal
+    //   /discarded-drafts -> patients page (discarded drafts view)
+    const activePage = (showDemoModal || location.pathname === '/demo')
         ? demoSubPage
-        : (location.pathname === '/search' ? 'search' : location.pathname.startsWith('/notebook') ? 'notebook' : 'patients')
-    const activeTab = params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
-        ? params.tab
-        : location.pathname === '/mortalities'
-            ? 'mortalities'
-            : 'my_team'
+        : (effectivePath === '/search' ? 'search' : effectivePath.startsWith('/notebook') ? 'notebook' : 'patients')
+    const activeTab = (showDemoModal || location.pathname === '/demo')
+        ? 'my_team'
+        : (params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
+            ? params.tab
+            : effectivePath.includes('/team/other_team')
+                ? 'other_team'
+                : effectivePath === '/mortalities'
+                    ? 'mortalities'
+                    : 'my_team')
 
     const goToPage = useCallback((page) => {
         setMortalitiesOnly(false)
+        setDiscardedDraftsOnly(false)
         if (showDemoModal) {
             setDemoSubPage(page === 'notebook' ? 'notebook' : 'patients')
             return
         }
         if (page === 'notebook') navigate('/notebook')
+        else if (page === 'discarded-drafts') navigate('/discarded-drafts')
         else navigate(`/team/${activeTab}`)
     }, [navigate, activeTab, showDemoModal])
 
     const goToTab = useCallback((tab) => {
         setMortalitiesOnly(false)
+        setDiscardedDraftsOnly(false)
         if (!showDemoModal) {
             navigate(`/team/${tab}`)
         }
@@ -132,6 +188,7 @@ export default function App() {
 
     const onHome = useCallback(() => {
         setMortalitiesOnly(false)
+        setDiscardedDraftsOnly(false)
         if (!showDemoModal) {
             navigate('/team/my_team')
         }
@@ -146,7 +203,9 @@ const navigateBackFromUrlRoute = useCallback(() => {
     } else if (path.endsWith('/add') || path.includes('/edit') ||
         path.includes('/handover') || path.includes('/recieve') || path.includes('/receive')) {
         navigate(`/team/${activeTab}`)
-    } else if (path === '/settings' || path === '/search' || path === '/demo') {
+    } else if (path === '/settings') {
+        navigate(previousPathRef.current || '/team/my_team')
+    } else if (path === '/search' || path === '/demo' || path === '/discarded-drafts') {
         navigate('/team/my_team')
     }
 }, [location.pathname, navigate, activeTab])
@@ -190,21 +249,45 @@ useEffect(() => {
     } else if (path === '/demo') {
         setShowDemoModal(true)
         setDemoSubPage('patients')
+        setMortalitiesOnly(false)
+        setDiscardedDraftsOnly(false)
+        setSelectedPatientIds(new Set())
+        setComposingFor(null)
+        setViewingDraft(null)
+        setEditingPatient(null)
+        setNotebookEditDoc(null)
+        setSearchHighlightField(null)
+        setSearchHighlightQuery('')
+        setInitialSelectedPatientId(null)
+        setInitialSelectedDocId(null)
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'instant' })
+        }
+    } else if (path === '/discarded-drafts') {
+        setDiscardedDraftsOnly(true)
     }
 }, [location.pathname])
 
     const [isLoaded, setIsLoaded] = useState(false)
 
-    // Request persistent storage to protect IndexedDB from automatic eviction
+    // Request persistent storage to protect IndexedDB from automatic eviction.
+    // Only run once per device (flagged in localStorage) so it doesn't add
+    // latency to every cold start.
     useEffect(() => {
         const requestPersistentStorage = async () => {
-            if ('storage' in navigator && 'persist' in navigator.storage) {
-                try {
-                    const granted = await navigator.storage.persist()
-                    console.log(`[Storage] Persistent storage ${granted ? 'granted' : 'denied'}`)
-                } catch (err) {
-                    console.error('[Storage] Failed to request persistence:', err)
-                }
+            if (!('storage' in navigator && 'persist' in navigator.storage)) return
+            try {
+                const alreadyRequested = localStorage.getItem(PERSIST_REQUESTED_KEY) === '1'
+                const isPersisted = await navigator.storage.persisted()
+                setIsStoragePersisted(isPersisted)
+                if (isPersisted) return
+                if (alreadyRequested) return // don't re-ask on every launch
+                const granted = await navigator.storage.persist()
+                setIsStoragePersisted(granted)
+                if (DEBUG) console.log(`[Storage] Persistence requested: ${granted}`)
+                localStorage.setItem(PERSIST_REQUESTED_KEY, '1')
+            } catch (err) {
+                if (DEBUG) console.error('[Storage] Failed to request persistence:', err)
             }
         }
         requestPersistentStorage()
@@ -212,13 +295,15 @@ useEffect(() => {
 
     const [patients, setPatients] = useState([])
     const [mortalities, setMortalities] = useState([])
-const [discharges, setDischarges] = useState([])
-const [docs, setDocs] = useState([])
+    const [discharges, setDischarges] = useState([])
+    const [docs, setDocs] = useState([])
+    const [discardedDrafts, setDiscardedDrafts] = useState([])
 const [notebookExportDocs, setNotebookExportDocs] = useState(null)
 const [notebookEditDoc, setNotebookEditDoc] = useState(null)
 const [composingFor, setComposingFor] = useState(null) // patient object when DocComposer is open
 const [dischargesResetDate, setDischargesResetDate] = useState(new Date().toLocaleDateString())
 const [mortalitiesOnly, setMortalitiesOnly] = useState(false)
+const [discardedDraftsOnly, setDiscardedDraftsOnly] = useState(false)
 const [initialSelectedPatientId, setInitialSelectedPatientId] = useState(null)
     const [darkMode, setDarkMode] = useState(() => {
         try {
@@ -238,7 +323,7 @@ const checkStoragePersistence = useCallback(async () => {
             setIsStoragePersisted(isPersisted)
             return isPersisted
         } catch (err) {
-            console.error('[Storage] Error checking persistence:', err)
+            if (DEBUG) console.error('[Storage] Error checking persistence:', err)
         }
     }
     return false
@@ -247,12 +332,19 @@ const checkStoragePersistence = useCallback(async () => {
 const requestStoragePersistence = useCallback(async () => {
     if ('storage' in navigator && 'persist' in navigator.storage) {
         try {
+            const alreadyRequested = localStorage.getItem(PERSIST_REQUESTED_KEY) === '1'
+            if (alreadyRequested) {
+                const isPersisted = await navigator.storage.persisted()
+                setIsStoragePersisted(isPersisted)
+                return isPersisted
+            }
             const granted = await navigator.storage.persist()
             setIsStoragePersisted(granted)
-            console.log(`[Storage] Persistence requested: ${granted}`)
+            if (DEBUG) console.log(`[Storage] Persistence requested: ${granted}`)
+            localStorage.setItem(PERSIST_REQUESTED_KEY, '1')
             return granted
         } catch (err) {
-            console.error('[Storage] Error requesting persistence:', err)
+            if (DEBUG) console.error('[Storage] Error requesting persistence:', err)
         }
     }
     return false
@@ -275,52 +367,83 @@ const mortalitiesRef = useRef(mortalities)
 mortalitiesRef.current = mortalities
 const docsRef = useRef(docs)
 docsRef.current = docs
+const discardedDraftsRef = useRef(discardedDrafts)
+discardedDraftsRef.current = discardedDrafts
 const pendingEditRef = useRef(null)
 
-// Load from IndexedDB or migrate from localStorage
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                // Patients
-                let pts = await get(STORAGE_KEY)
-                if (pts === undefined) {
-                    const legacy = localStorage.getItem(STORAGE_KEY)
-                    if (legacy) { pts = JSON.parse(legacy); await set(STORAGE_KEY, pts); localStorage.removeItem(STORAGE_KEY) }
-                    else pts = []
-                }
-                
-                // Mortalities
-                let morts = await get(MORTALITIES_KEY)
-                if (morts === undefined) {
-                    const legacy = localStorage.getItem(MORTALITIES_KEY)
-                    if (legacy) { morts = JSON.parse(legacy); await set(MORTALITIES_KEY, morts); localStorage.removeItem(MORTALITIES_KEY) }
-                    else morts = []
-                }
+// Load from IndexedDB or migrate from localStorage.
+// Each section commits its own React state as soon as it resolves so the UI
+// can paint before every read finishes — this cuts perceived startup latency.
+useEffect(() => {
+    const loadData = async () => {
+        perfLog('load.start')
+        try {
+            // Issue all IndexedDB reads concurrently so they share a single
+            // transaction instead of paying for 6 separate round-trips.
+            const [ptsRaw, mortsRaw, disRaw, resDateRaw, draftsRaw, storedDocsRaw] =
+                await Promise.all([
+                    get(STORAGE_KEY),
+                    get(MORTALITIES_KEY),
+                    get(DISCHARGES_KEY),
+                    get(DISCHARGES_RESET_KEY),
+                    get(DISCARDED_DRAFTS_KEY),
+                    get(DOCUMENTATION_KEY),
+                ])
+            perfLog('load.allReads')
 
-                // Discharges
-                let dis = await get(DISCHARGES_KEY)
-                if (dis === undefined) {
-                    const legacy = localStorage.getItem(DISCHARGES_KEY)
-                    if (legacy) { dis = JSON.parse(legacy); await set(DISCHARGES_KEY, dis); localStorage.removeItem(DISCHARGES_KEY) }
-                    else dis = []
-                }
+            // Patients
+            let pts = ptsRaw
+            if (pts === undefined) {
+                const legacy = localStorage.getItem(STORAGE_KEY)
+                if (legacy) { pts = JSON.parse(legacy); await set(STORAGE_KEY, pts); localStorage.removeItem(STORAGE_KEY) }
+                else pts = []
+            }
+            setPatients(pts)
+            perfLog('load.patients')
 
-                // Discharge Reset Date
-                let resDate = await get(DISCHARGES_RESET_KEY)
-                if (resDate === undefined) {
-                    const legacy = localStorage.getItem(DISCHARGES_RESET_KEY)
-                    if (legacy) { resDate = legacy; await set(DISCHARGES_RESET_KEY, resDate); localStorage.removeItem(DISCHARGES_RESET_KEY) }
-                    else resDate = new Date().toLocaleDateString()
-                }
+            // Mortalities
+            let morts = mortsRaw
+            if (morts === undefined) {
+                const legacy = localStorage.getItem(MORTALITIES_KEY)
+                if (legacy) { morts = JSON.parse(legacy); await set(MORTALITIES_KEY, morts); localStorage.removeItem(MORTALITIES_KEY) }
+                else morts = []
+            }
+            setMortalities(morts)
+            perfLog('load.mortalities')
 
-                setPatients(pts)
-                setMortalities(morts)
-                setDischarges(dis)
-                setDischargesResetDate(resDate)
+            // Discharges
+            let dis = disRaw
+            if (dis === undefined) {
+                const legacy = localStorage.getItem(DISCHARGES_KEY)
+                if (legacy) { dis = JSON.parse(legacy); await set(DISCHARGES_KEY, dis); localStorage.removeItem(DISCHARGES_KEY) }
+                else dis = []
+            }
 
-                // Docs — load then migrate any legacy patient.note strings
-                let storedDocs = await get(DOCUMENTATION_KEY)
-                if (storedDocs === undefined) storedDocs = []
+            // Discharge Reset Date
+            let resDate = resDateRaw
+            if (resDate === undefined) {
+                const legacy = localStorage.getItem(DISCHARGES_RESET_KEY)
+                if (legacy) { resDate = legacy; await set(DISCHARGES_RESET_KEY, resDate); localStorage.removeItem(DISCHARGES_RESET_KEY) }
+                else resDate = new Date().toLocaleDateString()
+            }
+            setDischarges(dis)
+            setDischargesResetDate(resDate)
+            perfLog('load.discharges')
+
+            // Discarded Drafts
+            let drafts = draftsRaw
+            if (drafts === undefined) {
+                const legacy = localStorage.getItem(DISCARDED_DRAFTS_KEY)
+                if (legacy) { drafts = JSON.parse(legacy); await set(DISCARDED_DRAFTS_KEY, drafts); localStorage.removeItem(DISCARDED_DRAFTS_KEY) }
+                else drafts = []
+            }
+            setDiscardedDrafts(drafts)
+            perfLog('load.drafts')
+
+            // Docs — load then migrate any legacy patient.note strings
+            let storedDocs = storedDocsRaw
+            if (storedDocs === undefined) storedDocs = []
+            perfLog('load.docs')
 
                 // One-time migration: any patient that still has a note string
                 // but no corresponding doc entry gets one created
@@ -382,6 +505,7 @@ const pendingEditRef = useRef(null)
             } catch (err) {
                 console.error("Failed to load data from IndexedDB", err)
             } finally {
+                perfLog('load.done')
                 setIsLoaded(true)
             }
         }
@@ -411,6 +535,7 @@ const pendingEditRef = useRef(null)
     })
     const [editingPatient, setEditingPatient] = useState(null)
     const editingPatientRef = useRef(editingPatient)
+    const [viewingDraft, setViewingDraft] = useState(null)
     useEffect(() => {
         editingPatientRef.current = editingPatient
     })
@@ -437,6 +562,41 @@ const pendingEditRef = useRef(null)
         setShowDemoSkipToast(true)
         setTimeout(() => setShowDemoSkipToast(false), 5000)
     }, [])
+
+    const handleStartDemo = useCallback(() => {
+        setMortalitiesOnly(false)
+        setDiscardedDraftsOnly(false)
+        setSelectedPatientIds(new Set())
+        setComposingFor(null)
+        setViewingDraft(null)
+        setEditingPatient(null)
+        setNotebookEditDoc(null)
+        setShowAddForm(false)
+        setShowMortalityForm(false)
+        setShowExport(false)
+        setShowScanner(false)
+        setShowSettings(false)
+        setShowSearch(false)
+        setSearchHighlightField(null)
+        setSearchHighlightQuery('')
+        setInitialSelectedPatientId(null)
+        setInitialSelectedDocId(null)
+        setDemoSubPage('patients')
+        setShowDemoModal(true)
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'instant' })
+        }
+        if (location.pathname !== '/demo') {
+            navigate('/demo')
+        }
+    }, [navigate, location.pathname])
+
+    const handleCloseSettings = useCallback(() => {
+        setShowSettings(false)
+        if (location.pathname === '/settings') {
+            navigate('/team/my_team')
+        }
+    }, [location.pathname, navigate])
 
     // Clear selection when switching tabs or pages
     useEffect(() => {
@@ -475,38 +635,62 @@ const pendingEditRef = useRef(null)
     }, [])
 
     const clearMyTeam = useCallback(() => {
-        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         const removedPatients = patients.filter(p => p.team === 'my_team')
         const remainingPatients = patients.filter(p => p.team !== 'my_team')
         const updatedPatients = updateSuffixesAfterRemoval(remainingPatients, removedPatients)
         setPatients(updatedPatients)
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [patients, mortalities, discharges, docs])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const clearOnCall = useCallback(() => {
-        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         const removedPatients = patients.filter(p => p.team === 'other_team')
         const remainingPatients = patients.filter(p => p.team !== 'other_team')
         const updatedPatients = updateSuffixesAfterRemoval(remainingPatients, removedPatients)
         setPatients(updatedPatients)
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [patients, mortalities, discharges, docs])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const clearMortalities = useCallback(() => {
-        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         setMortalities([])
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [patients, mortalities, discharges, docs])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const clearNotebook = useCallback(() => {
-        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         setDocs([])
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [patients, mortalities, discharges, docs])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
+
+    const addDiscardedDraft = useCallback((draftData) => {
+        const record = {
+            id: generateId(),
+            ...draftData,
+            reason: 'discarded_draft',
+            discardedAt: new Date().toISOString(),
+        }
+        setDiscardedDrafts(prev => [record, ...prev])
+    }, [])
+
+    const deleteDiscardedDraft = useCallback((id) => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
+        setDiscardedDrafts(prev => prev.filter(d => d.id !== id))
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
+
+    const clearDiscardedDrafts = useCallback(() => {
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
+        setDiscardedDrafts([])
+        setShowUndoToast(true)
+        setTimeout(() => setShowUndoToast(false), 5000)
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const handleClearRequest = useCallback((action) => {
         setPendingClearAction(action)
@@ -523,12 +707,15 @@ const pendingEditRef = useRef(null)
             case 'mortalities':
                 clearMortalities()
                 break
+            case 'discarded_drafts':
+                clearDiscardedDrafts()
+                break
             case 'notebook':
                 clearNotebook()
                 break
         }
         setPendingClearAction(null)
-    }, [pendingClearAction, clearMyTeam, clearOnCall, clearMortalities, clearNotebook])
+    }, [pendingClearAction, clearMyTeam, clearOnCall, clearMortalities, clearDiscardedDrafts, clearNotebook])
 
     // Debounced IndexedDB persistence to avoid blocking main thread
     const saveTimers = useRef({})
@@ -561,6 +748,11 @@ const pendingEditRef = useRef(null)
         debouncedSave(DOCUMENTATION_KEY, docs.filter(d => !d.isDemoData), 1500)
     }, [docs, isLoaded, debouncedSave])
 
+    useEffect(() => {
+        if (!isLoaded) return;
+        debouncedSave(DISCARDED_DRAFTS_KEY, discardedDrafts)
+    }, [discardedDrafts, isLoaded, debouncedSave])
+
     // ── Demo data callbacks (tour injects temporary patients/notes) ──────────
     const addDemoData = useCallback(({ patients: demoPats = [], docs: demoDocs = [] }) => {
         if (demoPats.length > 0) {
@@ -588,6 +780,24 @@ const pendingEditRef = useRef(null)
             const dir = swipeDirMap[p.id] !== undefined ? swipeDirMap[p.id] : null
             return { ...p, demoSwipeDir: dir }
         }))
+    }, [])
+
+    const openExportModal = useCallback(() => {
+        setShowExport(true);
+    }, [])
+
+    const closeExportModal = useCallback(() => {
+        setShowExport(false);
+        setNotebookExportDocs(null);
+        clearSelection();
+    }, [])
+
+    const openScannerModal = useCallback(() => {
+        setShowScanner(true);
+    }, [])
+
+    const closeScannerModal = useCallback(() => {
+        setShowScanner(false);
     }, [])
 
     // ── Documentation callbacks ───────────────────────────────────────────────
@@ -643,11 +853,11 @@ const pendingEditRef = useRef(null)
     }, [])
 
     const deleteDoc = useCallback((id) => {
-        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         setDocs(prev => prev.filter(d => d.id !== id))
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [patients, mortalities, discharges, docs])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const docCountMap = useMemo(() => {
         const map = {}
@@ -665,7 +875,7 @@ const pendingEditRef = useRef(null)
     // ── Restore from JSON backup ──────────────────────────────────────────────
 
     const restoreFromBackup = useCallback((data) => {
-        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
 
         if (Array.isArray(data.patients)) {
             setPatients(prev => {
@@ -695,7 +905,14 @@ const pendingEditRef = useRef(null)
                 return [...prev, ...newOnes]
             })
         }
-    }, [patients, mortalities, discharges, docs])
+        if (Array.isArray(data.discardedDrafts)) {
+            setDiscardedDrafts(prev => {
+                const ids = new Set(prev.map(d => d.id))
+                const newOnes = data.discardedDrafts.filter(d => !ids.has(d.id))
+                return [...prev, ...newOnes]
+            })
+        }
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     // ── Save full JSON backup ─────────────────────────────────────────────────
 
@@ -708,6 +925,7 @@ const pendingEditRef = useRef(null)
             mortalities,
             discharges,
             docs,
+            discardedDrafts,
         }
         const json = JSON.stringify(backup, null, 2)
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -1)
@@ -740,7 +958,7 @@ const pendingEditRef = useRef(null)
         document.body.removeChild(link)
         URL.revokeObjectURL(url)
         return true
-    }, [patients, mortalities, discharges, docs])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const savePatient = useCallback(({ team = 'my_team', name, hospitalNumber, ward, bed, note, critical = false, admissionDate, diagnosis }) => {
         const n = name.trim()
@@ -856,7 +1074,7 @@ const pendingEditRef = useRef(null)
             removedAt: new Date().toISOString(),
             originalTeam: 'my_team',
         }
-        setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         setMortalities(prev => [record, ...prev])
         setShowMortalityForm(false)
         navigateBackFromUrlRoute()
@@ -875,6 +1093,7 @@ const pendingEditRef = useRef(null)
         setShowAddForm(false)
         setShowMortalityForm(false)
         setEditingPatient(null)
+        setViewingDraft(null)
         navigateBackFromUrlRoute()
     }, [navigateBackFromUrlRoute])
 
@@ -901,16 +1120,16 @@ const pendingEditRef = useRef(null)
     }, [])
 
     const deleteMortalityRecord = useCallback((id) => {
-        setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         setMortalities(prev => prev.filter(p => p.id !== id))
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [patients, mortalities, discharges])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const dischargePatient = useCallback(() => {
         if (removalCandidateId) {
             const patient = patients.find(p => p.id === removalCandidateId)
-            setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
+            setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
             const remainingPatients = patients.filter((p) => p.id !== removalCandidateId)
             const updatedPatients = patient ? updateSuffixesAfterRemoval(remainingPatients, [patient]) : remainingPatients
             setPatients(updatedPatients)
@@ -921,13 +1140,13 @@ const pendingEditRef = useRef(null)
             setShowUndoToast(true)
             setTimeout(() => setShowUndoToast(false), 5000)
         }
-    }, [removalCandidateId, patients, mortalities, discharges])
+    }, [removalCandidateId, patients, mortalities, discharges, docs, discardedDrafts])
 
     const markAsMortality = useCallback(() => {
         if (removalCandidateId) {
             const deceased = patients.find(p => p.id === removalCandidateId)
             if (deceased) {
-                setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
+                setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
                 const mortalityRecord = {
                     ...deceased,
                     removedAt: new Date().toISOString(),
@@ -943,7 +1162,7 @@ const pendingEditRef = useRef(null)
             setShowUndoToast(true)
             setTimeout(() => setShowUndoToast(false), 5000)
         }
-    }, [removalCandidateId, patients, mortalities, discharges])
+    }, [removalCandidateId, patients, mortalities, discharges, docs, discardedDrafts])
 
     const toggleReview = useCallback((id, isReviewed) => {
         setPatients(prev => prev.map(p =>
@@ -958,13 +1177,13 @@ const pendingEditRef = useRef(null)
     }, [activeTab])
 
     const movePatientTeam = useCallback((id, targetTeam) => {
-        setHistory(prev => [{ patients, mortalities, discharges, docs }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         setPatients(prev => prev.map(p =>
             p.id === id ? { ...p, team: targetTeam, lastUpdated: new Date().toISOString() } : p
         ))
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [patients, mortalities, discharges, docs])
+    }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     const undo = useCallback(() => {
         if (history.length > 0) {
@@ -973,6 +1192,7 @@ const pendingEditRef = useRef(null)
             setMortalities(prev.mortalities)
             setDischarges(prev.discharges)
             if (prev.docs) setDocs(prev.docs)
+            if (prev.discardedDrafts) setDiscardedDrafts(prev.discardedDrafts)
             setHistory(rest)
             setShowUndoToast(false)
         }
@@ -980,13 +1200,13 @@ const pendingEditRef = useRef(null)
 
 
     const resetDischarges = useCallback(() => {
-        setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
         setDischarges(prev => prev.filter(d => d.team !== activeTab))
         setDischargesResetDate(new Date().toLocaleDateString())
         setShowConfirmResetStats(false)
         setShowUndoToast(true)
         setTimeout(() => setShowUndoToast(false), 5000)
-    }, [activeTab, patients, mortalities, discharges])
+    }, [activeTab, patients, mortalities, discharges, docs, discardedDrafts])
 
     // Merge imported patients, deduplicate
     const importPatients = useCallback((incoming = [], incomingDocs = []) => {
@@ -1117,7 +1337,7 @@ const pendingEditRef = useRef(null)
 
             if (incomingActive.length > 0) setPatients(prev => [...prev, ...incomingActive]);
             if (incomingMortalities.length > 0) {
-                setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5));
+                setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5));
                 setMortalities(prev => [...prev, ...incomingMortalities]);
             }
 
@@ -1185,10 +1405,10 @@ const pendingEditRef = useRef(null)
             }
             return true;
         }
-    }, [activeTab, patients, mortalities, discharges])
+    }, [activeTab, patients, mortalities, discharges, docs, discardedDrafts])
 
     const resolveImport = useCallback((resolvedConflicts, newOnes) => {
-        setHistory(prev => [{ patients, mortalities, discharges }, ...prev].slice(0, 5))
+        setHistory(prev => [{ patients, mortalities, discharges, docs, discardedDrafts }, ...prev].slice(0, 5))
 
         const toAddActive = [...newOnes.filter(p => p.reason !== 'mortality')];
         const toAddMortality = [...newOnes.filter(p => p.reason === 'mortality')];
@@ -1321,12 +1541,13 @@ const pendingEditRef = useRef(null)
         }
 
         setPendingImport(null);
-    }, [patients, mortalities, discharges, pendingImport]);
+    }, [patients, mortalities, discharges, docs, discardedDrafts, pendingImport]);
 
     const activePatients = useMemo(() => {
         if (activeTab === 'mortalities' || mortalitiesOnly) return mortalities
+        if (discardedDraftsOnly) return discardedDrafts
         return patients.filter(p => (p.team || 'my_team') === activeTab)
-    }, [activeTab, patients, mortalities, mortalitiesOnly])
+    }, [activeTab, patients, mortalities, mortalitiesOnly, discardedDrafts, discardedDraftsOnly])
 
     const lookupPatient = useCallback((hospitalNumber) => {
         const found = activePatients.find(p => p.hospitalNumber === hospitalNumber)
@@ -1366,8 +1587,9 @@ const pendingEditRef = useRef(null)
     const mortalitiesCount = mortalities.length
     const dischargeCount = counts.myDischarges
     const otherDischargeCount = counts.otherDischarges
+    const discardedDraftsCount = discardedDrafts.length
 
-    const listName = mortalitiesOnly ? 'Mortalities' : activeTab === 'my_team' ? 'My Team' : activeTab === 'other_team' ? 'On Call' : 'Mortalities'
+    const listName = mortalitiesOnly ? 'Mortalities' : discardedDraftsOnly ? 'Discarded Drafts' : activeTab === 'my_team' ? 'My Team' : activeTab === 'other_team' ? 'On Call' : 'Mortalities'
 
     const patientsToExport = useMemo(() => {
         return selectedPatientIds.size > 0
@@ -1377,6 +1599,7 @@ const pendingEditRef = useRef(null)
 
     const navigateToPatient = useCallback((patientId, highlightField, highlightQuery, targetTeam) => {
         setMortalitiesOnly(false)
+        setDiscardedDraftsOnly(false)
         // Determine target tab based on patient team
         let targetTab = activeTab
         if (targetTeam === 'mortalities') {
@@ -1487,14 +1710,9 @@ const pendingEditRef = useRef(null)
         setNotebookSearchHighlight('')
     }, [])
 
-    if (!isLoaded) {
-        return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-        )
-    }
-
+    // Render the real UI immediately. Each data section commits its own state
+    // as its IndexedDB read resolves, so the app paints fast and fills in
+    // progressively instead of blocking behind a single spinner.
     return (
         <SearchProvider>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col transition-colors duration-300">
@@ -1517,7 +1735,7 @@ const pendingEditRef = useRef(null)
 
                 {showDemoBanner && (
                     <DemoBanner
-                        onStartDemo={() => navigate('/demo')}
+                        onStartDemo={handleStartDemo}
                         onSkip={handleSkipDemoBanner}
                     />
                 )}
@@ -1594,6 +1812,7 @@ const pendingEditRef = useRef(null)
                             isMortalityMode
                             onAdd={addMortality}
                             onCancel={cancelForm}
+                            onDiscardDraft={addDiscardedDraft}
                             patients={patients}
                         />
                     ) : (showAddForm || editingPatient) ? (
@@ -1602,13 +1821,28 @@ const pendingEditRef = useRef(null)
                             initialTeam={activeTab}
                             onAdd={savePatient}
                             onCancel={cancelForm}
+                            onDiscardDraft={addDiscardedDraft}
                             isMortalityMode={editingPatient?.reason === 'mortality'}
                             patients={patients}
+                        />
+                    ) : viewingDraft ? (
+                        <AddPatientForm
+                            initialData={viewingDraft}
+                            initialTeam={activeTab}
+                            onCancel={cancelForm}
+                            onDiscardDraft={addDiscardedDraft}
+                            isMortalityMode={viewingDraft?.reason === 'mortality'}
+                            patients={patients}
+                            isDraftView
+                            onDeleteDraft={() => {
+                                deleteDiscardedDraft(viewingDraft.id)
+                                setViewingDraft(null)
+                            }}
                         />
                     ) : null}
 
                     {/* Tabs */}
-                    {!showAddForm && !editingPatient && !showMortalityForm && !mortalitiesOnly && activeTab !== 'mortalities' && (
+                    {!showAddForm && !editingPatient && !showMortalityForm && !mortalitiesOnly && !discardedDraftsOnly && activeTab !== 'mortalities' && (
                         <div id="tour-team-tabs" className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
                             <button
                                 onClick={() => goToTab('my_team')}
@@ -1633,18 +1867,6 @@ const pendingEditRef = useRef(null)
 
                     {(activeTab === 'mortalities' || mortalitiesOnly) ? (
                         <div className="mt-2">
-                            <div className="flex items-center gap-2 mb-4">
-                                <button
-                                    onClick={onHome}
-                                    className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                                    aria-label="Back to main page"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M19 12H5M12 19l-7-7 7-7" />
-                                    </svg>
-                                    Back
-                                </button>
-                            </div>
                             {mortalities.length === 0 ? (
                                 <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
                                     <div className="bg-gray-50 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1666,6 +1888,55 @@ const pendingEditRef = useRef(null)
                                     onToggleSelect={toggleSelectPatient}
                                     onToggleSelectAll={toggleSelectAll}
                                     isMortality
+                                    reviewedExpandTrigger={reviewedExpandTrigger}
+                                    onReviewedExpanded={() => setReviewedExpandTrigger(prev => prev + 1)}
+                                    initialSelectedPatientId={initialSelectedPatientId}
+                                    onPatientOpened={() => setInitialSelectedPatientId(null)}
+                                />
+                            )}
+                        </div>
+                    ) : discardedDraftsOnly ? (
+                        <div className="mt-2">
+                            {!discardedDraftsOnly && (
+                                <div className="flex items-center gap-2 mb-4">
+                                    <button
+                                        onClick={onHome}
+                                        className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                                        aria-label="Back to main page"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                                        </svg>
+                                        Back
+                                    </button>
+                                </div>
+                            )}
+                            {discardedDrafts.length === 0 ? (
+                                <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                                    <div className="bg-gray-50 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                                            <polyline points="14 2 14 8 20 8" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">No discarded drafts</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 mt-1 max-w-[240px] mx-auto text-sm">Discarded drafts will appear here for recovery.</p>
+                                </div>
+                            ) : (
+                                <PatientList
+                                    patients={discardedDrafts}
+                                    onEdit={null}
+                                    onDelete={deleteDiscardedDraft}
+                                    onReview={null}
+                                    onResetReviews={() => { }}
+                                    selectedIds={selectedPatientIds}
+                                    onToggleSelect={toggleSelectPatient}
+                                    onToggleSelectAll={toggleSelectAll}
+                                    isMortality={false}
+                                    listTitle="Drafts"
+                                    disableSwipeReview
+                                    isDraft
+                                    onOpenDraft={setViewingDraft}
                                     reviewedExpandTrigger={reviewedExpandTrigger}
                                     onReviewedExpanded={() => setReviewedExpandTrigger(prev => prev + 1)}
                                     initialSelectedPatientId={initialSelectedPatientId}
@@ -1698,7 +1969,7 @@ const pendingEditRef = useRef(null)
                         />
                     )}
 
-                    {activeTab === 'my_team' && (
+                    {activeTab === 'my_team' && !discardedDraftsOnly && !mortalitiesOnly && (
                         <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
                             <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
                                 {dischargeCount} patient{dischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
@@ -1711,7 +1982,7 @@ const pendingEditRef = useRef(null)
                             </button>
                         </div>
                     )}
-                    {activeTab === 'other_team' && (
+                    {activeTab === 'other_team' && !discardedDraftsOnly && !mortalitiesOnly && (
                         <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 text-center flex flex-col items-center gap-2 mb-8">
                             <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest italic">
                                 {otherDischargeCount} patient{otherDischargeCount !== 1 ? 's' : ''} discharges since {dischargesResetDate}
@@ -1729,7 +2000,7 @@ const pendingEditRef = useRef(null)
 
 
             {/* Bottom Action Bar — Tracker Page */}
-            {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && (
+            {activePage === 'patients' && !showAddForm && !editingPatient && !showMortalityForm && !discardedDraftsOnly && (
                 <PatientActionBar
                     isMortality={activeTab === 'mortalities' || mortalitiesOnly}
                     onAdd={() => {
@@ -1792,14 +2063,16 @@ const pendingEditRef = useRef(null)
                         onSaveBackup={handleSaveBackup}
                         onRestoreBackup={restoreFromBackup}
                         onViewMortalities={() => { setShowSettings(false); navigate('/mortalities'); }}
+                        onViewDiscardedDrafts={() => { setShowSettings(false); navigate('/discarded-drafts'); }}
                         hasMyTeamPatients={patients.some(p => p.team === 'my_team')}
                         hasOnCallPatients={patients.some(p => p.team === 'other_team')}
                         hasMortalities={mortalities.length > 0}
+                        hasDiscardedDrafts={discardedDrafts.length > 0}
                         hasDocs={docs.length > 0}
-                        hasAnyData={patients.length > 0 || mortalities.length > 0 || docs.length > 0 || discharges.length > 0}
+                        hasAnyData={patients.length > 0 || mortalities.length > 0 || docs.length > 0 || discharges.length > 0 || discardedDrafts.length > 0}
                         isStoragePersisted={isStoragePersisted}
                         onRequestStoragePersist={requestStoragePersistence}
-                        onStartDemo={() => { setShowSettings(false); navigate('/demo'); }}
+                        onStartDemo={handleStartDemo}
                     />
                 )}
 
@@ -1816,6 +2089,10 @@ const pendingEditRef = useRef(null)
                         onUpdateDemoPatients={updateDemoPatients}
                         onStepRoute={handleStepRoute}
                         onToggleSelect={toggleSelectPatient}
+                        onOpenExportModal={openExportModal}
+                        onCloseExportModal={closeExportModal}
+                        onOpenScannerModal={openScannerModal}
+                        onCloseScannerModal={closeScannerModal}
                     />
                 )}
 
@@ -1847,8 +2124,8 @@ const pendingEditRef = useRef(null)
 
             {pendingClearAction && (
                 <ConfirmDialog
-                    title={`Clear ${pendingClearAction === 'my_team' ? 'My Team' : pendingClearAction === 'on_call' ? 'On Call' : pendingClearAction === 'mortalities' ? 'Mortalities' : 'Notebook'}?`}
-                    message={`This will permanently remove all ${pendingClearAction === 'my_team' ? 'My Team' : pendingClearAction === 'on_call' ? 'On Call' : pendingClearAction === 'mortalities' ? 'Mortalities' : 'Notebook'} data. This action can be undone.`}
+                    title={`Clear ${pendingClearAction === 'my_team' ? 'My Team' : pendingClearAction === 'on_call' ? 'On Call' : pendingClearAction === 'mortalities' ? 'Mortalities' : pendingClearAction === 'discarded_drafts' ? 'Discarded Drafts' : 'Notebook'}?`}
+                    message={`This will permanently remove all ${pendingClearAction === 'my_team' ? 'My Team' : pendingClearAction === 'on_call' ? 'On Call' : pendingClearAction === 'mortalities' ? 'Mortalities' : pendingClearAction === 'discarded_drafts' ? 'Discarded Drafts' : 'Notebook'} data. This action can be undone.`}
                     confirmLabel="Yes, Clear"
                     onConfirm={confirmClear}
                     onCancel={() => setPendingClearAction(null)}

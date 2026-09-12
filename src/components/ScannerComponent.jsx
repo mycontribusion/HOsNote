@@ -40,7 +40,6 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
     const quickScanDoneRef = useRef(false)
     const isProcessingRef = useRef(false)
     const lastQuickScanRef = useRef(null) // { value, timestamp }
-    const [scanMode, setScanMode] = useState('import') // 'import' | 'quick'
     const [cameraMode, setCameraMode] = useState('camera') // 'camera' | 'paste'
     const [pasteData, setPasteData] = useState('')
     const [status, setStatus] = useState('initializing') // 'initializing' | 'scanning' | 'success' | 'error' | 'found'
@@ -76,15 +75,10 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 html5QrCode = new Html5Qrcode('qr-reader')
                 scannerRef.current = html5QrCode
 
-                // Build formats to support based on scan mode
-                let formatsToSupport = null
-                if (scanMode === 'quick') {
-                    // In quick mode, support all common barcode formats
-                    formatsToSupport = BARCODE_FORMATS
-                        .filter(f => Html5QrcodeSupportedFormats[f] !== undefined)
-                        .map(f => Html5QrcodeSupportedFormats[f])
-                }
-                // In import mode, default to all formats but prioritize QR
+                // Always support all common barcode formats (QR codes for records + barcodes for wristbands)
+                const formatsToSupport = BARCODE_FORMATS
+                    .filter(f => Html5QrcodeSupportedFormats[f] !== undefined)
+                    .map(f => Html5QrcodeSupportedFormats[f])
 
                 await html5QrCode.start(
                     { facingMode: 'environment' },
@@ -99,12 +93,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         const format = decodedResult?.result?.format?.formatName || 'UNKNOWN'
                         setDetectedFormat(format)
 
-                        // Handle based on scan mode
-                        if (scanMode === 'import') {
-                            handleImportScan(decodedText)
-                        } else {
-                            handleQuickScan(decodedText, format)
-                        }
+                        handleScan(decodedText, format)
 
                         // html5-qrcode v2.3+ sets its internal "paused" state
                         // AFTER the success callback returns, so an immediate
@@ -131,7 +120,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
                 if (mountedRef.current) {
                     setStatus('scanning')
-                    setStatusMsg(scanMode === 'import' ? 'Point camera at handover QR code' : 'Point camera at patient wristband or ID code')
+                    setStatusMsg('Point camera at handover QR code')
                 }
             } catch (err) {
                 if (mountedRef.current) {
@@ -163,17 +152,38 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 scannerRef.current = null
             }
         }
-    }, [cameraMode, scanMode])
+    }, [cameraMode])
 
-    const handleImportScan = (decodedText) => {
+    useEffect(() => {
+        if (cameraMode === 'paste') {
+            setStatusMsg('')
+        }
+    }, [cameraMode])
+
+    // Unified scan handler — tries chunked frames, then single-QR JSON, then
+    // falls back to wristband/barcode lookup. Replaces the old separate
+    // handleImportScan / handleQuickScan split.
+    const handleScan = (decodedText, format) => {
         if (transferDoneRef.current || isProcessingRef.current) return
 
-        // 1. Try chunked-transfer frame first (animated full transfer).
+        const cleaned = decodedText.trim()
+        if (!cleaned) return
+
+        // Deduplicate: ignore the same barcode/QR if scanned within the last 2 seconds.
+        const now = Date.now()
+        const last = lastQuickScanRef.current
+        if (last && last.value === cleaned && (now - last.timestamp) < 2000) {
+            return
+        }
+        lastQuickScanRef.current = { value: cleaned, timestamp: now }
+
+        setLastScanned({ value: cleaned, format, timestamp: new Date() })
+        setScanHistory(prev => [{ value: cleaned, format, timestamp: new Date() }, ...prev].slice(0, 10))
+
+        // 1. Try chunked-transfer frame first (HN1 protocol — handles both Patient List and Patients Record)
         const frame = parseFrame(decodedText)
-        console.log('[SCANNER DIAGNOSTIC] FRAME:', frame)
         if (frame) {
             const result = receiverRef.current.addFrame(frame)
-            console.log('[SCANNER DIAGNOSTIC] RESULT:', result)
             if (result.status === 'complete') {
                 isProcessingRef.current = true
                 transferDoneRef.current = true
@@ -238,99 +248,63 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             return
         }
 
-        // 2. Fallback: legacy single-QR JSON array.
+        // 2. Try JSON parse (single QR payload — legacy compact or full)
         try {
             const parsed = JSON.parse(decodedText)
-            if (!Array.isArray(parsed)) throw new Error('Not an array')
-            isProcessingRef.current = true
-            transferDoneRef.current = true
-            quickScanDoneRef.current = true
-            try { scannerRef.current?.pause(true) } catch (e) { }
-
-            setImportedCount(parsed.length)
-            setStatus('success')
-            setStatusMsg(`Found ${parsed.length} patient record${parsed.length !== 1 ? 's' : ''}! Receiving…`)
-
-            setTimeout(() => {
-                if (mountedRef.current) {
-                    const success = onImport(parsed)
-                    if (success) {
-                        onImportComplete?.()
-                        setTimeout(() => {
-                            if (mountedRef.current) {
-                                onClose()
-                            }
-                        }, 1200)
-                    }
-                }
-            }, 600)
-        } catch {
-            setStatus('error')
-            setStatusMsg('Invalid QR code. Please scan a HOsNote handover code or switch to Scan Wristband mode.')
-            setTimeout(() => {
-                if (mountedRef.current && status !== 'success') {
-                    setStatus('scanning')
-                    setStatusMsg('Point camera at handover QR code')
-                }
-            }, 2500)
-        }
-    }
-
-    const handleQuickScan = (decodedText, format) => {
-        if (transferDoneRef.current || quickScanDoneRef.current || isProcessingRef.current) return
-
-        const cleaned = decodedText.trim()
-        if (!cleaned) return
-
-        // Deduplicate: ignore the same barcode/QR if scanned within the last 2 seconds.
-        const now = Date.now()
-        const last = lastQuickScanRef.current
-        if (last && last.value === cleaned && (now - last.timestamp) < 2000) {
-            return
-        }
-        lastQuickScanRef.current = { value: cleaned, timestamp: now }
-
-        setLastScanned({ value: cleaned, format, timestamp: new Date() })
-        setScanHistory(prev => [{ value: cleaned, format, timestamp: new Date() }, ...prev].slice(0, 10))
-
-        // Check if scanned code is a full JSON patient record payload
-        let parsedPayload = null
-        try {
-            const parsed = JSON.parse(cleaned)
             if (Array.isArray(parsed)) {
-                parsedPayload = { incoming: parsed, docs: [] }
-            } else if (parsed && typeof parsed === 'object' && (parsed.patients || parsed.mortalities || parsed.docs)) {
-                parsedPayload = {
-                    incoming: [...(parsed.patients || []), ...(parsed.mortalities || [])],
-                    docs: parsed.docs || []
-                }
+                isProcessingRef.current = true
+                transferDoneRef.current = true
+                quickScanDoneRef.current = true
+                try { scannerRef.current?.pause(true) } catch (e) { }
+
+                setImportedCount(parsed.length)
+                setStatus('success')
+                setStatusMsg(`Found ${parsed.length} patient record${parsed.length !== 1 ? 's' : ''}! Receiving…`)
+
+                setTimeout(() => {
+                    if (mountedRef.current) {
+                        const success = onImport(parsed)
+                        if (success) {
+                            onImportComplete?.()
+                            setTimeout(() => {
+                                if (mountedRef.current) {
+                                    onClose()
+                                }
+                            }, 1200)
+                        }
+                    }
+                }, 600)
+                return
+            }
+            if (parsed && typeof parsed === 'object' && (parsed.patients || parsed.mortalities || parsed.docs)) {
+                isProcessingRef.current = true
+                transferDoneRef.current = true
+                quickScanDoneRef.current = true
+                try { scannerRef.current?.pause(true) } catch (e) { }
+
+                const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
+                const incomingDocs = parsed.docs || []
+                const totalCount = incoming.length + incomingDocs.length
+                setStatus('success')
+                setStatusMsg(`Found ${totalCount} record${totalCount !== 1 ? 's' : ''}! Receiving…`)
+                setTimeout(() => {
+                    if (mountedRef.current) {
+                        const success = onImport(incoming, incomingDocs)
+                        if (success) {
+                            onImportComplete?.()
+                            setTimeout(() => {
+                                if (mountedRef.current) {
+                                    onClose()
+                                }
+                            }, 1200)
+                        }
+                    }
+                }, 600)
+                return
             }
         } catch { }
 
-        if (parsedPayload && (parsedPayload.incoming.length > 0 || parsedPayload.docs.length > 0)) {
-            isProcessingRef.current = true
-            quickScanDoneRef.current = true
-            transferDoneRef.current = true
-            try { scannerRef.current?.pause(true) } catch (e) { }
-
-            const totalCount = parsedPayload.incoming.length + parsedPayload.docs.length;
-            setStatus('success')
-            setStatusMsg(`Found ${totalCount} record${totalCount !== 1 ? 's' : ''}! Receiving…`)
-            setTimeout(() => {
-                if (mountedRef.current) {
-                    const success = onImport(parsedPayload.incoming, parsedPayload.docs)
-                    if (success) {
-                        onImportComplete?.()
-                        setTimeout(() => {
-                            if (mountedRef.current) onClose()
-                        }, 1200)
-                    }
-                }
-            }, 600)
-            return
-        }
-
-        // Wristband / Barcode lookup
+        // 3. Wristband / Barcode lookup
         let hospitalNumber = null
         let patientName = null
 
@@ -372,7 +346,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         setTimeout(() => {
             if (mountedRef.current && !isProcessingRef.current) {
                 setStatus('scanning')
-                setStatusMsg('Point camera at patient wristband or ID code')
+                setStatusMsg('Point camera at handover QR code')
             }
         }, 3000)
     }
@@ -437,29 +411,26 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
         e.target.value = ''
     }
 
-    const handlePasteImport = () => {
-        mountedRef.current = true // Ensure component is marked as mounted for paste operations
-        console.log('[PASTE IMPORT DIAGNOSTIC] Button clicked, pasteData length:', pasteData.length)
+    // Unified paste handler — tries chunked frames, then JSON, then hospital number.
+    // Replaces the old separate handlePasteImport / handlePasteQuick split.
+    const handlePasteScan = () => {
+        mountedRef.current = true
         const rawText = decodeHtml(pasteData)
         const cleaned = rawText.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
-        console.log('[PASTE IMPORT DIAGNOSTIC] Cleaned text length:', cleaned.length, 'starts with:', cleaned.slice(0, 50))
-        if (!cleaned) {
-            console.log('[PASTE IMPORT DIAGNOSTIC] Empty cleaned text, returning early')
-            return
-        }
+        if (!cleaned) return
+
+        setLastScanned({ value: cleaned, format: 'PASTE', timestamp: new Date() })
+        setScanHistory(prev => [{ value: cleaned, format: 'PASTE', timestamp: new Date() }, ...prev].slice(0, 10))
 
         if (cleaned.includes('HOsNote Patient List:') || cleaned.includes('Name: ') || cleaned.includes('HOsNote Handover')) {
-            console.log('[PASTE IMPORT DIAGNOSTIC] Detected readable share text, rejecting')
             setStatus('error')
-            setStatusMsg('That looks like the readable "Share Text". Go back to Export and tap "Share Code" / "Copy Code" instead.')
+            setStatusMsg('That looks like the readable "Share Text". Go back to Export and tap "Share as File" / "Share as Text" instead.')
             return
         }
 
-        // Support pasted chunked frames (one per line) for the Full Transfer.
+        // 1. Try chunked frames (one per line)
         const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-        console.log('[PASTE IMPORT DIAGNOSTIC] Lines count:', lines.length)
         const firstFrame = parseFrame(lines[0])
-        console.log('[PASTE IMPORT DIAGNOSTIC] First frame:', firstFrame)
         if (firstFrame && lines.length >= 1) {
             receiverRef.current.reset()
             let completed = null
@@ -481,13 +452,11 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             if (completed) {
                 const incoming = [...(completed.patients || []), ...(completed.mortalities || [])]
                 const incomingDocs = completed.docs || []
-                console.log('[PASTE IMPORT DIAGNOSTIC] Chunked transfer complete, patients:', incoming.length, 'docs:', incomingDocs.length)
                 setStatus('success')
                 setStatusMsg(`Loaded ${incoming.length} patient${incoming.length !== 1 ? 's' : ''}! Importing…`)
                 setTimeout(() => {
                     if (mountedRef.current) {
                         const success = onImport(incoming, incomingDocs)
-                        console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                         if (success) {
                             onImportComplete?.()
                             setTimeout(() => {
@@ -505,6 +474,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             return
         }
 
+        // 2. Try JSON parse
         let jsonStr = cleaned
         const firstBracket = jsonStr.indexOf('[')
         const firstBrace = jsonStr.indexOf('{')
@@ -535,16 +505,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
 
         try {
             const parsed = JSON.parse(jsonStr)
-            console.log('[PASTE IMPORT DIAGNOSTIC] JSON parsed, type:', typeof parsed, 'isArray:', Array.isArray(parsed))
 
             if (Array.isArray(parsed)) {
-                console.log('[PASTE IMPORT DIAGNOSTIC] Importing array of', parsed.length, 'patients')
                 setStatus('success')
                 setStatusMsg(`Loaded ${parsed.length} patient${parsed.length !== 1 ? 's' : ''}! Importing…`)
                 setTimeout(() => {
                     if (mountedRef.current) {
                         const success = onImport(parsed)
-                        console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                         if (success) {
                             onImportComplete?.()
                             setTimeout(() => {
@@ -561,15 +528,13 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             if (parsed && typeof parsed === 'object') {
                 const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
                 const incomingDocs = parsed.docs || []
-                console.log('[PASTE IMPORT DIAGNOSTIC] Object payload, patients:', incoming.length, 'docs:', incomingDocs.length)
                 if (incoming.length > 0 || incomingDocs.length > 0) {
-                    const totalCount = incoming.length + incomingDocs.length;
+                    const totalCount = incoming.length + incomingDocs.length
                     setStatus('success')
                     setStatusMsg(`Loaded ${totalCount} record${totalCount !== 1 ? 's' : ''}! Importing…`)
                     setTimeout(() => {
                         if (mountedRef.current) {
                             const success = onImport(incoming, incomingDocs)
-                            console.log('[PASTE IMPORT DIAGNOSTIC] onImport returned:', success)
                             if (success) {
                                 onImportComplete?.()
                                 setTimeout(() => {
@@ -583,70 +548,9 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     return
                 }
             }
-            console.log('[PASTE IMPORT DIAGNOSTIC] JSON parsed but no valid payload found')
-            throw new Error('Not a valid payload')
-        } catch (e) {
-            console.log('[PASTE IMPORT DIAGNOSTIC] JSON parse error:', e.message)
-            setStatus('error')
-            setStatusMsg('Invalid code. Paste the exact code from "Share Code" / "Copy Code".')
-        }
-    }
+        } catch { }
 
-    const handlePasteQuick = () => {
-        mountedRef.current = true // Ensure component is marked as mounted for paste operations
-        const rawText = decodeHtml(pasteData)
-        const cleaned = rawText.trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
-        if (!cleaned) return
-
-        setLastScanned({ value: cleaned, format: 'PASTE', timestamp: new Date() })
-        setScanHistory(prev => [{ value: cleaned, format: 'PASTE', timestamp: new Date() }, ...prev].slice(0, 10))
-
-        // Try JSON first
-        try {
-            let jsonStr = cleaned
-            const firstBracket = jsonStr.indexOf('[')
-            const firstBrace = jsonStr.indexOf('{')
-            let startIdx = -1
-            let isArray = false
-
-            if (firstBracket !== -1 && firstBrace !== -1) {
-                if (firstBracket < firstBrace) { startIdx = firstBracket; isArray = true }
-                else { startIdx = firstBrace }
-            } else if (firstBracket !== -1) { startIdx = firstBracket; isArray = true }
-            else if (firstBrace !== -1) { startIdx = firstBrace }
-
-            if (startIdx !== -1) {
-                const endChar = isArray ? ']' : '}'
-                const endIdx = jsonStr.lastIndexOf(endChar)
-                if (endIdx !== -1 && endIdx >= startIdx) {
-                    jsonStr = jsonStr.substring(startIdx, endIdx + 1)
-                }
-            }
-
-            const parsed = JSON.parse(jsonStr)
-
-            if (Array.isArray(parsed)) {
-                onImport(parsed)
-                onImportComplete?.()
-                setTimeout(() => onClose?.(), 600)
-                return
-            }
-
-            if (parsed && typeof parsed === 'object') {
-                const incoming = [...(parsed.patients || []), ...(parsed.mortalities || [])]
-                const incomingDocs = parsed.docs || []
-                if (incoming.length > 0) {
-                    onImport(incoming, incomingDocs)
-                    onImportComplete?.()
-                    setTimeout(() => onClose?.(), 600)
-                    return
-                }
-            }
-        } catch {
-            // Not JSON
-        }
-
-        // Treat as hospital number
+        // 3. Treat as hospital number
         const hospitalNumber = cleaned.includes('|') ? cleaned.split('|')[1].trim() : cleaned
         onLookup?.(hospitalNumber)
         setPasteData('')
@@ -699,35 +603,27 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         </button>
                     </div>
 
-                    {/* Mode Selector — inside header (scan mode buttons hidden in notebook view) */}
-                    <div className={`flex bg-blue-800/50 dark:bg-gray-800/50 p-1 rounded-lg mt-3 ${listName === 'Notebook' && cameraMode === 'camera' ? 'invisible' : ''}`}>
+                    {/* Mode Selector — inside header */}
+                    <div id="tour-scan-mode-tabs" className="flex bg-blue-800/50 dark:bg-gray-800/50 p-1 rounded-lg mt-3">
                         {cameraMode === 'camera' ? (
-                            <>
-                                <button
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
-                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at handover QR code') }}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></svg>
-                                    Scan Details
-                                </button>
-                                <button
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'quick' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
-                                    onClick={() => { setScanMode('quick'); setStatus('scanning'); setStatusMsg('Point camera at patient wristband or ID code') }}
-                                >
-                                    <Scan size={14} />
-                                    Scan List
-                                </button>
-                            </>
+                            <button
+                                id="tour-scan-record-btn"
+                                className="flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all bg-white text-blue-700 shadow-sm"
+                            >
+                                <Scan size={14} />
+                                Scan QR
+                            </button>
                         ) : (
                             <>
                                 <button
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${scanMode === 'import' ? 'bg-white text-blue-700 shadow-sm' : 'text-blue-200 hover:text-white'}`}
-                                    onClick={() => { setScanMode('import'); setStatus('scanning'); setStatusMsg('Point camera at handover QR code') }}
+                                    id="tour-paste-code-btn"
+                                    className="flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all bg-white text-blue-700 shadow-sm"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
                                     Paste Code
                                 </button>
                                 <button
+                                    id="tour-open-file-btn"
                                     className="flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center gap-1.5 transition-all text-blue-200 hover:text-white"
                                     onClick={() => restoreInputRef.current?.click()}
                                 >
@@ -789,8 +685,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                                 )}
                             </div>
 
-                            {/* Last Scanned Info (Quick Mode) */}
-                            {scanMode === 'quick' && lastScanned && (
+                            {/* Last Scanned Info */}
+                            {!transferProgress && lastScanned && (
                                 <div className="bg-gray-50 dark:bg-gray-800/40 rounded-xl p-2.5 border border-gray-100 dark:border-gray-700">
                                     <div className="flex items-center justify-between">
                                         <div className="truncate pr-2">
@@ -805,16 +701,18 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                             )}
 
                             {/* Buttons Grid */}
-                            <div className="grid grid-cols-2 gap-2">
+                            <div id="tour-paste-code-file-btns" className="grid grid-cols-2 gap-2">
                                 <button
+                                    id="tour-paste-code-btn"
                                     className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
                                     onClick={() => setCameraMode('paste')}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg>
-                                    Use Code
+                                    Paste Code
                                 </button>
                                 {onRestore && (
                                     <button
+                                        id="tour-open-file-btn-camera"
                                         className="py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
                                         onClick={() => restoreInputRef.current?.click()}
                                     >
@@ -828,32 +726,24 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                         <div className="flex flex-col gap-3 flex-1 min-h-0">
                             <textarea
                                 className="w-full flex-1 min-h-0 rounded-xl border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500 px-3 py-3 text-xs font-mono text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/40 resize-none shadow-sm"
-                                placeholder={scanMode === 'import'
-                                    ? 'Paste the Data Code here...'
-                                    : 'Paste barcode or hospital number...'}
+                                placeholder='Paste handover code, barcode, or hospital number...'
                                 value={pasteData}
                                 onChange={(e) => setPasteData(e.target.value)}
                             />
-                            {/* Status bar for paste mode */}
-                            <div className={`rounded-xl px-3 py-2 text-xs font-bold text-center transition-colors shadow-sm ${statusColors[status] || 'bg-gray-100 text-gray-600'}`}>
-                                {status === 'success' && <span className="mr-1.5">✅</span>}
-                                {status === 'error' && <span className="mr-1.5">⚠️</span>}
-                                {status === 'found' && <Search size={14} className="inline mr-1.5" />}
-                                {statusMsg}
-                            </div>
+                            {statusMsg && (
+                                <div className={`rounded-xl px-3 py-2 text-xs font-bold text-center transition-colors shadow-sm ${statusColors[status] || 'bg-gray-100 text-gray-600'}`}>
+                                    {status === 'success' && <span className="mr-1.5">✅</span>}
+                                    {status === 'error' && <span className="mr-1.5">⚠️</span>}
+                                    {status === 'found' && <Search size={14} className="inline mr-1.5" />}
+                                    {statusMsg}
+                                </div>
+                            )}
                             <button
                                 className="w-full py-3 bg-blue-700 hover:bg-blue-800 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl font-bold text-sm shadow-sm shadow-blue-200 dark:shadow-blue-900/30 active:scale-[0.98] transition-all"
                                 disabled={!pasteData.trim()}
-                                onClick={() => {
-                                    console.log('[PASTE IMPORT DIAGNOSTIC] Button onClick fired, scanMode:', scanMode, 'pasteData trimmed:', pasteData.trim().slice(0, 30))
-                                    if (scanMode === 'import') {
-                                        handlePasteImport()
-                                    } else {
-                                        handlePasteQuick()
-                                    }
-                                }}
+                                onClick={handlePasteScan}
                             >
-                                {scanMode === 'import' ? 'Receive Records' : 'Lookup / Add Patient'}
+                                Submit
                             </button>
                             <div className="grid grid-cols-2 gap-2 mt-1">
                                 <button

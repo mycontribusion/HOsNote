@@ -12,7 +12,7 @@ const SORT_OPTIONS = [
     { value: 'hospnum', label: 'Hosp No.' },
 ]
 
-const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, reviewedExpandTrigger, onReviewedExpanded, initialSelectedPatientId, onPatientOpened }) => {
+const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews, onDocument, getDocCount, selectedIds = new Set(), onToggleSelect, onToggleSelectAll, isMortality = false, onMoveTeam, moveTeamLabel, highlightField, highlightQuery, reviewedExpandTrigger, onReviewedExpanded, initialSelectedPatientId, onPatientOpened, listTitle, disableSwipeReview = false, isDraft = false, onOpenDraft }) => {
     const [sortBy, setSortBy] = useState('none')
     const [isReviewedOpen, setIsReviewedOpen] = useState(false)
     const [selectedDetailPatient, setSelectedDetailPatient] = useState(null)
@@ -33,6 +33,10 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
     }, [initialSelectedPatientId, patients, onPatientOpened])
 
     const { activePatients, reviewedPatients } = useMemo(() => {
+        // For mortality lists, don't separate into reviewed/active - show all in one list
+        if (isMortality) {
+            return { activePatients: patients, reviewedPatients: [] }
+        }
         const active = []
         const reviewed = []
         for (let i = 0; i < patients.length; i++) {
@@ -40,7 +44,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
             else active.push(patients[i])
         }
         return { activePatients: active, reviewedPatients: reviewed }
-    }, [patients])
+    }, [patients, isMortality])
 
     const sortPatients = (list) => {
         if (sortBy === 'none') return list
@@ -163,7 +167,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                 {/* Title + count badge */}
                 <div className="flex items-center gap-2">
                     <h2 className="font-bold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest">
-                        {isMortality ? 'Mortality' : 'Patients'}
+                        {listTitle || (isMortality ? 'Mortality' : 'Patients')}
                     </h2>
                     <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full min-w-[22px] text-center ${isMortality
                         ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
@@ -173,37 +177,39 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                     </span>
                 </div>
 
-                {/* Controls: Select All + Sort */}
-                <div className="flex items-center gap-2">
-                    {/* Select All toggle */}
-                    <button
-                        onClick={() => onToggleSelectAll(allIds)}
-                        className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60"
-                        title={allSelected ? 'Deselect all' : 'Select all for handover'}
-                    >
-                        {allSelected
-                            ? <CheckSquare size={14} className="text-blue-600 dark:text-blue-400" />
-                            : someSelected
-                                ? <CheckSquare size={14} className="text-blue-400 opacity-70" />
-                                : <Square size={14} />
-                        }
-                        {someSelected ? `${selectedIds.size} selected` : 'Select'}
-                    </button>
-
-                    {/* Sort dropdown */}
-                    <div className="flex items-center bg-gray-100 dark:bg-gray-700/60 rounded-md px-1.5 py-0.5 border border-gray-200/60 dark:border-gray-600/40">
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="text-[10px] text-gray-600 dark:text-gray-300 font-bold bg-transparent border-0 cursor-pointer focus:outline-none"
-                            aria-label="Sort patients by"
+                {/* Controls: Select All + Sort (hidden for drafts) */}
+                {!isDraft && (
+                    <div className="flex items-center gap-2">
+                        {/* Select All toggle */}
+                        <button
+                            onClick={() => onToggleSelectAll(allIds)}
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60"
+                            title={allSelected ? 'Deselect all' : 'Select all for handover'}
                         >
-                            {SORT_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
+                            {allSelected
+                                ? <CheckSquare size={14} className="text-blue-600 dark:text-blue-400" />
+                                : someSelected
+                                    ? <CheckSquare size={14} className="text-blue-400 opacity-70" />
+                                    : <Square size={14} />
+                            }
+                            {someSelected ? `${selectedIds.size} selected` : 'Select'}
+                        </button>
+
+                        {/* Sort dropdown */}
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-700/60 rounded-md px-1.5 py-0.5 border border-gray-200/60 dark:border-gray-600/40">
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="text-[10px] text-gray-600 dark:text-gray-300 font-bold bg-transparent border-0 cursor-pointer focus:outline-none"
+                                aria-label="Sort patients by"
+                            >
+                                {SORT_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* ── Active patients ───────────────────────────────────────── */}
@@ -241,7 +247,10 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                             highlightField={highlightField}
                             highlightQuery={highlightQuery}
                             onOpenDetail={setSelectedDetailPatient}
+                            onOpenDraft={onOpenDraft}
                             demoSwipeDir={patient.isDemoData ? patient.demoSwipeDir ?? null : null}
+                            disableSwipeReview={disableSwipeReview}
+                            isDraft={isDraft}
                         />
                     </div>
                 ))}
@@ -250,7 +259,7 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                         Showing {visibleCount} of {sortedActive.length} {isMortality ? 'records' : 'patients'}...
                     </div>
                 )}
-                {sortedActive.length === 0 && reviewedPatients.length > 0 && (
+                {!isMortality && sortedActive.length === 0 && reviewedPatients.length > 0 && (
                     <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
                         <span className="text-3xl">🎉</span>
                         <p className="text-sm font-semibold">All patients reviewed!</p>
@@ -304,6 +313,9 @@ const PatientListInner = ({ patients, onDelete, onEdit, onReview, onResetReviews
                                     highlightField={highlightField}
                                     highlightQuery={highlightQuery}
                                     onOpenDetail={setSelectedDetailPatient}
+                                    onOpenDraft={onOpenDraft}
+                                    disableSwipeReview={disableSwipeReview}
+                                    isDraft={isDraft}
                                 />
                             ))}
                             {visibleReviewedCount < sortedReviewed.length && (
@@ -349,6 +361,10 @@ export default memo(PatientListInner, (prev, next) => {
     if (prev.onToggleSelectAll !== next.onToggleSelectAll) return false
     if (prev.onMoveTeam !== next.onMoveTeam) return false
     if (prev.moveTeamLabel !== next.moveTeamLabel) return false
+    if (prev.listTitle !== next.listTitle) return false
+    if (prev.disableSwipeReview !== next.disableSwipeReview) return false
+    if (prev.isDraft !== next.isDraft) return false
+    if (prev.onOpenDraft !== next.onOpenDraft) return false
     if (prev.reviewedExpandTrigger !== next.reviewedExpandTrigger) return false
     if (prev.onReviewedExpanded !== next.onReviewedExpanded) return false
     if (prev.initialSelectedPatientId !== next.initialSelectedPatientId) return false

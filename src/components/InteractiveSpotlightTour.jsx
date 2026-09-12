@@ -67,9 +67,9 @@ const DEMO_DOCS = [
 ]
 
 // First step index that belongs to the notebook section
-const NOTEBOOK_START_STEP = 11
+const NOTEBOOK_START_STEP = 15
 
-export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRemoveDemoData, onUpdateDemoPatients, onStepRoute, onToggleSelect }) {
+export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRemoveDemoData, onUpdateDemoPatients, onStepRoute, onToggleSelect, onOpenExportModal, onCloseExportModal, onOpenScannerModal, onCloseScannerModal }) {
     const [currentStep, setCurrentStep] = useState(0)
     const [targetRect, setTargetRect] = useState(null)
     const [popoverHeight, setPopoverHeight] = useState(240)
@@ -144,6 +144,32 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
         }
     }, [currentStep])
 
+    // Handover Guide Steps (10 & 11): Open ExportModal and highlight QR tabs, then Share/Copy buttons
+    useEffect(() => {
+        // Step 10 (index 10): Open ExportModal and highlight QR tabs
+        // Step 11 (index 11): Highlight Share as File and Share as Text buttons
+        const isHandoverStep = currentStep === 10 || currentStep === 11
+        if (isHandoverStep && onOpenExportModal) {
+            onOpenExportModal()
+        } else if (!isHandoverStep && onCloseExportModal) {
+            // Close ExportModal when leaving handover guide steps (going to step 9 or 12)
+            onCloseExportModal()
+        }
+    }, [currentStep, onOpenExportModal, onCloseExportModal])
+
+    // Scanner Guide Steps (13 & 14): Open ScannerComponent and highlight scan modes, then Paste Code/Open File
+    useEffect(() => {
+        // Step 13 (index 13): Open ScannerComponent and highlight Scan QR tab
+        // Step 14 (index 14): Highlight Paste Code and Open File buttons
+        const isScannerStep = currentStep === 13 || currentStep === 14
+        if (isScannerStep && onOpenScannerModal) {
+            onOpenScannerModal()
+        } else if (!isScannerStep && onCloseScannerModal) {
+            // Close ScannerComponent when leaving scanner guide steps (going to step 12 or 15)
+            onCloseScannerModal()
+        }
+    }, [currentStep, onOpenScannerModal, onCloseScannerModal])
+
     const steps = [
         // --- PART 1: PATIENTS TRACKER GUIDE ---
         {
@@ -170,35 +196,35 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
         {
             targetId: 'tour-patient-card-right',
             title: 'Swipe Right to Mark Reviewed',
-            description: 'Swipe Left-to-Right ➡️ on a patient card to instantly add it to the Reviewed list and remove it from the active list, keeping your tracker clean.',
+            description: 'Swipe Left-to-Right to instantly add it to the Reviewed list.',
             preferredPos: 'bottom',
             route: '/team/my_team',
         },
         {
             targetId: 'tour-patient-card-left',
             title: 'Swipe Left for Quick Actions',
-            description: 'Swipe Right-to-Left ⬅️ on a patient card to reveal Quick Actions (Discharge or Mortality).',
+            description: 'Swipe Right-to-Left to reveal Quick Actions (Discharge or Mortality).',
             preferredPos: 'top',
             route: '/team/my_team',
         },
         {
             targetId: 'tour-patient-card-right',
             title: 'Long Press to Select Patient',
-            description: 'Press and hold (hold for 0.5s) on any patient card to select it.',
+            description: 'Press and hold on any patient card to select it.',
             preferredPos: 'bottom',
             route: '/team/my_team',
         },
         {
             targetId: 'tour-card-scrollbar',
             title: 'Scrollable Card Notes',
-            description: 'Scroll the scrollbar inside the card to read longer clinical entries without opening the detail view.',
+            description: 'Scroll the scrollbar inside the card to read longer clinical entries.',
             preferredPos: 'left',
             route: '/team/my_team',
         },
         {
             targetId: 'tour-action-collapse',
             title: 'Collapse / Expand Action Bar',
-            description: 'Tap this button to collapse the action bar for full-screen reading, or tap again to expand.',
+            description: 'Tap this button to collapse the action bar, or tap again to expand.',
             preferredPos: 'top',
             route: '/team/my_team',
         },
@@ -216,6 +242,23 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
             preferredPos: 'top',
             route: '/team/my_team',
         },
+
+        // --- PART 2: HANDOVER GUIDE (ExportModal) — Patient handover only (QR tabs not shown in Notebook) ---
+        {
+            targetId: 'tour-qr-tabs',
+            title: 'Handover: Patient List vs Patients Record',
+            description: '• Patient List - share biodata only (ward, bed, name, hosp#). \n\n• Patients Record - share biodata, clinical notes and dates.',
+            preferredPos: 'bottom',
+            route: '/team/my_team',
+        },
+        {
+            targetId: 'tour-share-copy-btns',
+            title: 'Handover: Share as File & Share as Text',
+            description: '• Share as File - share as file via bluetooth whatsapp, etc. Includes full patient data \n\n• Share as Text - share as text.',
+            preferredPos: 'top',
+            route: '/team/my_team',
+        },
+
         {
             targetId: 'pat-action-import',
             title: 'Receive & Scan Handover',
@@ -224,7 +267,23 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
             route: '/team/my_team',
         },
 
-        // --- PART 2: CLINICAL NOTEBOOK GUIDE (Transitions automatically to /notebook) ---
+        // --- PART 3: RECEIVE GUIDE (ScannerComponent) — Patient receive only (scan modes differ in Notebook) ---
+        {
+            targetId: 'tour-scan-mode-tabs',
+            title: 'Receive: Scan QR',
+            description: '• Scan QR — scan any handover QR code (Patient List or Patients Record).',
+            preferredPos: 'bottom',
+            route: '/receive',
+        },
+        {
+            targetId: 'tour-paste-code-file-btns',
+            title: 'Receive: Paste Code & Open File',
+            description: '• Paste Code — paste code from the "Share as Text" in Handover.\n\n• Open File — Import a file shared via "Share as File" in Handover.',
+            preferredPos: 'top',
+            route: '/receive',
+        },
+
+        // --- PART 4: CLINICAL NOTEBOOK GUIDE (Transitions automatically to /notebook) ---
         {
             targetId: 'tour-page-switch',
             title: 'Patients vs. Notebook Switcher',
@@ -308,15 +367,26 @@ export default function InteractiveSpotlightTour({ onClose, onAddDemoData, onRem
             onStepRoute(activeStep.route)
         }
 
-        const el = document.getElementById(activeStep.targetId)
-        if (el) {
-            const rect = el.getBoundingClientRect()
-            const isOffscreen = rect.top < 0 || rect.bottom > window.innerHeight || rect.left < 0 || rect.right > window.innerWidth
-            if (isOffscreen) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // For handover guide steps (10, 11) and scanner guide steps (13, 14), wait for modal to render before finding target
+        const isModalStep = currentStep === 10 || currentStep === 11 || currentStep === 13 || currentStep === 14
+        const findTarget = () => {
+            const el = document.getElementById(activeStep.targetId)
+            if (el) {
+                const rect = el.getBoundingClientRect()
+                const isOffscreen = rect.top < 0 || rect.bottom > window.innerHeight || rect.left < 0 || rect.right > window.innerWidth
+                if (isOffscreen) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }
+                updateRect()
+            } else if (isModalStep) {
+                // Retry after a short delay for modal to render
+                setTimeout(findTarget, 100)
+            } else {
+                updateRect()
             }
         }
-        updateRect()
+
+        findTarget()
         const timer = setTimeout(updateRect, 350)
         return () => clearTimeout(timer)
     }, [currentStep, activeStep, onStepRoute, updateRect])

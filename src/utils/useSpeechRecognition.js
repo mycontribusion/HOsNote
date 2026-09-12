@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
 
+// Debug flag for speech recognition logs — only enabled in development
+const DEBUG = import.meta.env.DEV || localStorage.getItem('debug') === '1'
+
 export function useSpeechRecognition({ onResult, onError, lang = 'en-US', continuous = true } = {}) {
     const [isSupported, setIsSupported] = useState(false)
     const [isListening, setIsListening] = useState(false)
@@ -46,7 +49,7 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
             setIsListening(false)
             isListeningRef.current = false
             setInterimTranscript('')
-            console.log('[SpeechRecognition] onend fired', {
+            if (DEBUG) console.log('[SpeechRecognition] onend fired', {
                 wasListening,
                 wasUserStopped,
                 isListening: isListeningRef.current,
@@ -56,14 +59,14 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
             // Auto-restart if the user did NOT explicitly stop and we were listening.
             // This handles the browser's silence-timeout behavior.
             if (wasListening && !wasUserStopped) {
-                console.log('[SpeechRecognition] auto-restarting after silence timeout')
+                if (DEBUG) console.log('[SpeechRecognition] auto-restarting after silence timeout')
                 setTimeout(() => {
                     if (userStoppedRef.current) return
                     if (!recognitionRef.current) return
                     try {
                         recognitionRef.current.start()
                     } catch (err) {
-                        console.warn('[SpeechRecognition] auto-restart failed:', err)
+                        if (DEBUG) console.warn('[SpeechRecognition] auto-restart failed:', err)
                     }
                 }, 150)
             }
@@ -94,7 +97,7 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
             setInterimTranscript(interim)
 
             // Diagnostic logging — check browser console for these
-            console.log('[SpeechRecognition] onresult fired', {
+            if (DEBUG) console.log('[SpeechRecognition] onresult fired', {
                 resultCount: event.results.length,
                 resultIndex: event.resultIndex,
                 rawFinals,
@@ -110,14 +113,14 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
                 // Cumulative session — emit only the genuinely new suffix
                 const newChunk = fullFinalSoFar.slice(confirmedRef.current.length).trim()
                 confirmedRef.current = fullFinalSoFar
-                console.log('[SpeechRecognition] emitting newChunk:', JSON.stringify(newChunk))
+                if (DEBUG) console.log('[SpeechRecognition] emitting newChunk:', JSON.stringify(newChunk))
                 if (newChunk) onResultRef.current?.(newChunk)
             } else {
                 // Browser reset its results array (new recognition session)
                 // Emit the whole new text cleanly
                 confirmedRef.current = fullFinalSoFar
                 const chunk = fullFinalSoFar.trim()
-                console.log('[SpeechRecognition] emitting full chunk (reset):', JSON.stringify(chunk))
+                if (DEBUG) console.log('[SpeechRecognition] emitting full chunk (reset):', JSON.stringify(chunk))
                 if (chunk) onResultRef.current?.(chunk)
             }
         }
@@ -147,15 +150,15 @@ export function useSpeechRecognition({ onResult, onError, lang = 'en-US', contin
         userStoppedRef.current = false
         confirmedRef.current = '' // ← ONLY reset here: user explicitly started a new session
         try { recognitionRef.current.start() }
-        catch (err) { console.warn('Speech recognition start error:', err) }
+        catch (err) { if (DEBUG) console.warn('Speech recognition start error:', err) }
     }, [])
 
     const stopListening = useCallback(() => {
         if (!recognitionRef.current || !isListeningRef.current) return
         userStoppedRef.current = true
-        console.log('[SpeechRecognition] user-initiated stop')
+        if (DEBUG) console.log('[SpeechRecognition] user-initiated stop')
         try { recognitionRef.current.stop() }
-        catch (err) { console.warn('Speech recognition stop error:', err) }
+        catch (err) { if (DEBUG) console.warn('Speech recognition stop error:', err) }
     }, [])
 
     const toggleListening = useCallback(() => {
