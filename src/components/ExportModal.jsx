@@ -92,7 +92,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
                 t: d.text || '',
                 ca: d.createdAt || '',
                 ua: d.updatedAt || '',
-                patientId: d.patientId || ''
+                patientId: d.patientId || null
             }))
         }
         : patients.map((p) => {
@@ -160,7 +160,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             d.text || '',
             d.createdAt || '',
             d.updatedAt || '',
-            d.patientId || ''
+            d.patientId || null
         ]) : []
 
         return {
@@ -204,7 +204,7 @@ export default function ExportModal({ patients, allPatients, listName, selection
             text: d.text || '',
             createdAt: d.createdAt || '',
             updatedAt: d.updatedAt || '',
-            patientId: d.patientId || ''
+            patientId: d.patientId || null
         })) : []
 
         return {

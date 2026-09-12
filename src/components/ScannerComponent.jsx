@@ -360,8 +360,8 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
             try {
                 const data = JSON.parse(ev.target.result)
 
-                // Detect share payload format: type === 'patients' or patients is array of arrays
-                const isSharePayload = data.type === 'patients' ||
+                // Detect share payload format: type === 'patients', type === 'notebook', or patients is array of arrays
+                const isSharePayload = data.type === 'patients' || data.type === 'notebook' ||
                     (Array.isArray(data.patients) && data.patients.length > 0 && Array.isArray(data.patients[0]))
 
                 // Detect backup format
@@ -370,8 +370,9 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                 if (isSharePayload) {
                     const incoming = [...(data.patients || []), ...(data.mortalities || [])]
                     const incomingDocs = data.docs || []
-                    if (incoming.length === 0) {
-                        setRestoreMsg('❌ No patients found in file.')
+                    // Notebook share files have no patients — only docs. Allow import even if incoming is empty.
+                    if (incoming.length === 0 && incomingDocs.length === 0) {
+                        setRestoreMsg('❌ No records found in file.')
                         setTimeout(() => setRestoreMsg(''), 4000)
                         return
                     }

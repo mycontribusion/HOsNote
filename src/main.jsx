@@ -7,22 +7,77 @@ import './index.css'
 
 const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter
 
-// Conditionally load analytics only when online to prevent hangs on WiFi without internet
+// Check for real internet connectivity with a fast timeout.
+// Note: navigator.onLine is true whenever connected to a local WiFi/LAN interface,
+// even if the router has NO internet connection (dead WiFi, hospital intranet).
+async function verifyInternetAccess(timeoutMs = 1500) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return false
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    await Promise.any([
+      fetch('https://connectivitycheck.gstatic.com/generate_204', {
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: controller.signal,
+      }),
+      fetch('/_vercel/insights/script.js', {
+        method: 'HEAD',
+        cache: 'no-store',
+        signal: controller.signal,
+      }),
+    ])
+    return true
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// Conditionally load analytics only when real internet is verified.
 function ConditionalAnalytics() {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+  // Never load analytics in Capacitor native app, or during initial cold start.
+  // Start as false so initial page render is NEVER delayed or suspended.
+  const [canLoadAnalytics, setCanLoadAnalytics] = useState(false)
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
+    if (Capacitor.isNativePlatform()) return
+
+    let isMounted = true
+
+    // Delay verification until 3s after startup so local data and UI render immediately
+    const checkTimer = setTimeout(() => {
+      verifyInternetAccess(1500).then((isReachable) => {
+        if (isMounted && isReachable) {
+          setCanLoadAnalytics(true)
+        }
+      })
+    }, 3000)
+
+    const handleOnline = () => {
+      verifyInternetAccess(1500).then((isReachable) => {
+        if (isMounted) setCanLoadAnalytics(isReachable)
+      })
+    }
+    const handleOffline = () => {
+      if (isMounted) setCanLoadAnalytics(false)
+    }
+
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+
     return () => {
+      isMounted = false
+      clearTimeout(checkTimer)
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
 
-  if (!isOnline) return null
+  if (!canLoadAnalytics) return null
 
   return (
     <>

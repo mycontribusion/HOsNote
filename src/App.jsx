@@ -901,7 +901,11 @@ useEffect(() => {
         if (Array.isArray(data.docs)) {
             setDocs(prev => {
                 const ids = new Set(prev.map(d => d.id))
-                const newOnes = data.docs.filter(d => !ids.has(d.id))
+                const newOnes = data.docs
+                    .filter(d => !ids.has(d.id))
+                    // Normalize patientId: '' (from older exports) → null so standalone
+                    // notes aren't misclassified as patient notes in the filter tabs.
+                    .map(d => d.patientId === '' ? { ...d, patientId: null } : d)
                 return [...prev, ...newOnes]
             })
         }
@@ -1387,7 +1391,7 @@ useEffect(() => {
                         if (!isDuplicate) {
                             nextDocs.unshift({
                                 id: d.id || generateId(),
-                                patientId: newPatientId,
+                                patientId: newPatientId || null,
                                 patientName: docName,
                                 patientWard: docWard,
                                 patientHosp: docHosp,
@@ -1523,7 +1527,7 @@ useEffect(() => {
                     if (!isDuplicate) {
                         nextDocs.unshift({
                             id: d.id || generateId(),
-                            patientId: newPatientId,
+                            patientId: newPatientId || null,
                             patientName: docName,
                             patientWard: docWard,
                             patientHosp: docHosp,
