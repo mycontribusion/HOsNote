@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'inline',
-      includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'fonts/*.ttf'],
+      includeAssets: ['favicon.ico', 'icon.svg', 'icon-192.png', 'icon-512.png', 'fonts/*.ttf'],
       manifest: {
         name: 'HOsNote – Patient Tracker & Notebook',
         short_name: 'HOsNote',
