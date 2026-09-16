@@ -13,6 +13,18 @@ export interface HosnoteConfigPlugin {
     getGoogleClientId(): Promise<{ clientId: string }>
 
     /**
+     * Returns the Web OAuth client ID baked into the APK at build time.
+     *
+     * The native Android app authenticates with a *Web* application OAuth
+     * client (see {@code getGoogleDriveConfig}) because Google rejects HTTPS
+     * redirect URIs for Android client types with "redirect_uri_mismatch",
+     * while custom-scheme redirects for Android clients are blocked by
+     * default. A Web client accepts the HTTPS App Link redirect, which
+     * Android then delivers back to HOsNote via the autoVerify intent-filter.
+     */
+    getGoogleWebClientId(): Promise<{ clientId: string }>
+
+    /**
      * Opens the given URL in the device's default external browser using an
      * Android {@code ACTION_VIEW} intent.
      *

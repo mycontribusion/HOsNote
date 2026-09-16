@@ -80,18 +80,26 @@ function getRedirectUri() {
 }
 
 /**
- * Returns the Android OAuth client ID that was injected at build time by
- * Gradle's {@code buildConfigField}. The debug build type gets the debug
- * client ID and the release build type gets the release client ID — this
- * is determined by the Android build system, NOT by Vite's PROD/DEV flag.
+ * Returns the Web OAuth client ID that was injected at build time by Gradle's
+ * {@code buildConfigField}. The native Android app now uses a *Web*
+ * application OAuth client (not the Android client) because Google rejects
+ * HTTPS redirect URIs for Android client types with "redirect_uri_mismatch",
+ * while custom-scheme redirects for Android clients are blocked by default.
+ * A Web client accepts the HTTPS App Link redirect
+ * (https://hosnote.vercel.app/oauth2redirect), which Android then delivers
+ * back to HOsNote via the autoVerify intent-filter in AndroidManifest.xml.
+ *
+ * The debug build type gets the debug Web client ID and the release build
+ * type gets the release Web client ID — determined by the Android build
+ * system, NOT by Vite's PROD/DEV flag.
  *
  * On web/PWA this returns an empty string; the web client ID is read
  * separately from {@code VITE_GOOGLE_WEB_CLIENT_ID}.
  */
-async function getAndroidClientId() {
+async function getGoogleWebClientId() {
     if (!Capacitor.isNativePlatform()) return ''
     try {
-        const result = await HosnoteConfig.getGoogleClientId()
+        const result = await HosnoteConfig.getGoogleWebClientId()
         return result?.clientId || ''
     } catch {
         return ''
@@ -101,7 +109,7 @@ async function getAndroidClientId() {
 export async function isGoogleDriveConfigured() {
     const isNative = Capacitor.isNativePlatform()
     const clientId = isNative
-        ? await getAndroidClientId()
+        ? await getGoogleWebClientId()
         : (import.meta.env?.VITE_GOOGLE_WEB_CLIENT_ID || import.meta.env?.VITE_GOOGLE_CLIENT_ID || '')
     return Boolean(clientId)
 }
@@ -109,7 +117,7 @@ export async function isGoogleDriveConfigured() {
 export async function getGoogleDriveConfig() {
     const isNative = Capacitor.isNativePlatform()
     const clientId = isNative
-        ? await getAndroidClientId()
+        ? await getGoogleWebClientId()
         : (import.meta.env?.VITE_GOOGLE_WEB_CLIENT_ID || import.meta.env?.VITE_GOOGLE_CLIENT_ID || '')
     const redirectUri = import.meta.env?.VITE_GOOGLE_REDIRECT_URI || getRedirectUri()
 
