@@ -365,7 +365,7 @@ export default function ScannerComponent({ onImport, onLookup, listName, onClose
                     (Array.isArray(data.patients) && data.patients.length > 0 && Array.isArray(data.patients[0]))
 
                 // Detect backup format
-                const isBackup = data.__type === 'hosnote-backup'
+                const isBackup = data.__type === 'hosnote-backup' || data.__type === 'hosnote-cloud-backup'
 
                 if (isSharePayload) {
                     const incoming = [...(data.patients || []), ...(data.mortalities || [])]

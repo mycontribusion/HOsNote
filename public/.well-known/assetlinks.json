@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.get_asset_links"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.hosnote.app",
+      "sha256_cert_fingerprints": [
+        "E6:8A:1A:E6:0B:7A:F7:85:70:1F:89:64:72:A3:9E:79:73:2D:6B:4C:B4:27:15:3C:BA:9B:A9:56:57:53:35:5A"
+      ]
+    }
+  }
+]

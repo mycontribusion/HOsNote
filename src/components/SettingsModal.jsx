@@ -1,5 +1,41 @@
 import { useState, useRef } from 'react'
-import { X, Type, Trash2, Database, Download, Upload, CheckCircle, ChevronRight, MessageSquare, Skull, Sparkles, ShieldCheck, FileX } from 'lucide-react'
+import {
+    X,
+    Type,
+    Trash2,
+    Database,
+    Download,
+    Upload,
+    CheckCircle,
+    ChevronRight,
+    MessageSquare,
+    Skull,
+    Sparkles,
+    ShieldCheck,
+    FileX,
+    Cloud,
+    CloudUpload,
+    CloudDownload,
+    RefreshCw,
+    LogOut,
+} from 'lucide-react'
+
+function formatBackupDate(isoString) {
+    if (!isoString) return ''
+    try {
+        const date = new Date(isoString)
+        if (isNaN(date.getTime())) return ''
+        return date.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        })
+    } catch {
+        return ''
+    }
+}
 
 export default function SettingsModal({
     onClose,
@@ -21,10 +57,24 @@ export default function SettingsModal({
     onStartDemo,
     isStoragePersisted,
     onRequestStoragePersist,
+    // Google Drive props
+    isGoogleDriveConnected = false,
+    googleDriveUser = null,
+    googleBackupMeta = null,
+    isGoogleDriveLoading = false,
+    googleDriveStatusMsg = null,
+    onConnectGoogleDrive,
+    onDisconnectGoogleDrive,
+    onBackupGoogleDrive,
+    onRestoreGoogleDrive,
+    onRefreshGoogleDrive,
 }) {
     const [backupDone, setBackupDone] = useState(false)
     const [restoreMsg, setRestoreMsg] = useState('')
-    const [confirmClear, setConfirmClear] = useState(null) // action string pending confirm
+    const [confirmClear, setConfirmClear] = useState(null)
+    const [confirmRestoreCloud, setConfirmRestoreCloud] = useState(false)
+    const [confirmDisconnectDrive, setConfirmDisconnectDrive] = useState(false)
+    const [localDriveMsg, setLocalDriveMsg] = useState('')
     const fileInputRef = useRef(null)
 
     const handleSaveBackupClick = async () => {
@@ -59,6 +109,15 @@ export default function SettingsModal({
         }
         reader.readAsText(file)
         e.target.value = ''
+    }
+
+    const handleConnectClick = async () => {
+        try {
+            await onConnectGoogleDrive?.()
+        } catch (err) {
+            setLocalDriveMsg(err.message || 'Unable to connect to Google Drive. Please check your internet connection and try again.')
+            setTimeout(() => setLocalDriveMsg(''), 4500)
+        }
     }
 
     const clearOptions = [
@@ -152,6 +211,206 @@ export default function SettingsModal({
                         />
                     </Section>
 
+                    {/* Google Drive Cloud Backup */}
+                    <Section title="Google Drive Cloud Backup">
+                        {!isGoogleDriveConnected ? (
+                            <>
+                                <div className="p-4 bg-blue-50/40 dark:bg-blue-950/20 border-b border-gray-100 dark:border-gray-700/40">
+                                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                                        Back up your HOsNote data to your Google Drive and restore it when needed.
+                                    </p>
+                                </div>
+                                <Row
+                                    icon={<Cloud size={15} className="text-white" />}
+                                    iconBg="bg-blue-600"
+                                    label="Connect Google Drive"
+                                    sublabel="Sign in with your Google account"
+                                    right={
+                                        isGoogleDriveLoading ? (
+                                            <RefreshCw size={15} className="animate-spin text-blue-500 shrink-0" />
+                                        ) : (
+                                            <span className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shrink-0 shadow-xs">
+                                                Connect
+                                            </span>
+                                        )
+                                    }
+                                    onClick={handleConnectClick}
+                                    disabled={isGoogleDriveLoading}
+                                    noBorder={!googleDriveStatusMsg && !localDriveMsg}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                {/* Account chip */}
+                                <div className="px-4 py-3 bg-blue-50/50 dark:bg-blue-950/20 border-b border-gray-100 dark:border-gray-700/40">
+                                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+                                        Connected to:
+                                    </p>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                                            {googleDriveUser?.photoLink ? (
+                                                <img src={googleDriveUser.photoLink} alt="Avatar" className="w-full h-full object-cover" />
+                                            ) : (
+                                                googleDriveUser?.displayName ? googleDriveUser.displayName[0].toUpperCase() : 'G'
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+                                                {googleDriveUser?.emailAddress || googleDriveUser?.displayName || 'Google Account'}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => onRefreshGoogleDrive?.()}
+                                            title="Check Google Drive"
+                                            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                        >
+                                            <RefreshCw size={13} className={isGoogleDriveLoading ? 'animate-spin' : ''} />
+                                        </button>
+                                    </div>
+                                    {googleBackupMeta?.exists && (
+                                        <div className="mt-2 pt-2 border-t border-blue-100/60 dark:border-gray-700/50 flex flex-col gap-0.5">
+                                            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                                                Last backup:
+                                            </p>
+                                            <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                                                {formatBackupDate(googleBackupMeta.lastBackupTime)}
+                                                {googleBackupMeta.recordCount > 0 && ` (${googleBackupMeta.recordCount} records)`}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Back Up Now */}
+                                <Row
+                                    icon={<CloudUpload size={15} className="text-white" />}
+                                    iconBg="bg-blue-600"
+                                    label="Back Up Now"
+                                    sublabel="Save your latest patient list and notes to Drive"
+                                    right={
+                                        isGoogleDriveLoading ? (
+                                            <RefreshCw size={15} className="animate-spin text-blue-500 shrink-0" />
+                                        ) : (
+                                            <ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                                        )
+                                    }
+                                    onClick={async () => {
+                                        try {
+                                            await onBackupGoogleDrive?.()
+                                        } catch (e) {
+                                            setLocalDriveMsg(e.message || 'Backup failed')
+                                            setTimeout(() => setLocalDriveMsg(''), 4000)
+                                        }
+                                    }}
+                                    disabled={!hasAnyData || isGoogleDriveLoading}
+                                />
+
+                                {/* Restore Backup */}
+                                {confirmRestoreCloud ? (
+                                    <div className="px-4 py-3 bg-teal-50/70 dark:bg-teal-950/30 border-b border-gray-100 dark:border-gray-700/40">
+                                        <p className="text-xs font-bold text-gray-900 dark:text-white mb-1">
+                                            Restore from Google Drive?
+                                        </p>
+                                        <p className="text-[11px] text-gray-600 dark:text-gray-300 mb-2.5 leading-relaxed">
+                                            {googleBackupMeta?.exists
+                                                ? `Found backup from ${formatBackupDate(googleBackupMeta.lastBackupTime)} with ${googleBackupMeta.recordCount} records. This will safely restore and merge records into your current list.`
+                                                : 'This will download your latest backup from Google Drive and restore records.'}
+                                        </p>
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => setConfirmRestoreCloud(false)}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    setConfirmRestoreCloud(false)
+                                                    try {
+                                                        await onRestoreGoogleDrive?.()
+                                                    } catch (e) {
+                                                        setLocalDriveMsg(e.message || 'Restore failed')
+                                                        setTimeout(() => setLocalDriveMsg(''), 4000)
+                                                    }
+                                                }}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white shadow-xs"
+                                            >
+                                                Confirm Restore
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <Row
+                                        icon={<CloudDownload size={15} className="text-white" />}
+                                        iconBg="bg-teal-600"
+                                        label="Restore Backup"
+                                        sublabel={
+                                            googleBackupMeta?.exists
+                                                ? `Cloud backup available (${googleBackupMeta.recordCount} records)`
+                                                : 'Download latest backup from Drive'
+                                        }
+                                        right={
+                                            isGoogleDriveLoading ? (
+                                                <RefreshCw size={15} className="animate-spin text-teal-500 shrink-0" />
+                                            ) : (
+                                                <ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+                                            )
+                                        }
+                                        onClick={() => setConfirmRestoreCloud(true)}
+                                        disabled={!googleBackupMeta?.exists || isGoogleDriveLoading}
+                                    />
+                                )}
+
+                                {/* Disconnect */}
+                                {confirmDisconnectDrive ? (
+                                    <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-700/40">
+                                        <p className="flex-1 text-xs text-red-600 dark:text-red-400 font-semibold">Disconnect Google Drive?</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfirmDisconnectDrive(false)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                setConfirmDisconnectDrive(false)
+                                                await onDisconnectGoogleDrive?.()
+                                            }}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500 text-white"
+                                        >
+                                            Disconnect
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <Row
+                                        icon={<LogOut size={14} className="text-gray-600 dark:text-gray-300" />}
+                                        iconBg="bg-gray-100 dark:bg-gray-700"
+                                        label="Disconnect"
+                                        sublabel="Sign out of Google on this device"
+                                        right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
+                                        onClick={() => setConfirmDisconnectDrive(true)}
+                                        noBorder
+                                    />
+                                )}
+                            </>
+                        )}
+
+                        {/* Status Messages */}
+                        {(googleDriveStatusMsg || localDriveMsg) && (
+                            <p className={`text-xs font-semibold text-center px-4 py-2 border-t border-gray-100 dark:border-gray-700/40 ${
+                                (googleDriveStatusMsg?.type === 'error' || localDriveMsg?.includes('failed') || localDriveMsg?.includes('Error') || localDriveMsg?.includes('cancel') || localDriveMsg?.includes('Unable'))
+                                    ? 'text-red-500'
+                                    : 'text-emerald-600 dark:text-emerald-400'
+                            }`}>
+                                {googleDriveStatusMsg?.text || localDriveMsg}
+                            </p>
+                        )}
+                    </Section>
+
                     {/* Text Size */}
                     <Section title="Appearance">
                         <div className="flex items-center gap-3.5 px-4 py-3.5">
@@ -179,8 +438,8 @@ export default function SettingsModal({
                         </div>
                     </Section>
 
-                    {/* Backup & Restore */}
-                    <Section title="Data">
+                    {/* Local Backup & Restore */}
+                    <Section title="Local Data & File Backup">
                         <Row
                             icon={<ShieldCheck size={15} className="text-white" />}
                             iconBg={isStoragePersisted ? 'bg-emerald-500' : 'bg-amber-500'}
@@ -202,7 +461,7 @@ export default function SettingsModal({
                         <Row
                             icon={backupDone ? <CheckCircle size={15} className="text-white" /> : <Download size={15} className="text-white" />}
                             iconBg={backupDone ? 'bg-emerald-500' : 'bg-blue-500'}
-                            label={backupDone ? 'Backup saved!' : 'Save Backup'}
+                            label={backupDone ? 'Backup saved!' : 'Save Backup File'}
                             sublabel="Export full data snapshot as JSON"
                             right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
                             onClick={handleSaveBackupClick}
@@ -211,7 +470,7 @@ export default function SettingsModal({
                         <Row
                             icon={<Upload size={15} className="text-white" />}
                             iconBg="bg-purple-500"
-                            label="Restore Backup"
+                            label="Restore from File"
                             sublabel="Import from a saved JSON file"
                             right={<ChevronRight size={15} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />}
                             onClick={() => fileInputRef.current?.click()}

@@ -81,14 +81,44 @@ export async function prepareCloudSnapshot(data) {
     return snapshot
 }
 
-export function validateCloudBackup(data) {
-    if (!data || data.__type !== BACKUP_TYPE || data.__v !== BACKUP_VERSION) {
-        throw new Error('Unsupported backup format')
-    }
+let memoryDeviceId = null
 
-    for (const field of ['patients', 'mortalities', 'discharges', 'docs', 'discardedDrafts']) {
-        if (!Array.isArray(data[field])) throw new Error(`Invalid backup field: ${field}`)
+export function getOrCreateDeviceId() {
+    if (typeof localStorage === 'undefined') {
+        if (!memoryDeviceId) {
+            memoryDeviceId = 'device_' + ((typeof crypto !== 'undefined' && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : Math.random().toString(36).slice(2))
+        }
+        return memoryDeviceId
     }
-
-    return data
+    let deviceId = localStorage.getItem('hosnote_device_id')
+    if (!deviceId) {
+        deviceId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2)
+        localStorage.setItem('hosnote_device_id', deviceId)
+    }
+    return deviceId
 }
+
+export function validateCloudBackup(data) {
+    if (!data || (data.__type !== BACKUP_TYPE && data.__type !== 'hosnote-backup')) {
+        throw new Error('Unsupported backup format. Expected HOsNote backup file.')
+    }
+
+    if (!Array.isArray(data.patients) && !Array.isArray(data.docs)) {
+        throw new Error('Invalid backup file: no patient or clinical records found.')
+    }
+
+    return {
+        ...data,
+        patients: Array.isArray(data.patients) ? data.patients : [],
+        mortalities: Array.isArray(data.mortalities) ? data.mortalities : [],
+        discharges: Array.isArray(data.discharges) ? data.discharges : [],
+        dischargesResetDate: typeof data.dischargesResetDate === 'string' ? data.dischargesResetDate : '',
+        docs: Array.isArray(data.docs) ? data.docs : [],
+        discardedDrafts: Array.isArray(data.discardedDrafts) ? data.discardedDrafts : [],
+    }
+}
+

@@ -14,6 +14,23 @@ import { formatSmartDate } from './utils/formatSmartDate'
 import { Capacitor } from '@capacitor/core'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+import {
+    startGoogleDriveAuth,
+    completeGoogleDriveAuth,
+    getGoogleDriveConnectionState,
+    getGoogleDriveUserInfo,
+    getGoogleDriveBackupMetadata,
+    uploadGoogleDriveBackup,
+    downloadGoogleDriveBackup,
+    disconnectGoogleDrive,
+    listenForGoogleDriveRedirect,
+    isGoogleDriveConfigured,
+} from './utils/googleDriveBackup'
+import {
+    prepareCloudSnapshot,
+    validateCloudBackup,
+    getOrCreateDeviceId,
+} from './utils/backupSnapshot'
 
 import DemoBanner from './components/DemoBanner'
 
@@ -554,6 +571,86 @@ useEffect(() => {
     })
     const [showDemoSkipToast, setShowDemoSkipToast] = useState(false)
 
+    // ── Google Drive Backup State ─────────────────────────────────────────────
+    const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false)
+    const [googleDriveUser, setGoogleDriveUser] = useState(null)
+    const [googleBackupMeta, setGoogleBackupMeta] = useState(null)
+    const [isGoogleDriveLoading, setIsGoogleDriveLoading] = useState(false)
+    const [googleDriveStatusMsg, setGoogleDriveStatusMsg] = useState(null)
+
+    const refreshGoogleDriveState = useCallback(async () => {
+        try {
+            const connected = await getGoogleDriveConnectionState()
+            setIsGoogleDriveConnected(connected)
+            if (connected) {
+                const [userInfo, meta] = await Promise.all([
+                    getGoogleDriveUserInfo().catch(() => null),
+                    getGoogleDriveBackupMetadata().catch(() => null),
+                ])
+                if (userInfo) setGoogleDriveUser(userInfo)
+                if (meta) setGoogleBackupMeta(meta)
+            } else {
+                setGoogleDriveUser(null)
+                setGoogleBackupMeta(null)
+            }
+        } catch (e) {
+            console.error('Failed to refresh Google Drive state:', e)
+        }
+    }, [])
+
+    useEffect(() => {
+        refreshGoogleDriveState()
+
+        // 1. Android Native deep link listener
+        const cleanup = listenForGoogleDriveRedirect(async (url) => {
+            setIsGoogleDriveLoading(true)
+            try {
+                await completeGoogleDriveAuth(url)
+                await refreshGoogleDriveState()
+                setGoogleDriveStatusMsg({ type: 'success', text: 'Google Drive connected successfully!' })
+                setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
+            } catch (err) {
+                console.error('Google Drive auth error:', err)
+                setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Google Drive connection failed' })
+                setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
+            } finally {
+                setIsGoogleDriveLoading(false)
+            }
+        }, (cancelMsg) => {
+            setIsGoogleDriveLoading(false)
+            setGoogleDriveStatusMsg({ type: 'error', text: cancelMsg || 'Google Drive connection was cancelled.' })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
+        })
+
+        // 2. Web OAuth redirect check
+        if (!Capacitor.isNativePlatform() && typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search)
+            if (params.has('code') && params.has('state')) {
+                setIsGoogleDriveLoading(true)
+                completeGoogleDriveAuth(window.location.href)
+                    .then(async () => {
+                        const cleanUrl = window.location.origin + window.location.pathname
+                        window.history.replaceState({}, document.title, cleanUrl)
+                        await refreshGoogleDriveState()
+                        setGoogleDriveStatusMsg({ type: 'success', text: 'Google Drive connected successfully!' })
+                        setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
+                    })
+                    .catch(err => {
+                        console.error('Web Google Drive auth error:', err)
+                        setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Google Drive connection failed' })
+                        setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
+                    })
+                    .finally(() => {
+                        setIsGoogleDriveLoading(false)
+                    })
+            }
+        }
+
+        return () => {
+            cleanup?.()
+        }
+    }, [refreshGoogleDriveState])
+
     const handleSkipDemoBanner = useCallback(() => {
         setShowDemoBanner(false)
         try {
@@ -916,6 +1013,9 @@ useEffect(() => {
                 return [...prev, ...newOnes]
             })
         }
+        if (data.dischargesResetDate && typeof data.dischargesResetDate === 'string') {
+            setDischargesResetDate(data.dischargesResetDate)
+        }
     }, [patients, mortalities, discharges, docs, discardedDrafts])
 
     // ── Save full JSON backup ─────────────────────────────────────────────────
@@ -963,6 +1063,105 @@ useEffect(() => {
         URL.revokeObjectURL(url)
         return true
     }, [patients, mortalities, discharges, docs, discardedDrafts])
+
+    // ── Google Drive Cloud Backup & Restore Handlers ──────────────────────────
+
+    const handleConnectGoogleDrive = useCallback(async () => {
+        setIsGoogleDriveLoading(true)
+        try {
+            // startGoogleDriveAuth() opens the device's default external browser
+            // and resolves as soon as the browser is launched — it does NOT
+            // wait for the OAuth callback. The loading state must therefore
+            // stay on until the callback (or cancellation) is handled by the
+            // listenForGoogleDriveRedirect listener below, which is the
+            // single source of truth for clearing isGoogleDriveLoading.
+            await startGoogleDriveAuth()
+        } catch (err) {
+            console.error('Failed to start Google Drive auth:', err)
+            setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Failed to start Google sign-in' })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
+            setIsGoogleDriveLoading(false)
+        }
+    }, [])
+
+    const handleDisconnectGoogleDrive = useCallback(async () => {
+        setIsGoogleDriveLoading(true)
+        try {
+            await disconnectGoogleDrive()
+            setIsGoogleDriveConnected(false)
+            setGoogleDriveUser(null)
+            setGoogleBackupMeta(null)
+            setGoogleDriveStatusMsg({ type: 'success', text: 'Disconnected from Google Drive' })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 3500)
+        } catch (err) {
+            console.error('Failed to disconnect Google Drive:', err)
+            setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Failed to disconnect' })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
+        } finally {
+            setIsGoogleDriveLoading(false)
+        }
+    }, [])
+
+    const handleBackupGoogleDrive = useCallback(async () => {
+        setIsGoogleDriveLoading(true)
+        try {
+            const deviceId = getOrCreateDeviceId()
+            const snapshot = await prepareCloudSnapshot({
+                patients,
+                mortalities,
+                discharges,
+                dischargesResetDate,
+                docs,
+                discardedDrafts,
+                deviceId,
+            })
+            const result = await uploadGoogleDriveBackup(snapshot)
+            const meta = await getGoogleDriveBackupMetadata().catch(() => null)
+            if (meta) setGoogleBackupMeta(meta)
+            setGoogleDriveStatusMsg({
+                type: 'success',
+                text: `Backed up ${snapshot.recordCount} records to Google Drive!`,
+            })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
+            return result
+        } catch (err) {
+            console.error('Google Drive backup error:', err)
+            setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Backup failed. Please try again.' })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
+            throw err
+        } finally {
+            setIsGoogleDriveLoading(false)
+        }
+    }, [patients, mortalities, discharges, dischargesResetDate, docs, discardedDrafts])
+
+    const handleRestoreGoogleDrive = useCallback(async () => {
+        setIsGoogleDriveLoading(true)
+        try {
+            const meta = await getGoogleDriveBackupMetadata()
+            if (!meta.exists || !meta.file) {
+                throw new Error('No existing backup found in your Google Drive.')
+            }
+            const raw = await downloadGoogleDriveBackup(meta.file)
+            const valid = validateCloudBackup(raw)
+            restoreFromBackup(valid)
+            setGoogleBackupMeta(meta)
+            const count = (valid.patients?.length || 0) + (valid.docs?.length || 0) + (valid.mortalities?.length || 0)
+            setGoogleDriveStatusMsg({
+                type: 'success',
+                text: `Restored ${count} clinical records from Google Drive!`,
+            })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 4500)
+            return valid
+        } catch (err) {
+            console.error('Google Drive restore error:', err)
+            setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Restore failed. Please try again.' })
+            setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
+            throw err
+        } finally {
+            setIsGoogleDriveLoading(false)
+        }
+    }, [restoreFromBackup])
+
 
     const savePatient = useCallback(({ team = 'my_team', name, hospitalNumber, ward, bed, note, critical = false, admissionDate, diagnosis }) => {
         const n = name.trim()
@@ -2077,6 +2276,16 @@ useEffect(() => {
                         isStoragePersisted={isStoragePersisted}
                         onRequestStoragePersist={requestStoragePersistence}
                         onStartDemo={handleStartDemo}
+                        isGoogleDriveConnected={isGoogleDriveConnected}
+                        googleDriveUser={googleDriveUser}
+                        googleBackupMeta={googleBackupMeta}
+                        isGoogleDriveLoading={isGoogleDriveLoading}
+                        googleDriveStatusMsg={googleDriveStatusMsg}
+                        onConnectGoogleDrive={handleConnectGoogleDrive}
+                        onDisconnectGoogleDrive={handleDisconnectGoogleDrive}
+                        onBackupGoogleDrive={handleBackupGoogleDrive}
+                        onRestoreGoogleDrive={handleRestoreGoogleDrive}
+                        onRefreshGoogleDrive={refreshGoogleDriveState}
                     />
                 )}
 
