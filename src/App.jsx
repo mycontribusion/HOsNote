@@ -229,7 +229,7 @@ const navigateBackFromUrlRoute = useCallback(() => {
         navigate(`/team/${activeTab}`)
     } else if (path === '/settings') {
         navigate(previousPathRef.current || '/team/my_team')
-    } else if (path === '/search' || path === '/demo' || path === '/discarded-drafts' || path === '/privacy') {
+    } else if (path === '/search' || path === '/demo' || path === '/discarded-drafts') {
         navigate('/team/my_team')
     }
 }, [location.pathname, navigate, activeTab])
