@@ -43,6 +43,7 @@ const NotebookPage = lazy(() => import('./components/NotebookPage'))
 const DocComposer = lazy(() => import('./components/DocComposer'))
 const SearchResultsPage = lazy(() => import('./components/SearchResultsPage'))
 const InteractiveSpotlightTour = lazy(() => import('./components/InteractiveSpotlightTour'))
+const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'))
 
 const STORAGE_KEY = '4myteam_patients'
 const MORTALITIES_KEY = '4myteam_mortalities'
@@ -167,9 +168,10 @@ export default function App() {
     //   /team/:tab        -> patients page, :tab in {my_team, other_team, mortalities}
     //   /notebook         -> clinical notebook page
     //   /discarded-drafts -> patients page (discarded drafts view)
+    //   /privacy          -> privacy policy page
     const activePage = (showDemoModal || location.pathname === '/demo')
         ? demoSubPage
-        : (effectivePath === '/search' ? 'search' : effectivePath.startsWith('/notebook') ? 'notebook' : 'patients')
+        : (effectivePath === '/search' ? 'search' : effectivePath === '/privacy' ? 'privacy' : effectivePath.startsWith('/notebook') ? 'notebook' : 'patients')
     const activeTab = (showDemoModal || location.pathname === '/demo')
         ? 'my_team'
         : (params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
@@ -227,7 +229,7 @@ const navigateBackFromUrlRoute = useCallback(() => {
         navigate(`/team/${activeTab}`)
     } else if (path === '/settings') {
         navigate(previousPathRef.current || '/team/my_team')
-    } else if (path === '/search' || path === '/demo' || path === '/discarded-drafts') {
+    } else if (path === '/search' || path === '/demo' || path === '/discarded-drafts' || path === '/privacy') {
         navigate('/team/my_team')
     }
 }, [location.pathname, navigate, activeTab])
@@ -282,6 +284,11 @@ useEffect(() => {
         setSearchHighlightQuery('')
         setInitialSelectedPatientId(null)
         setInitialSelectedDocId(null)
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'instant' })
+        }
+    } else if (path === '/privacy') {
+        // Privacy policy page - no additional state needed, handled by activePage
         if (typeof window !== 'undefined') {
             window.scrollTo({ top: 0, behavior: 'instant' })
         }
@@ -2063,24 +2070,26 @@ useEffect(() => {
     return (
         <SearchProvider>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col transition-colors duration-300">
-                <Header
-                    patientCount={patients.length}
-                    docCount={docs.length}
-                    darkMode={darkMode}
-                    toggleDarkMode={toggleDarkMode}
-                    onOpenSettings={() => navigate('/settings')}
-                    activePage={activePage}
-                    onPageChange={goToPage}
-                    onOpenSearch={() => {
-                        searchReturnPathRef.current = location.pathname
-                        navigate('/search')
-                    }}
-                    onHome={onHome}
-                    onBackFromSearch={() => navigate(searchReturnPathRef.current || '/team/my_team')}
-                    theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
-                />
+                {activePage !== 'privacy' && (
+                    <Header
+                        patientCount={patients.length}
+                        docCount={docs.length}
+                        darkMode={darkMode}
+                        toggleDarkMode={toggleDarkMode}
+                        onOpenSettings={() => navigate('/settings')}
+                        activePage={activePage}
+                        onPageChange={goToPage}
+                        onOpenSearch={() => {
+                            searchReturnPathRef.current = location.pathname
+                            navigate('/search')
+                        }}
+                        onHome={onHome}
+                        onBackFromSearch={() => navigate(searchReturnPathRef.current || '/team/my_team')}
+                        theme={activePage === 'patients' && (activeTab === 'mortalities' || mortalitiesOnly) ? 'red' : 'blue'}
+                    />
+                )}
 
-                {showDemoBanner && (
+                {showDemoBanner && activePage !== 'privacy' && (
                     <DemoBanner
                         onStartDemo={handleStartDemo}
                         onSkip={handleSkipDemoBanner}
@@ -2140,6 +2149,13 @@ useEffect(() => {
                         onStartEditDoc={handleNotebookStartEdit}
                         navigate={navigate}
                     />
+                </Suspense>
+            )}
+
+            {/* Privacy Policy Page */}
+            {activePage === 'privacy' && (
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+                    <PrivacyPolicy />
                 </Suspense>
             )}
 
