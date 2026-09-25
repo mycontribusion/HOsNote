@@ -106,6 +106,23 @@ async function getGoogleWebClientId() {
     }
 }
 
+/**
+ * Returns the Android OAuth client ID baked into the APK at build time.
+ *
+ * This is the credential used by the native Android authorization flow
+ * ({@code com.google.android.gms.auth.api.identity.AuthorizationClient}).
+ * It is a public client, so no client secret is ever required.
+ */
+async function getGoogleClientId() {
+    if (!Capacitor.isNativePlatform()) return ''
+    try {
+        const result = await HosnoteConfig.getGoogleClientId()
+        return result?.clientId || ''
+    } catch {
+        return ''
+    }
+}
+
 export async function isGoogleDriveConfigured() {
     const isNative = Capacitor.isNativePlatform()
     const clientId = isNative
@@ -117,7 +134,7 @@ export async function isGoogleDriveConfigured() {
 export async function getGoogleDriveConfig() {
     const isNative = Capacitor.isNativePlatform()
     const clientId = isNative
-        ? await getGoogleWebClientId()
+        ? await getGoogleClientId()
         : (import.meta.env?.VITE_GOOGLE_WEB_CLIENT_ID || import.meta.env?.VITE_GOOGLE_CLIENT_ID || '')
     const redirectUri = import.meta.env?.VITE_GOOGLE_REDIRECT_URI || getRedirectUri()
 
@@ -254,47 +271,176 @@ async function tokenRequest(parameters) {
     }
 }
 
+let gisLoadPromise = null
+let gisTokenClient = null
+
+export function ensureGisLoaded() {
+    if (typeof window === 'undefined') return Promise.reject(new Error('Window is not defined'))
+    if (window.google?.accounts?.oauth2) return Promise.resolve(window.google.accounts.oauth2)
+    if (gisLoadPromise) return gisLoadPromise
+
+    gisLoadPromise = new Promise((resolve, reject) => {
+        const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]')
+        if (existingScript) {
+            existingScript.addEventListener('load', () => {
+                if (window.google?.accounts?.oauth2) resolve(window.google.accounts.oauth2)
+                else reject(new Error('Google Identity Services failed to initialize'))
+            })
+            existingScript.addEventListener('error', () => reject(new Error('Failed to load Google Identity Services')))
+            if (window.google?.accounts?.oauth2) resolve(window.google.accounts.oauth2)
+            return
+        }
+        const script = document.createElement('script')
+        script.src = 'https://accounts.google.com/gsi/client'
+        script.async = true
+        script.defer = true
+        script.onload = () => {
+            if (window.google?.accounts?.oauth2) resolve(window.google.accounts.oauth2)
+            else reject(new Error('Google Identity Services failed to initialize'))
+        }
+        script.onerror = () => reject(new Error('Failed to load Google Identity Services'))
+        document.head.appendChild(script)
+    })
+    return gisLoadPromise
+}
+
+function requestGisToken(options = {}) {
+    return new Promise((resolve, reject) => {
+        ensureGisLoaded().then((oauth2) => {
+            const clientId = import.meta.env?.VITE_GOOGLE_WEB_CLIENT_ID || import.meta.env?.VITE_GOOGLE_CLIENT_ID || ''
+            if (!clientId) {
+                if (import.meta.env?.DEV) {
+                    reject(new Error('Google Drive is not configured. Add VITE_GOOGLE_WEB_CLIENT_ID to your environment.'))
+                } else {
+                    reject(new Error('Unable to connect to Google Drive. Cloud backup is not configured on this build.'))
+                }
+                return
+            }
+
+            if (!gisTokenClient) {
+                gisTokenClient = oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: DRIVE_SCOPE,
+                    callback: () => {},
+                })
+            }
+
+            gisTokenClient.callback = (response) => {
+                if (response.error) {
+                    if (response.error === 'access_denied') {
+                        reject(new Error('Google Drive connection was cancelled.'))
+                    } else {
+                        reject(new Error(response.error_description || response.error))
+                    }
+                } else {
+                    resolve(response)
+                }
+            }
+
+            gisTokenClient.error_callback = (err) => {
+                if (err?.type === 'popup_closed') {
+                    reject(new Error('Google Drive connection was cancelled.'))
+                } else {
+                    reject(new Error(err?.message || err?.type || 'Google Identity Services error'))
+                }
+            }
+
+            gisTokenClient.requestAccessToken(options)
+        }).catch(reject)
+    })
+}
+
 export async function startGoogleDriveAuth() {
     if (!isGoogleDriveSupported()) {
         throw new Error('Google Drive backup is not supported on this device.')
     }
 
-    const { clientId, redirectUri } = await getGoogleDriveConfig()
-    const state = randomBase64Url(32)
-    const codeVerifier = randomBase64Url(64)
-    const codeChallenge = await sha256Base64Url(codeVerifier)
-    const pendingAuth = { state, codeVerifier, createdAt: Date.now() }
-    await savePendingAuth(pendingAuth)
-
-    const authUrl = new URL(AUTH_ENDPOINT)
-    authUrl.searchParams.set('client_id', clientId)
-    authUrl.searchParams.set('redirect_uri', redirectUri)
-    authUrl.searchParams.set('response_type', 'code')
-    authUrl.searchParams.set('scope', DRIVE_SCOPE)
-    authUrl.searchParams.set('access_type', 'offline')
-    authUrl.searchParams.set('prompt', 'consent')
-    authUrl.searchParams.set('state', state)
-    authUrl.searchParams.set('code_challenge', codeChallenge)
-    authUrl.searchParams.set('code_challenge_method', 'S256')
-
+    // Native Android path: use the current officially supported Android
+    // authorization API (com.google.android.gms.auth.api.identity
+    // .AuthorizationClient) exposed through the HosnoteConfig plugin.
+    //
+    // This intentionally does NOT use the Web OAuth client + PKCE flow:
+    // Play services resolves the account, shows the consent screen, and
+    // returns the access token directly. No authorization-code exchange,
+    // no token endpoint call, and no client secret are involved — the
+    // Android OAuth client baked into the APK is the only credential.
     if (Capacitor.isNativePlatform()) {
-        // Open the device's DEFAULT external browser (Chrome, Firefox, ...)
-        // via an explicit Android ACTION_VIEW intent exposed through the
-        // existing HosnoteConfig plugin.
-        //
-        // This is intentionally NOT Capacitor's Browser plugin: that plugin
-        // launches Custom Tabs, an in-app browser component. With Custom Tabs
-        // Google's redirect back to com.hosnote.app:/oauth2redirect is never
-        // delivered to HOsNote, so the OAuth callback is lost and the Connect
-        // button spins forever. A normal ACTION_VIEW intent lets the system
-        // resolve the URL to the user's default browser, whose existing Google
-        // session is available to the OAuth page, and whose redirect back to
-        // HOsNote is delivered via the Capacitor appUrlOpen event.
-        await HosnoteConfig.openExternalUrl({ url: authUrl.toString() })
-    } else {
-        window.location.assign(authUrl.toString())
+        const result = await HosnoteConfig.authorizeGoogleDrive({
+            scope: DRIVE_SCOPE,
+            offline: true,
+        })
+        const tokens = buildTokensFromAuthorizationResult(result)
+        await saveTokens(tokens)
+        return tokens.state || 'native'
     }
-    return state
+
+    // Web/PWA path: Google Identity Services (GIS) Token Model
+    const tokenResponse = await requestGisToken({ prompt: 'consent' })
+    if (!tokenResponse?.access_token) {
+        throw new Error('Google Drive authorization did not return an access token.')
+    }
+    const tokens = {
+        access_token: tokenResponse.access_token,
+        refresh_token: null,
+        scope: tokenResponse.scope || DRIVE_SCOPE,
+        token_type: tokenResponse.token_type || 'Bearer',
+        expires_in: Number(tokenResponse.expires_in) || 3600,
+        expires_at: Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000,
+        state: 'gis',
+    }
+    await saveTokens(tokens)
+    return tokens
+}
+
+/**
+ * Converts the {@code authorizeGoogleDrive} plugin payload into the token
+ * shape the rest of the module already consumes
+ * ({@link getTokens}, {@link getGoogleDriveAccessToken}, refresh logic).
+ *
+ * The native flow returns the access token directly and, when requested,
+ * a refresh token plus the token lifetime. No {@code expires_at} is
+ * computed here; {@link getGoogleDriveAccessToken} refreshes via the
+ * refresh token when the access token nears expiry.
+ */
+function buildTokensFromAuthorizationResult(result) {
+    // DIAGNOSTIC: log the raw native payload so we can see what Google
+    // actually returned (access token, refresh token, expires_in, scopes).
+    try {
+        console.log('[GoogleDrive] native auth result:', JSON.stringify({
+            accessTokenLen: result?.accessToken ? String(result.accessToken).length : 0,
+            hasRefreshToken: Boolean(result?.refreshToken),
+            expiresInSeconds: result?.expiresInSeconds,
+            grantedScopes: Array.isArray(result?.grantedScopes) ? result.grantedScopes.length : result?.grantedScopes,
+            hasResolution: result?.hasResolution,
+        }))
+    } catch {
+        // ignore
+    }
+
+    const tokens = {
+        access_token: result?.accessToken,
+        refresh_token: result?.refreshToken || null,
+        scope: DRIVE_SCOPE,
+        token_type: 'Bearer',
+        expires_in: Number(result?.expiresInSeconds) || 3600,
+        expires_at: Date.now() + (Number(result?.expiresInSeconds) || 3600) * 1000,
+        state: result?.state || 'native',
+    }
+    if (!tokens.access_token) {
+        // Include the raw native payload in the error so the next test
+        // report reveals exactly what Google returned (access token,
+        // refresh token, expires_in, server auth code, scopes).
+        const diag = {
+            accessToken: result?.accessToken,
+            refreshToken: result?.refreshToken,
+            expiresInSeconds: result?.expiresInSeconds,
+            grantedScopes: result?.grantedScopes,
+            hasResolution: result?.hasResolution,
+            raw: result,
+        }
+        throw new Error('Google Drive authorization did not return an access token. ' + JSON.stringify(diag))
+    }
+    return tokens
 }
 
 export async function completeGoogleDriveAuth(url) {
@@ -339,16 +485,47 @@ export async function completeGoogleDriveAuth(url) {
 }
 
 async function refreshTokens(tokens) {
-    if (!tokens?.refresh_token) return null
-    const { clientId } = await getGoogleDriveConfig()
-    const refreshed = await tokenRequest({
-        client_id: clientId,
-        refresh_token: tokens.refresh_token,
-        grant_type: 'refresh_token',
-    })
-    const merged = { ...tokens, ...refreshed }
-    await saveTokens(merged)
-    return merged
+    // Native Android path: ask Play services for a fresh access token.
+    // This avoids the token endpoint entirely (and therefore the
+    // client_secret requirement) by re-running the authorization client.
+    if (Capacitor.isNativePlatform()) {
+        if (!tokens?.refresh_token) return null
+        try {
+            const result = await HosnoteConfig.authorizeGoogleDrive({
+                scope: DRIVE_SCOPE,
+                offline: true,
+            })
+            const refreshed = buildTokensFromAuthorizationResult(result)
+            // Preserve the refresh token we already hold when the SDK does
+            // not return a new one.
+            if (!refreshed.refresh_token) {
+                refreshed.refresh_token = tokens.refresh_token
+            }
+            const merged = { ...tokens, ...refreshed }
+            await saveTokens(merged)
+            return merged
+        } catch {
+            return null
+        }
+    }
+
+    // Web path: GIS silent authorization without prompt
+    try {
+        const tokenResponse = await requestGisToken({ prompt: '' })
+        if (tokenResponse?.access_token) {
+            const refreshed = {
+                ...tokens,
+                access_token: tokenResponse.access_token,
+                expires_in: Number(tokenResponse.expires_in) || 3600,
+                expires_at: Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000,
+            }
+            await saveTokens(refreshed)
+            return refreshed
+        }
+        return null
+    } catch {
+        return null
+    }
 }
 
 export async function getGoogleDriveAccessToken() {
@@ -531,6 +708,26 @@ export async function getGoogleDriveConnectionState() {
 }
 
 export async function disconnectGoogleDrive() {
+    // Native Android path: revoke access through Play services so Google
+    // stops issuing tokens for this app, in addition to clearing the
+    // local cache. Best-effort — the local cache is cleared regardless.
+    if (Capacitor.isNativePlatform()) {
+        try {
+            await HosnoteConfig.revokeGoogleDrive()
+        } catch {
+            // Ignore; local cache is cleared below regardless.
+        }
+    } else {
+        // Web path: best-effort revocation via Google Identity Services
+        try {
+            const tokens = await getTokens()
+            if (tokens?.access_token && window.google?.accounts?.oauth2?.revoke) {
+                window.google.accounts.oauth2.revoke(tokens.access_token, () => {})
+            }
+        } catch {
+            // Ignore
+        }
+    }
     await clearTokens()
     await clearPendingAuth()
 }
@@ -576,6 +773,15 @@ export function listenForGoogleDriveRedirect(callback, onCancel) {
         // delivered the com.hosnote.app:/oauth2redirect callback, they either
         // cancelled or the flow failed, and the spinner must stop.
         App.addListener('appStateChange', (data) => {
+            // DIAGNOSTIC: log every appStateChange so we can see whether a
+            // screen-off/on cycle fires isActive=true with no auth in progress.
+            try {
+                console.log('[GoogleDrive] appStateChange', JSON.stringify({
+                    isActive: data?.isActive,
+                    authHandled,
+                    wasBackgrounded,
+                }))
+            } catch {}
             if (!active) return
             if (data?.isActive) {
                 if (!authHandled) {
@@ -584,6 +790,9 @@ export function listenForGoogleDriveRedirect(callback, onCancel) {
                     // reporting cancellation.
                     setTimeout(() => {
                         if (active && !authHandled) {
+                            try {
+                                console.log('[GoogleDrive] onCancel fired', JSON.stringify({ authHandled, wasBackgrounded }))
+                            } catch {}
                             onCancel?.('Google Drive sign-in was cancelled.')
                         }
                     }, 600)

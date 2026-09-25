@@ -622,30 +622,6 @@ useEffect(() => {
             setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
         })
 
-        // 2. Web OAuth redirect check
-        if (!Capacitor.isNativePlatform() && typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search)
-            if (params.has('code') && params.has('state')) {
-                setIsGoogleDriveLoading(true)
-                completeGoogleDriveAuth(window.location.href)
-                    .then(async () => {
-                        const cleanUrl = window.location.origin + window.location.pathname
-                        window.history.replaceState({}, document.title, cleanUrl)
-                        await refreshGoogleDriveState()
-                        setGoogleDriveStatusMsg({ type: 'success', text: 'Google Drive connected successfully!' })
-                        setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
-                    })
-                    .catch(err => {
-                        console.error('Web Google Drive auth error:', err)
-                        setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Google Drive connection failed' })
-                        setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
-                    })
-                    .finally(() => {
-                        setIsGoogleDriveLoading(false)
-                    })
-            }
-        }
-
         return () => {
             cleanup?.()
         }
@@ -1069,20 +1045,20 @@ useEffect(() => {
     const handleConnectGoogleDrive = useCallback(async () => {
         setIsGoogleDriveLoading(true)
         try {
-            // startGoogleDriveAuth() opens the device's default external browser
-            // and resolves as soon as the browser is launched — it does NOT
-            // wait for the OAuth callback. The loading state must therefore
-            // stay on until the callback (or cancellation) is handled by the
-            // listenForGoogleDriveRedirect listener below, which is the
-            // single source of truth for clearing isGoogleDriveLoading.
             await startGoogleDriveAuth()
+            if (!Capacitor.isNativePlatform()) {
+                await refreshGoogleDriveState()
+                setGoogleDriveStatusMsg({ type: 'success', text: 'Google Drive connected successfully!' })
+                setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
+                setIsGoogleDriveLoading(false)
+            }
         } catch (err) {
             console.error('Failed to start Google Drive auth:', err)
             setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Failed to start Google sign-in' })
             setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
             setIsGoogleDriveLoading(false)
         }
-    }, [])
+    }, [refreshGoogleDriveState])
 
     const handleDisconnectGoogleDrive = useCallback(async () => {
         setIsGoogleDriveLoading(true)
