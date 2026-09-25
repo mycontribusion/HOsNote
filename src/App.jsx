@@ -20,6 +20,7 @@ import {
     getGoogleDriveConnectionState,
     getGoogleDriveUserInfo,
     getGoogleDriveBackupMetadata,
+    getGoogleDriveAccessToken,
     uploadGoogleDriveBackup,
     downloadGoogleDriveBackup,
     disconnectGoogleDrive,
@@ -76,6 +77,10 @@ const DISCHARGES_RESET_KEY = '4myteam_discharges_reset'
 const DARK_MODE_KEY = '4myteam_darkmode'
 const DOCUMENTATION_KEY = 'hosnote_docs'
 const DISCARDED_DRAFTS_KEY = '4myteam_discarded_drafts'
+const BACKUP_PENDING_KEY = 'hosnote_backup_pending'
+const LAST_BACKUP_HASH_KEY = 'hosnote_last_backup_hash'
+const AUTO_BACKUP_DELAY_MS = 45000 // 45s quiet period after meaningful changes
+const AUTO_BACKUP_RETRY_COOLDOWN_MS = 60000 // 60s cooldown to avoid tight retry loops
 
 function generateId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -382,6 +387,10 @@ const patientsRef = useRef(patients)
 patientsRef.current = patients
 const mortalitiesRef = useRef(mortalities)
 mortalitiesRef.current = mortalities
+const dischargesRef = useRef(discharges)
+dischargesRef.current = discharges
+const dischargesResetDateRef = useRef(dischargesResetDate)
+dischargesResetDateRef.current = dischargesResetDate
 const docsRef = useRef(docs)
 docsRef.current = docs
 const discardedDraftsRef = useRef(discardedDrafts)
@@ -577,6 +586,14 @@ useEffect(() => {
     const [googleBackupMeta, setGoogleBackupMeta] = useState(null)
     const [isGoogleDriveLoading, setIsGoogleDriveLoading] = useState(false)
     const [googleDriveStatusMsg, setGoogleDriveStatusMsg] = useState(null)
+
+    const isGoogleDriveConnectedRef = useRef(isGoogleDriveConnected)
+    isGoogleDriveConnectedRef.current = isGoogleDriveConnected
+
+    const isInitialDataLoadedRef = useRef(false)
+    const autoBackupTimerRef = useRef(null)
+    const isBackingUpRef = useRef(false)
+    const lastAutoBackupAttemptRef = useRef(0)
 
     const refreshGoogleDriveState = useCallback(async () => {
         try {
@@ -1042,6 +1059,99 @@ useEffect(() => {
 
     // ── Google Drive Cloud Backup & Restore Handlers ──────────────────────────
 
+    const performBackup = useCallback(async ({ isAuto = false } = {}) => {
+        if (isBackingUpRef.current) return null
+
+        // 1. Must be connected to Google Drive
+        if (!isGoogleDriveConnectedRef.current) {
+            return null
+        }
+
+        // 2. Network connectivity check
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            if (isAuto) {
+                try { localStorage.setItem(BACKUP_PENDING_KEY, '1') } catch {}
+                return null
+            }
+            throw new Error('Device appears to be offline. Please check your internet connection.')
+        }
+
+        // 3. Active token check (silent check for auto-backup so no login popup is opened)
+        const token = await getGoogleDriveAccessToken().catch(() => null)
+        if (!token) {
+            if (isAuto) {
+                console.warn('[GoogleDrive] Auto-backup skipped: no active token or silent refresh unavailable')
+                return null
+            }
+            throw new Error('Your Google Drive authorization has expired. Please reconnect.')
+        }
+
+        // 4. Prepare cloud snapshot using latest clinical data refs
+        const deviceId = getOrCreateDeviceId()
+        const snapshot = await prepareCloudSnapshot({
+            patients: patientsRef.current,
+            mortalities: mortalitiesRef.current,
+            discharges: dischargesRef.current,
+            dischargesResetDate: dischargesResetDateRef.current,
+            docs: docsRef.current,
+            discardedDrafts: discardedDraftsRef.current,
+            deviceId,
+        })
+
+        // 5. Avoid unnecessary uploads if nothing changed since last successful backup
+        const lastHash = typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_BACKUP_HASH_KEY) : null
+        if (isAuto && lastHash && lastHash === snapshot.hash) {
+            try { localStorage.removeItem(BACKUP_PENDING_KEY) } catch {}
+            return null
+        }
+
+        isBackingUpRef.current = true
+        setIsGoogleDriveLoading(true)
+
+        try {
+            const result = await uploadGoogleDriveBackup(snapshot)
+            try {
+                localStorage.setItem(LAST_BACKUP_HASH_KEY, snapshot.hash)
+                localStorage.removeItem(BACKUP_PENDING_KEY)
+            } catch {}
+
+            const meta = await getGoogleDriveBackupMetadata().catch(() => null)
+            if (meta) setGoogleBackupMeta(meta)
+
+            if (!isAuto) {
+                setGoogleDriveStatusMsg({
+                    type: 'success',
+                    text: `Backed up ${snapshot.recordCount} records to Google Drive!`,
+                })
+                setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
+            } else {
+                setGoogleDriveStatusMsg({
+                    type: 'success',
+                    text: 'Auto-backed up to Google Drive',
+                })
+                setTimeout(() => setGoogleDriveStatusMsg(null), 3000)
+            }
+            return result
+        } catch (err) {
+            console.error(isAuto ? 'Google Drive auto-backup error:' : 'Google Drive backup error:', err)
+            lastAutoBackupAttemptRef.current = Date.now()
+            if (isAuto) {
+                try { localStorage.setItem(BACKUP_PENDING_KEY, '1') } catch {}
+            } else {
+                setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Backup failed. Please try again.' })
+                setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
+                throw err
+            }
+        } finally {
+            isBackingUpRef.current = false
+            setIsGoogleDriveLoading(false)
+        }
+    }, [])
+
+    const handleBackupGoogleDrive = useCallback(async () => {
+        return performBackup({ isAuto: false })
+    }, [performBackup])
+
     const handleConnectGoogleDrive = useCallback(async () => {
         setIsGoogleDriveLoading(true)
         try {
@@ -1051,6 +1161,15 @@ useEffect(() => {
                 setGoogleDriveStatusMsg({ type: 'success', text: 'Google Drive connected successfully!' })
                 setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
                 setIsGoogleDriveLoading(false)
+
+                // If backup is pending when user connects, schedule an auto-backup
+                const isPending = typeof localStorage !== 'undefined' && localStorage.getItem(BACKUP_PENDING_KEY) === '1'
+                if (isPending) {
+                    if (autoBackupTimerRef.current) clearTimeout(autoBackupTimerRef.current)
+                    autoBackupTimerRef.current = setTimeout(() => {
+                        performBackup({ isAuto: true })
+                    }, 3000)
+                }
             }
         } catch (err) {
             console.error('Failed to start Google Drive auth:', err)
@@ -1058,15 +1177,20 @@ useEffect(() => {
             setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
             setIsGoogleDriveLoading(false)
         }
-    }, [refreshGoogleDriveState])
+    }, [refreshGoogleDriveState, performBackup])
 
     const handleDisconnectGoogleDrive = useCallback(async () => {
         setIsGoogleDriveLoading(true)
+        if (autoBackupTimerRef.current) clearTimeout(autoBackupTimerRef.current)
         try {
             await disconnectGoogleDrive()
             setIsGoogleDriveConnected(false)
             setGoogleDriveUser(null)
             setGoogleBackupMeta(null)
+            try {
+                localStorage.removeItem(BACKUP_PENDING_KEY)
+                localStorage.removeItem(LAST_BACKUP_HASH_KEY)
+            } catch {}
             setGoogleDriveStatusMsg({ type: 'success', text: 'Disconnected from Google Drive' })
             setTimeout(() => setGoogleDriveStatusMsg(null), 3500)
         } catch (err) {
@@ -1077,38 +1201,6 @@ useEffect(() => {
             setIsGoogleDriveLoading(false)
         }
     }, [])
-
-    const handleBackupGoogleDrive = useCallback(async () => {
-        setIsGoogleDriveLoading(true)
-        try {
-            const deviceId = getOrCreateDeviceId()
-            const snapshot = await prepareCloudSnapshot({
-                patients,
-                mortalities,
-                discharges,
-                dischargesResetDate,
-                docs,
-                discardedDrafts,
-                deviceId,
-            })
-            const result = await uploadGoogleDriveBackup(snapshot)
-            const meta = await getGoogleDriveBackupMetadata().catch(() => null)
-            if (meta) setGoogleBackupMeta(meta)
-            setGoogleDriveStatusMsg({
-                type: 'success',
-                text: `Backed up ${snapshot.recordCount} records to Google Drive!`,
-            })
-            setTimeout(() => setGoogleDriveStatusMsg(null), 4000)
-            return result
-        } catch (err) {
-            console.error('Google Drive backup error:', err)
-            setGoogleDriveStatusMsg({ type: 'error', text: err.message || 'Backup failed. Please try again.' })
-            setTimeout(() => setGoogleDriveStatusMsg(null), 5000)
-            throw err
-        } finally {
-            setIsGoogleDriveLoading(false)
-        }
-    }, [patients, mortalities, discharges, dischargesResetDate, docs, discardedDrafts])
 
     const handleRestoreGoogleDrive = useCallback(async () => {
         setIsGoogleDriveLoading(true)
@@ -1121,6 +1213,15 @@ useEffect(() => {
             const valid = validateCloudBackup(raw)
             restoreFromBackup(valid)
             setGoogleBackupMeta(meta)
+
+            // Avoid redundant auto-backup of data that was just restored
+            if (meta.file?.appProperties?.snapshotHash) {
+                try {
+                    localStorage.setItem(LAST_BACKUP_HASH_KEY, meta.file.appProperties.snapshotHash)
+                    localStorage.removeItem(BACKUP_PENDING_KEY)
+                } catch {}
+            }
+
             const count = (valid.patients?.length || 0) + (valid.docs?.length || 0) + (valid.mortalities?.length || 0)
             setGoogleDriveStatusMsg({
                 type: 'success',
@@ -1137,6 +1238,73 @@ useEffect(() => {
             setIsGoogleDriveLoading(false)
         }
     }, [restoreFromBackup])
+
+    // Trigger automatic backup after meaningful clinical data changes
+    useEffect(() => {
+        if (!isLoaded) return
+
+        if (!isInitialDataLoadedRef.current) {
+            isInitialDataLoadedRef.current = true
+            // If there was a pending backup from previous session, attempt backup when connected
+            const wasPending = typeof localStorage !== 'undefined' && localStorage.getItem(BACKUP_PENDING_KEY) === '1'
+            if (wasPending && isGoogleDriveConnectedRef.current) {
+                if (autoBackupTimerRef.current) clearTimeout(autoBackupTimerRef.current)
+                autoBackupTimerRef.current = setTimeout(() => {
+                    performBackup({ isAuto: true })
+                }, 5000)
+            }
+            return
+        }
+
+        // Clinical data has changed locally: mark as needing backup
+        try { localStorage.setItem(BACKUP_PENDING_KEY, '1') } catch {}
+
+        if (autoBackupTimerRef.current) {
+            clearTimeout(autoBackupTimerRef.current)
+        }
+
+        // Only start the timer if Google Drive is connected
+        if (isGoogleDriveConnectedRef.current) {
+            autoBackupTimerRef.current = setTimeout(() => {
+                performBackup({ isAuto: true })
+            }, AUTO_BACKUP_DELAY_MS)
+        }
+    }, [patients, mortalities, discharges, dischargesResetDate, docs, discardedDrafts, isLoaded, performBackup])
+
+    // Resume / Online listener for pending auto-backup
+    useEffect(() => {
+        const handleResumeOrOnline = () => {
+            if (typeof document !== 'undefined' && document.hidden) return
+            if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+
+            const isPending = typeof localStorage !== 'undefined' && localStorage.getItem(BACKUP_PENDING_KEY) === '1'
+            if (!isPending || !isGoogleDriveConnectedRef.current) return
+
+            const timeSinceLastAttempt = Date.now() - lastAutoBackupAttemptRef.current
+            if (timeSinceLastAttempt < AUTO_BACKUP_RETRY_COOLDOWN_MS) {
+                const remaining = AUTO_BACKUP_RETRY_COOLDOWN_MS - timeSinceLastAttempt
+                if (autoBackupTimerRef.current) clearTimeout(autoBackupTimerRef.current)
+                autoBackupTimerRef.current = setTimeout(() => {
+                    performBackup({ isAuto: true })
+                }, remaining)
+                return
+            }
+
+            if (autoBackupTimerRef.current) clearTimeout(autoBackupTimerRef.current)
+            autoBackupTimerRef.current = setTimeout(() => {
+                performBackup({ isAuto: true })
+            }, 2000)
+        }
+
+        window.addEventListener('visibilitychange', handleResumeOrOnline)
+        window.addEventListener('online', handleResumeOrOnline)
+
+        return () => {
+            window.removeEventListener('visibilitychange', handleResumeOrOnline)
+            window.removeEventListener('online', handleResumeOrOnline)
+            if (autoBackupTimerRef.current) clearTimeout(autoBackupTimerRef.current)
+        }
+    }, [performBackup])
 
 
     const savePatient = useCallback(({ team = 'my_team', name, hospitalNumber, ward, bed, note, critical = false, admissionDate, diagnosis }) => {
