@@ -117,6 +117,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/notebook/handover" element={<App />} />
                 <Route path="/notebook/receive" element={<App />} />
                 <Route path="/privacy" element={<App />} />
+                <Route path="/terms" element={<App />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </Router>

@@ -44,6 +44,7 @@ const DocComposer = lazy(() => import('./components/DocComposer'))
 const SearchResultsPage = lazy(() => import('./components/SearchResultsPage'))
 const InteractiveSpotlightTour = lazy(() => import('./components/InteractiveSpotlightTour'))
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'))
+const TermsOfService = lazy(() => import('./components/TermsOfService'))
 
 const STORAGE_KEY = '4myteam_patients'
 const MORTALITIES_KEY = '4myteam_mortalities'
@@ -169,9 +170,10 @@ export default function App() {
     //   /notebook         -> clinical notebook page
     //   /discarded-drafts -> patients page (discarded drafts view)
     //   /privacy          -> privacy policy page
+    //   /terms            -> terms of service page
     const activePage = (showDemoModal || location.pathname === '/demo')
         ? demoSubPage
-        : (effectivePath === '/search' ? 'search' : effectivePath === '/privacy' ? 'privacy' : effectivePath.startsWith('/notebook') ? 'notebook' : 'patients')
+        : (effectivePath === '/search' ? 'search' : effectivePath === '/privacy' ? 'privacy' : effectivePath === '/terms' ? 'terms' : effectivePath.startsWith('/notebook') ? 'notebook' : 'patients')
     const activeTab = (showDemoModal || location.pathname === '/demo')
         ? 'my_team'
         : (params.tab && ['my_team', 'other_team', 'mortalities'].includes(params.tab)
@@ -289,6 +291,11 @@ useEffect(() => {
         }
     } else if (path === '/privacy') {
         // Privacy policy page - no additional state needed, handled by activePage
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'instant' })
+        }
+    } else if (path === '/terms') {
+        // Terms of service page - no additional state needed, handled by activePage
         if (typeof window !== 'undefined') {
             window.scrollTo({ top: 0, behavior: 'instant' })
         }
@@ -2070,7 +2077,7 @@ useEffect(() => {
     return (
         <SearchProvider>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col transition-colors duration-300">
-                {activePage !== 'privacy' && (
+                {activePage !== 'privacy' && activePage !== 'terms' && (
                     <Header
                         patientCount={patients.length}
                         docCount={docs.length}
@@ -2089,7 +2096,7 @@ useEffect(() => {
                     />
                 )}
 
-                {showDemoBanner && activePage !== 'privacy' && (
+                {showDemoBanner && activePage !== 'privacy' && activePage !== 'terms' && (
                     <DemoBanner
                         onStartDemo={handleStartDemo}
                         onSkip={handleSkipDemoBanner}
@@ -2156,6 +2163,13 @@ useEffect(() => {
             {activePage === 'privacy' && (
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
                     <PrivacyPolicy />
+                </Suspense>
+            )}
+
+            {/* Terms of Service Page */}
+            {activePage === 'terms' && (
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+                    <TermsOfService />
                 </Suspense>
             )}
 

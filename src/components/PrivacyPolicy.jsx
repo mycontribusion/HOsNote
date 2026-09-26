@@ -320,6 +320,9 @@ export default function PrivacyPolicy() {
                     <p className="text-gray-700 dark:text-gray-300 font-medium">
                         By using HOsNote, you acknowledge that you have read this Privacy Policy.
                     </p>
+                    <p className="text-gray-700 dark:text-gray-300 mt-4">
+                        For the full terms governing your use of HOsNote, see our <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">Terms of Service</a>.
+                    </p>
                 </article>
 
                 {/* Back to HOsNote button at bottom */}
