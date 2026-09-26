@@ -29,7 +29,7 @@ export interface HosnoteConfigPlugin {
      * Android {@code ACTION_VIEW} intent.
      *
      * This is intentionally different from Capacitor's {@code Browser}
-     * plugin, which launches Custom Tabs (an in-app browser component).
+     * plugin, which launches Custom Tabs (in-app browser component).
      * With Custom Tabs, Google's redirect back to
      * {@code com.hosnote.app:/oauth2redirect} is never delivered to
      * HOsNote, so the OAuth callback is lost and the Connect button spins
@@ -41,6 +41,60 @@ export interface HosnoteConfigPlugin {
      * @param url the absolute URL to open.
      */
     openExternalUrl(options: { url: string }): Promise<void>
+
+    /**
+     * Requests Google OAuth authorization for the given scope(s) using the
+     * current officially supported Android authorization API
+     * ({@code com.google.android.gms.auth.api.identity.AuthorizationClient}).
+     *
+     * <p>This is the native Android authorization path. Play services
+     * resolves the account, shows the consent screen, and returns the
+     * access token directly — no authorization-code exchange, no token
+     * endpoint call, and no client secret are involved. The Android OAuth
+     * client baked into the APK via
+     * {@code BuildConfig.GOOGLE_CLIENT_ID} is the only credential.</p>
+     *
+     * <p>The {@code scope} parameter defaults to
+     * {@code https://www.googleapis.com/auth/drive.file} (the
+     * {@code Scopes.DRIVE_FILE} equivalent). Additional scopes may be
+     * passed as a comma-separated string.</p>
+     *
+     * <p>The returned payload contains:</p>
+     * <ul>
+     *   <li>{@code accessToken} — the access token to use for Drive API
+     *       calls;</li>
+     *   <li>{@code grantedScopes} — the list of scopes actually granted;</li>
+     *   <li>{@code refreshToken} — present when {@code offline} is true
+     *       and a refresh token was issued;</li>
+     *   <li>{@code expiresInSeconds} — token lifetime, when available.</li>
+     * </ul>
+     *
+     * @param options.scope    optional scope string (default drive.file).
+     * @param options.prompt   optional {@code AuthorizationRequest.Prompt}
+     *                         value (e.g. {@code CONSENT}).
+     * @param options.offline  request a refresh token (default true).
+     */
+    authorizeGoogleDrive(options?: {
+        scope?: string
+        prompt?: string
+        offline?: boolean
+    }): Promise<{
+        accessToken: string
+        grantedScopes: string[]
+        refreshToken?: string
+        expiresInSeconds?: string
+        hasResolution?: boolean
+    }>
+
+    /**
+     * Revokes the application's access to the Google account and clears the
+     * local token cache, using
+     * {@code AuthorizationClient.revokeAccess(RevokeAccessRequest)}.
+     *
+     * Best-effort: failures are swallowed so the local token cache can still
+     * be cleared by the caller.
+     */
+    revokeGoogleDrive(): Promise<void>
 }
 
 const HosnoteConfig = registerPlugin<HosnoteConfigPlugin>('HosnoteConfig')

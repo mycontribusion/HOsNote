@@ -62,6 +62,28 @@ function randomBase64Url(bytes = 32) {
     return base64Url(values)
 }
 
+const WEB_CLIENT_KEY = 'hosnote_web_drive_key'
+
+function getOrCreateWebDriveKey() {
+    if (typeof localStorage === 'undefined') return randomBase64Url(32)
+    let key = localStorage.getItem(WEB_CLIENT_KEY)
+    if (!key) {
+        key = randomBase64Url(32)
+        try {
+            localStorage.setItem(WEB_CLIENT_KEY, key)
+        } catch {}
+    }
+    return key
+}
+
+function clearWebDriveKey() {
+    if (typeof localStorage !== 'undefined') {
+        try {
+            localStorage.removeItem(WEB_CLIENT_KEY)
+        } catch {}
+    }
+}
+
 async function sha256Base64Url(value) {
     if (!globalThis.crypto?.subtle) {
         throw new Error('This device does not support the secure crypto APIs required for Google sign-in.')
@@ -374,19 +396,83 @@ export async function startGoogleDriveAuth() {
         return tokens.state || 'native'
     }
 
-    // Web/PWA path: Google Identity Services (GIS) Token Model
-    const tokenResponse = await requestGisToken({ prompt: 'consent' })
-    if (!tokenResponse?.access_token) {
-        throw new Error('Google Drive authorization did not return an access token.')
+    // Web/PWA path: Server-side OAuth 2.0 with durable refresh authorization
+    const clientKey = getOrCreateWebDriveKey()
+
+    const startRes = await fetch('/api/auth/google/start', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-hosnote-client-key': clientKey,
+        },
+    })
+    const startData = await startRes.json().catch(() => ({}))
+    if (!startRes.ok || !startData.authUrl) {
+        throw new Error(startData.error || 'Failed to start Google Drive authorization.')
     }
+
+    const width = 500
+    const height = 650
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+    const popup = window.open(
+        startData.authUrl,
+        'hosnote_google_auth',
+        `width=${width},height=${height},left=${left},top=${top},status=no,menubar=no,toolbar=no`
+    )
+
+    if (!popup) {
+        throw new Error('Popup window was blocked by your browser. Please allow popups for HOsNote to connect Google Drive.')
+    }
+
+    await new Promise((resolve, reject) => {
+        let isResolved = false
+
+        const messageHandler = (event) => {
+            if (event.origin !== window.location.origin) return
+            if (event.data?.type === 'HOSNOTE_GOOGLE_AUTH_SUCCESS') {
+                isResolved = true
+                window.removeEventListener('message', messageHandler)
+                clearInterval(checkClosedInterval)
+                resolve()
+            } else if (event.data?.type === 'HOSNOTE_GOOGLE_AUTH_ERROR') {
+                isResolved = true
+                window.removeEventListener('message', messageHandler)
+                clearInterval(checkClosedInterval)
+                reject(new Error(event.data.error || 'Google Drive authorization failed.'))
+            }
+        }
+
+        window.addEventListener('message', messageHandler)
+
+        const checkClosedInterval = setInterval(() => {
+            if (popup.closed) {
+                clearInterval(checkClosedInterval)
+                window.removeEventListener('message', messageHandler)
+                if (!isResolved) {
+                    reject(new Error('Google Drive connection was cancelled.'))
+                }
+            }
+        }, 500)
+    })
+
+    const tokenRes = await fetch('/api/drive/token', {
+        headers: { 'x-hosnote-client-key': clientKey },
+    })
+    const tokenData = await tokenRes.json().catch(() => ({}))
+    if (!tokenRes.ok || !tokenData.access_token) {
+        throw new Error(tokenData.error || 'Failed to retrieve access token from server.')
+    }
+
     const tokens = {
-        access_token: tokenResponse.access_token,
-        refresh_token: null,
-        scope: tokenResponse.scope || DRIVE_SCOPE,
-        token_type: tokenResponse.token_type || 'Bearer',
-        expires_in: Number(tokenResponse.expires_in) || 3600,
-        expires_at: Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000,
-        state: 'gis',
+        access_token: tokenData.access_token,
+        refresh_token: 'server_managed',
+        scope: DRIVE_SCOPE,
+        token_type: 'Bearer',
+        expires_in: Number(tokenData.expires_in) || 3600,
+        expires_at: tokenData.expires_at || (Date.now() + 3600 * 1000),
+        state: 'backend',
+        email: tokenData.email || null,
     }
     await saveTokens(tokens)
     return tokens
@@ -509,20 +595,36 @@ async function refreshTokens(tokens) {
         }
     }
 
-    // Web path: GIS silent authorization without prompt
+    // Web path: Silent background refresh via Vercel serverless backend
     try {
-        const tokenResponse = await requestGisToken({ prompt: '' })
-        if (tokenResponse?.access_token) {
-            const refreshed = {
-                ...tokens,
-                access_token: tokenResponse.access_token,
-                expires_in: Number(tokenResponse.expires_in) || 3600,
-                expires_at: Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000,
+        const clientKey = typeof localStorage !== 'undefined' ? localStorage.getItem(WEB_CLIENT_KEY) : null
+        if (!clientKey) return null
+
+        const res = await fetch('/api/drive/token', {
+            headers: { 'x-hosnote-client-key': clientKey },
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.access_token) {
+            if (data.connected === false) {
+                await clearTokens()
+                clearWebDriveKey()
             }
-            await saveTokens(refreshed)
-            return refreshed
+            return null
         }
-        return null
+
+        const refreshed = {
+            ...(tokens || {}),
+            access_token: data.access_token,
+            refresh_token: 'server_managed',
+            scope: DRIVE_SCOPE,
+            token_type: 'Bearer',
+            expires_in: Number(data.expires_in) || 3600,
+            expires_at: data.expires_at || (Date.now() + 3600 * 1000),
+            state: 'backend',
+            email: data.email || tokens?.email || null,
+        }
+        await saveTokens(refreshed)
+        return refreshed
     } catch {
         return null
     }
@@ -530,7 +632,13 @@ async function refreshTokens(tokens) {
 
 export async function getGoogleDriveAccessToken() {
     let tokens = await getTokens()
-    if (!tokens) return null
+    if (!tokens) {
+        if (!Capacitor.isNativePlatform() && typeof localStorage !== 'undefined' && localStorage.getItem(WEB_CLIENT_KEY)) {
+            tokens = await refreshTokens(null)
+            if (tokens?.access_token) return tokens.access_token
+        }
+        return null
+    }
     if (tokens.expires_at && tokens.expires_at > Date.now() + 60 * 1000) return tokens.access_token
 
     try {
@@ -704,7 +812,12 @@ export async function deleteGoogleDriveBackup(file) {
 }
 
 export async function getGoogleDriveConnectionState() {
-    return Boolean(await getTokens())
+    if (Capacitor.isNativePlatform()) {
+        return Boolean(await getTokens())
+    }
+    const hasKey = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem(WEB_CLIENT_KEY))
+    const tokens = await getTokens()
+    return Boolean(tokens || hasKey)
 }
 
 export async function disconnectGoogleDrive() {
@@ -718,15 +831,19 @@ export async function disconnectGoogleDrive() {
             // Ignore; local cache is cleared below regardless.
         }
     } else {
-        // Web path: best-effort revocation via Google Identity Services
+        // Web path: revoke refresh token and remove session on Vercel backend
         try {
-            const tokens = await getTokens()
-            if (tokens?.access_token && window.google?.accounts?.oauth2?.revoke) {
-                window.google.accounts.oauth2.revoke(tokens.access_token, () => {})
+            const clientKey = typeof localStorage !== 'undefined' ? localStorage.getItem(WEB_CLIENT_KEY) : null
+            if (clientKey) {
+                await fetch('/api/drive/disconnect', {
+                    method: 'POST',
+                    headers: { 'x-hosnote-client-key': clientKey },
+                }).catch(() => null)
             }
         } catch {
             // Ignore
         }
+        clearWebDriveKey()
     }
     await clearTokens()
     await clearPendingAuth()
