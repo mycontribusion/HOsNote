@@ -5,7 +5,9 @@ function renderHtml(res, { success, message, error }) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     const title = success ? 'Google Drive Connected' : 'Google Drive Connection Failed'
     const color = success ? '#166534' : '#991b1b'
-    const msgType = success ? 'HOSNOTE_GOOGLE_AUTH_SUCCESS' : 'HOSNOTE_GOOGLE_AUTH_ERROR'
+    const defaultMsg = success
+        ? 'Authorization complete! You can close this window and return to HOsNote.'
+        : 'Authorization failed. You can close this window and try connecting again.'
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -18,31 +20,29 @@ function renderHtml(res, { success, message, error }) {
         .card { max-width: 440px; width: 90%; background: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; }
         h2 { margin: 0 0 12px; color: ${color}; font-size: 20px; }
         p { margin: 0 0 20px; color: #475569; font-size: 14px; line-height: 1.5; }
-        .spinner { border: 3px solid #e2e8f0; border-top: 3px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .btn { display: inline-block; background: ${success ? '#166534' : '#475569'}; color: #ffffff; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; text-decoration: none; }
+        .btn:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>${title}</h2>
-        <p>${message || error || 'Processing authorization...'}</p>
-        ${success ? '<div class="spinner"></div>' : ''}
+        <p>${message || error || defaultMsg}</p>
+        <button class="btn" onclick="window.close()">Close Window</button>
     </div>
     <script>
         try {
             if (window.opener) {
                 window.opener.postMessage({
-                    type: '${msgType}',
+                    type: '${success ? 'HOSNOTE_GOOGLE_AUTH_SUCCESS' : 'HOSNOTE_GOOGLE_AUTH_ERROR'}',
                     success: ${Boolean(success)},
                     error: ${JSON.stringify(error || null)}
-                }, window.location.origin);
-                setTimeout(function() { window.close(); }, ${success ? 1000 : 4000});
-            } else {
-                setTimeout(function() { window.location.href = '/settings'; }, 2000);
+                }, '*');
             }
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) {}
+        try {
+            setTimeout(function() { window.close(); }, ${success ? 1500 : 5000});
+        } catch (e) {}
     </script>
 </body>
 </html>`
@@ -183,7 +183,7 @@ export default async function handler(req, res) {
 
         return renderHtml(res, {
             success: true,
-            message: 'Connected to Google Drive! Returning to HOsNote...',
+            message: 'Authorization complete! You can close this window and return to HOsNote.',
         })
     } catch (saveErr) {
         console.error('Failed to save WebDriveSession:', saveErr)

@@ -425,43 +425,54 @@ export async function startGoogleDriveAuth() {
         throw new Error('Popup window was blocked by your browser. Please allow popups for HOsNote to connect Google Drive.')
     }
 
-    await new Promise((resolve, reject) => {
-        let isResolved = false
+    // Poll the backend until the OAuth callback stores the session or timeout expires
+    const pollIntervalMs = 1000
+    const timeoutMs = 120000 // 2 minutes
+    const startTime = Date.now()
 
-        const messageHandler = (event) => {
-            if (event.origin !== window.location.origin) return
-            if (event.data?.type === 'HOSNOTE_GOOGLE_AUTH_SUCCESS') {
-                isResolved = true
-                window.removeEventListener('message', messageHandler)
-                clearInterval(checkClosedInterval)
-                resolve()
-            } else if (event.data?.type === 'HOSNOTE_GOOGLE_AUTH_ERROR') {
-                isResolved = true
-                window.removeEventListener('message', messageHandler)
-                clearInterval(checkClosedInterval)
-                reject(new Error(event.data.error || 'Google Drive authorization failed.'))
-            }
+    let tokenData = null
+
+    while (Date.now() - startTime < timeoutMs) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+
+        let res
+        try {
+            res = await fetch('/api/drive/token', {
+                headers: { 'x-hosnote-client-key': clientKey },
+            })
+        } catch {
+            // Transient network glitch during polling; keep waiting
+            continue
         }
 
-        window.addEventListener('message', messageHandler)
-
-        const checkClosedInterval = setInterval(() => {
-            if (popup.closed) {
-                clearInterval(checkClosedInterval)
-                window.removeEventListener('message', messageHandler)
-                if (!isResolved) {
-                    reject(new Error('Google Drive connection was cancelled.'))
-                }
+        if (res.status === 200) {
+            const data = await res.json().catch(() => ({}))
+            if (data.ok && data.access_token) {
+                tokenData = data
+                break
             }
-        }, 500)
-    })
+        } else if (res.status === 401) {
+            // OAuth session not available yet; keep waiting
+            continue
+        } else {
+            // Other unexpected HTTP errors; fail the OAuth attempt
+            const errData = await res.json().catch(() => ({}))
+            try {
+                if (popup) popup.close()
+            } catch {}
+            clearWebDriveKey()
+            throw new Error(errData.error || `Server error during authorization check (${res.status})`)
+        }
+    }
 
-    const tokenRes = await fetch('/api/drive/token', {
-        headers: { 'x-hosnote-client-key': clientKey },
-    })
-    const tokenData = await tokenRes.json().catch(() => ({}))
-    if (!tokenRes.ok || !tokenData.access_token) {
-        throw new Error(tokenData.error || 'Failed to retrieve access token from server.')
+    // Best-effort attempt to close popup if still open
+    try {
+        if (popup) popup.close()
+    } catch {}
+
+    if (!tokenData || !tokenData.access_token) {
+        clearWebDriveKey()
+        throw new Error('Google Drive authorization timed out or was cancelled.')
     }
 
     const tokens = {
