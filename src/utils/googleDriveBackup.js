@@ -76,66 +76,12 @@ function getOrCreateWebDriveKey() {
     return key
 }
 
-/**
- * Removes the local client key.
- *
- * The client key is a STABLE per-browser identity: the backend hashes it into
- * WebDriveSession.clientKeyHash, which is how the durable server-side session
- * is located. It must therefore only ever be removed on an explicit user
- * disconnect (after the server-side session has been deleted). It must never
- * be removed as a reaction to a transient network/server error, or the
- * in-flight/registered session would be orphaned and become unreachable.
- */
 function clearWebDriveKey() {
     if (typeof localStorage !== 'undefined') {
         try {
             localStorage.removeItem(WEB_CLIENT_KEY)
         } catch {}
     }
-}
-
-/**
- * Asks the backend for the session bound to the given client key.
- *
- * Never throws and never mutates the client key. The result is classified so
- * callers can distinguish:
- *   - `authorized`  : backend returned a usable access token.
- *   - `pending`     : 401 - no session registered yet (normal while polling).
- *   - `transient`   : network failure or 5xx - retry later, keep the key.
- *   - `unavailable` : any other unexpected status.
- *
- * @returns {Promise<{state: 'authorized'|'pending'|'transient'|'unavailable',
- *                    data: object, status: number}>}
- */
-async function fetchBackendSession(clientKey) {
-    if (!clientKey) {
-        return { state: 'pending', data: {}, status: 0 }
-    }
-
-    let res
-    try {
-        res = await fetch('/api/drive/token', {
-            headers: { 'x-hosnote-client-key': clientKey },
-        })
-    } catch {
-        // Network-level failure (offline, DNS, aborted). Never fatal.
-        return { state: 'transient', data: {}, status: 0 }
-    }
-
-    const data = await res.json().catch(() => ({}))
-
-    if (res.status === 200 && data?.ok && data?.access_token) {
-        return { state: 'authorized', data, status: res.status }
-    }
-    if (res.status === 401) {
-        // Session not registered (yet), or definitively disconnected.
-        return { state: 'pending', data, status: res.status }
-    }
-    if (res.status >= 500) {
-        // Server-side or upstream Google hiccup. Transient by definition.
-        return { state: 'transient', data, status: res.status }
-    }
-    return { state: 'unavailable', data, status: res.status }
 }
 
 async function sha256Base64Url(value) {
@@ -479,45 +425,44 @@ export async function startGoogleDriveAuth() {
         throw new Error('Popup window was blocked by your browser. Please allow popups for HOsNote to connect Google Drive.')
     }
 
-    // Poll the backend until the OAuth callback stores the session or timeout expires.
-    //
-    // The client key is a stable per-browser identity that the backend hashes
-    // into WebDriveSession.clientKeyHash. It MUST be preserved for the entire
-    // duration of this poll, and on timeout: the callback may complete moments
-    // later, and deleting the key here would orphan that session permanently.
+    // Poll the backend until the OAuth callback stores the session or timeout expires
     const pollIntervalMs = 1000
     const timeoutMs = 120000 // 2 minutes
     const startTime = Date.now()
 
     let tokenData = null
-    let lastTransientError = null
 
     while (Date.now() - startTime < timeoutMs) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
 
-        const probe = await fetchBackendSession(clientKey)
-
-        if (probe.state === 'authorized') {
-            tokenData = probe.data
-            break
-        }
-
-        if (probe.state === 'pending') {
-            // Session not registered yet - the callback has not stored it.
-            // Expected during a normal flow; keep waiting.
+        let res
+        try {
+            res = await fetch('/api/drive/token', {
+                headers: { 'x-hosnote-client-key': clientKey },
+            })
+        } catch {
+            // Transient network glitch during polling; keep waiting
             continue
         }
 
-        if (probe.state === 'transient') {
-            // 5xx or network failure. The session may well be about to be
-            // written, so keep polling and preserve the client key.
-            lastTransientError = probe
+        if (res.status === 200) {
+            const data = await res.json().catch(() => ({}))
+            if (data.ok && data.access_token) {
+                tokenData = data
+                break
+            }
+        } else if (res.status === 401) {
+            // OAuth session not available yet; keep waiting
             continue
+        } else {
+            // Other unexpected HTTP errors; fail the OAuth attempt
+            const errData = await res.json().catch(() => ({}))
+            try {
+                if (popup) popup.close()
+            } catch {}
+            clearWebDriveKey()
+            throw new Error(errData.error || `Server error during authorization check (${res.status})`)
         }
-
-        // 'unavailable': an unexpected 4xx. Retry until the timeout rather than
-        // destroying a stable identity; the timeout handler reports the error.
-        lastTransientError = probe
     }
 
     // Best-effort attempt to close popup if still open
@@ -526,16 +471,7 @@ export async function startGoogleDriveAuth() {
     } catch {}
 
     if (!tokenData || !tokenData.access_token) {
-        // NOTE: the client key is intentionally NOT cleared here. A timeout
-        // does not prove the authorization was abandoned, and the callback may
-        // still complete server-side. Keeping the key lets the next attempt
-        // find (or re-bind) the same clientKeyHash instead of orphaning it.
-        if (lastTransientError) {
-            throw new Error(
-                lastTransientError.data?.error ||
-                    `Could not confirm Google Drive authorization (server status ${lastTransientError.status}). The existing connection was kept; please try again.`
-            )
-        }
+        clearWebDriveKey()
         throw new Error('Google Drive authorization timed out or was cancelled.')
     }
 
@@ -670,24 +606,23 @@ async function refreshTokens(tokens) {
         }
     }
 
-    // Web path: Silent background refresh via Vercel serverless backend.
-    //
-    // The client key is preserved in every failure mode here. A failed token
-    // request is not evidence that the user disconnected, and the backend
-    // session is keyed by that key, so deleting it would strand the session.
-    const clientKey = typeof localStorage !== 'undefined' ? localStorage.getItem(WEB_CLIENT_KEY) : null
-    if (!clientKey) return null
+    // Web path: Silent background refresh via Vercel serverless backend
+    try {
+        const clientKey = typeof localStorage !== 'undefined' ? localStorage.getItem(WEB_CLIENT_KEY) : null
+        if (!clientKey) return null
 
-    const probe = await fetchBackendSession(clientKey)
+        const res = await fetch('/api/drive/token', {
+            headers: { 'x-hosnote-client-key': clientKey },
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.access_token) {
+            if (data.connected === false) {
+                await clearTokens()
+                clearWebDriveKey()
+            }
+            return null
+        }
 
-    if (probe.state === 'transient') {
-        // Network failure or 5xx. Keep the client key AND the cached tokens so
-        // the next call can succeed once the server recovers.
-        return null
-    }
-
-    if (probe.state === 'authorized') {
-        const data = probe.data
         const refreshed = {
             ...(tokens || {}),
             access_token: data.access_token,
@@ -697,25 +632,13 @@ async function refreshTokens(tokens) {
             expires_in: Number(data.expires_in) || 3600,
             expires_at: data.expires_at || (Date.now() + 3600 * 1000),
             state: 'backend',
-            // Preserve the last known email if the backend omits it.
             email: data.email || tokens?.email || null,
         }
         await saveTokens(refreshed)
         return refreshed
+    } catch {
+        return null
     }
-
-    // 401 (no session) or an unexpected status.
-    //
-    // The server only returns `connected: false` after it has made a decision:
-    // either no WebDriveSession exists for this key, or Google's refresh token
-    // was definitively rejected and the server already deleted the row
-    // (see api/drive/token.js). In that case the server-side session is
-    // genuinely gone, so the client key is meaningless - but we still do not
-    // delete it here, because a bare 401 with no session can also be observed
-    // mid-connection. The key is retired only by an explicit disconnect, which
-    // performs the server-side cleanup first.
-    await clearTokens()
-    return null
 }
 
 export async function getGoogleDriveAccessToken() {
@@ -903,27 +826,9 @@ export async function getGoogleDriveConnectionState() {
     if (Capacitor.isNativePlatform()) {
         return Boolean(await getTokens())
     }
-
-    // Web path: the backend session is the source of truth. Mere presence of
-    // the local client key proves nothing - a key can outlive its session (e.g.
-    // after a failed authorization) and must not make the UI offer Backup.
-    const clientKey = typeof localStorage !== 'undefined' ? localStorage.getItem(WEB_CLIENT_KEY) : null
-    if (!clientKey) return false
-
-    const probe = await fetchBackendSession(clientKey)
-
-    if (probe.state === 'authorized') {
-        return true
-    }
-
-    // A transient failure must not flip the UI to "disconnected" and hide
-    // Backup/Restore, so fall back to whatever we already know.
-    if (probe.state === 'transient') {
-        return Boolean(await getTokens())
-    }
-
-    // 401 / unexpected status: the backend has no usable session.
-    return false
+    const hasKey = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem(WEB_CLIENT_KEY))
+    const tokens = await getTokens()
+    return Boolean(tokens || hasKey)
 }
 
 export async function disconnectGoogleDrive() {
@@ -937,39 +842,19 @@ export async function disconnectGoogleDrive() {
             // Ignore; local cache is cleared below regardless.
         }
     } else {
-        // Web path: the server-side WebDriveSession is keyed by the client key,
-        // so the key is retired ONLY after the backend confirms the deletion.
-        // Dropping the key first (or on failure) would orphan the row in
-        // Postgres, leaving a live Google refresh grant that nobody can revoke.
-        const clientKey = typeof localStorage !== 'undefined' ? localStorage.getItem(WEB_CLIENT_KEY) : null
-        if (clientKey) {
-            let disconnected = false
-            try {
-                const res = await fetch('/api/drive/disconnect', {
+        // Web path: revoke refresh token and remove session on Vercel backend
+        try {
+            const clientKey = typeof localStorage !== 'undefined' ? localStorage.getItem(WEB_CLIENT_KEY) : null
+            if (clientKey) {
+                await fetch('/api/drive/disconnect', {
                     method: 'POST',
                     headers: { 'x-hosnote-client-key': clientKey },
-                })
-                const data = await res.json().catch(() => ({}))
-                // 2xx means the row was deleted (or already absent). A 4xx means
-                // there is provably nothing to delete, which is also fine.
-                disconnected = res.ok || (res.status >= 400 && res.status < 500)
-                if (!disconnected && data?.error) {
-                    console.error('Server-side disconnect failed:', data.error)
-                }
-            } catch (err) {
-                console.error('Network error during disconnect:', err)
+                }).catch(() => null)
             }
-
-            if (disconnected) {
-                clearWebDriveKey()
-            } else {
-                // Server cleanup could not be confirmed. Keep the key so the
-                // user can retry, and surface it rather than silently orphaning.
-                throw new Error(
-                    'Could not reach the server to remove your Google Drive session. Please check your connection and try again.'
-                )
-            }
+        } catch {
+            // Ignore
         }
+        clearWebDriveKey()
     }
     await clearTokens()
     await clearPendingAuth()
